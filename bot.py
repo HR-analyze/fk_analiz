@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from aiogram import Bot, Dispatcher
-from aiogram.filters import Command
+from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -21,7 +21,7 @@ PRODUCT_GROUPS={'Холодная формовка':['Булочка бриош�
 REASONS=['Поломка оборудования','Нет сырья','Нет персонала','Техническая проблема','Качество продукции']
 
 class Form(StatesGroup):
-    event=State(); equipment=State(); group=State(); product=State(); start=State(); end=State(); quantity=State(); reason=State(); other=State(); confirm=State()
+    equipment=State(); group=State(); product=State(); start=State(); end=State(); quantity=State(); reason=State(); other=State(); confirm=State()
 
 def kb(rows,cols=1):
     b=InlineKeyboardBuilder()
@@ -34,25 +34,44 @@ def valid(v):
     except:return False
 
 def result(d):
-    if d['event']=='start':return f"🟢 **Начало производства**\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 Старт: {d['start']}"
-    if d['event']=='finish':return f"🏁 **Завершение производства**\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 Завершение: {d['start']}\n🔢 Количество: {d['quantity']} шт"
-    return f"🔴 **Критическая остановка**\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 С {d['start']} до {d['end']}\n❗ Причина: {d['reason']}"
+    event=d.get('event')
+    if event=='start':return f"🟢 **Начало производства**\n👤 {d.get('user_name','Сотрудник')}\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 Старт: {d['start']}"
+    if event=='finish':return f"🏁 **Завершение производства**\n👤 {d.get('user_name','Сотрудник')}\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 Завершение: {d['start']}\n🔢 Количество: {d['quantity']} шт"
+    return f"🔴 **Критическая остановка**\n👤 {d.get('user_name','Сотрудник')}\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 С {d['start']} до {d['end']}\n❗ Причина: {d['reason']}"
 
-async def menu(m: Message):
-    await m.answer('📊 **Производство**\n\nЧто записываем?',reply_markup=kb([('🟢 Начало производства','e:start'),('🏁 Завершение производства','e:finish'),('🔴 Остановка — критическая','e:pause')]),parse_mode='Markdown')
-
-async def setup(m: Message, bot: Bot):
-    if m.chat.type not in ('group','supergroup'):return
-    me=await bot.get_me()
-    await m.answer('📊 **Внесение данных о производстве**\n\nЗаполнение откроется в личном диалоге с ботом. В общий чат попадёт только итог.',reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='📊 Внести данные о производстве',url=f'https://t.me/{me.username}?start=production')]]),parse_mode='Markdown')
+async def start_handler(m: Message, command: CommandObject, state: FSMContext):
+    if m.chat.type in ('group','supergroup'):
+        await m.answer('📊 **ФК — производство**\n\nВыберите действие. После выбора заполнение продолжится в личном чате с ботом.',reply_markup=kb([('🟢 Начало производства','e:start'),('🏁 Завершение производства','e:finish'),('🔴 Остановка — критическая','e:pause')]),parse_mode='Markdown')
+        return
+    if m.chat.type!='private':return
+    payload=(command.args or '').strip()
+    if not payload.startswith('production_'):
+        await m.answer('📊 **ФК — производство**\n\nЗапустите нужную операцию из закреплённого сообщения в рабочем чате.',parse_mode='Markdown')
+        return
+    event=payload[len('production_'):]
+    if event not in ('start','finish','pause'):
+        await m.answer('Неизвестный тип операции. Запустите форму из рабочего чата.')
+        return
+    await state.clear()
+    await state.update_data(event=event,user_name=m.from_user.full_name)
+    await state.set_state(Form.equipment)
+    await m.answer('🏭 **Выберите оборудование:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)]+[('✏️ Другое','q:other')],2),parse_mode='Markdown')
 
 async def callbacks(c: CallbackQuery, state: FSMContext):
-    x=c.data or '';d=await state.get_data()
+    x=c.data or ''
     try:
         if x.startswith('e:'):
-            await state.clear();await state.update_data(event=x[2:]);await state.set_state(Form.equipment)
-            await c.message.edit_text('🏭 **Выберите оборудование:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)]+[('✏️ Другое','q:other')],2),parse_mode='Markdown')
-        elif x.startswith('q:'):
+            event=x[2:]
+            if c.message.chat.type not in ('group','supergroup'):
+                await c.answer('Запустите операцию из рабочего чата.',show_alert=True);return
+            me=await c.bot.get_me()
+            url=f'https://t.me/{me.username}?start=production_{event}'
+            labels={'start':'🟢 Начало производства','finish':'🏁 Завершение производства','pause':'🔴 Критическая остановка'}
+            await c.message.answer(f'👤 **{c.from_user.full_name}**, выбрано: {labels[event]}\n\nПродолжите заполнение в личном чате с ботом.',reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='➡️ Продолжить заполнение',url=url)]]),parse_mode='Markdown')
+            await c.answer('Заполнение перенесено в личный чат')
+            return
+        d=await state.get_data()
+        if x.startswith('q:'):
             v=x[2:]
             if v=='other':await state.update_data(wait='equipment');await state.set_state(Form.other);await c.message.edit_text('🏭 Напишите название оборудования:')
             else:await state.update_data(equipment=EQUIPMENT[int(v)]);await state.set_state(Form.group);await c.message.edit_text('📦 **Выберите вид формовки:**',reply_markup=kb([(v,f'g:{i}') for i,v in enumerate(PRODUCT_GROUPS)]),parse_mode='Markdown')
@@ -77,11 +96,10 @@ async def callbacks(c: CallbackQuery, state: FSMContext):
             if x=='c:edit':await state.set_state(Form.equipment);await c.message.edit_text('🏭 **Выберите оборудование заново:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)],2),parse_mode='Markdown');return
             d=await state.get_data()
             if not WORK_CHAT_ID:await c.answer('WORK_CHAT_ID не задан',show_alert=True);return
-            await c.bot.send_message(WORK_CHAT_ID,result(d),parse_mode='Markdown');await state.clear();await c.message.edit_text('✅ **Готово! Итог опубликован.**',parse_mode='Markdown')
+            await c.bot.send_message(WORK_CHAT_ID,result(d),parse_mode='Markdown');await state.clear();await c.message.edit_text('✅ **Готово! Итог опубликован в рабочий чат.**',parse_mode='Markdown')
     except Exception:
         logging.exception('Callback failed: %s',x)
-        await c.answer('Ошибка. Смотрите логи бота.',show_alert=True)
-        return
+        await c.answer('Ошибка. Попробуйте ещё раз.',show_alert=True);return
     await c.answer()
 
 async def after_start(m: Message,state: FSMContext):
@@ -120,13 +138,15 @@ async def chatid(m: Message):
 async def main():
     if not BOT_TOKEN:raise RuntimeError('BOT_TOKEN is not set')
     bot=Bot(BOT_TOKEN);dp=Dispatcher(storage=MemoryStorage())
-    dp.message.register(setup,Command('setup_production'))
+    dp.message.register(start_handler,Command('start'))
+    dp.message.register(menu_command,Command('menu'))
     dp.message.register(chatid,Command('chatid'))
-    dp.message.register(menu,Command('start'))
-    dp.message.register(menu,Command('menu'))
     dp.callback_query.register(callbacks)
     dp.message.register(input_msg)
     logging.info('Production bot started; work_chat_id=%s; timezone=%s',WORK_CHAT_ID,TIMEZONE)
     await dp.start_polling(bot)
+
+async def menu_command(m: Message):
+    if m.chat.type in ('group','supergroup'): await start_handler(m,CommandObject(command='menu'),FSMContext)
 
 if __name__=='__main__':asyncio.run(main())
