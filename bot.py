@@ -1,4 +1,4 @@
-import asyncio, hashlib, hmac, json, logging, os, sqlite3, uuid
+import asyncio,hashlib,hmac,json,logging,os,sqlite3,uuid
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import parse_qsl
@@ -6,111 +6,120 @@ from zoneinfo import ZoneInfo
 import psycopg
 from psycopg.rows import dict_row
 from aiohttp import web
-from aiogram import Bot, Dispatcher
+from aiogram import Bot,Dispatcher
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
-
+from aiogram.types import InlineKeyboardButton,InlineKeyboardMarkup,Message
 logging.basicConfig(level=logging.INFO)
-TOKEN=os.getenv("BOT_TOKEN","").strip(); TZ=ZoneInfo(os.getenv("TIMEZONE","Europe/Moscow")); CHAT=os.getenv("WORK_CHAT_ID","").strip(); PORT=int(os.getenv("PORT","8080")); DATABASE_URL=os.getenv("DATABASE_URL","").strip(); DB=Path(os.getenv("DB_PATH","/app/data/fk.db"))
+TOKEN=os.getenv("BOT_TOKEN","").strip();TZ=ZoneInfo(os.getenv("TIMEZONE","Europe/Moscow"));CHAT=os.getenv("WORK_CHAT_ID","").strip();PORT=int(os.getenv("PORT","8080"));DATABASE_URL=os.getenv("DATABASE_URL","").strip();DB=Path(os.getenv("DB_PATH","/app/data/fk.db"));DB.parent.mkdir(parents=True,exist_ok=True);DASHBOARD_API_KEY=os.getenv("DASHBOARD_API_KEY","").strip()
 EQUIPMENT=["cromaster","starline","Glimek","König / König хлеб","Rondo","Trima"]
-PRODUCTS={"Холодная формовка":["Булочка бриошь зерновая","Булочка ржаная","Булочка с корицей","Булочка Сладкое сердце","Венгерская ватрушка","Круассан для сэндвича","Круассан классика мини 55 г","Круассан мини 50 г","Круассан французский 70 г","Круассан французский без дефроста","Круассан французский с сыром","Лепёшка сдобная","Лепёшка сдобная с сосиской","Начинка булочка с корицей","Начинка для пирожков с курицей и сыром","Начинка маковая для улитки","Основа для слойки с вишней","Пирожок с курицей и сыром","Рогалик вишнёвый","Слойка голландская","Слойка с вишней и заварным кремом","Слойка с марсельской сосиской","Слойка шоколад-апельсин","Творожные ушки","Трубочка","Улитка с изюмом","Улитка с маком","Хачапури","Хлеб Бородинский"],"Тёплая формовка":["Багет злаковый","Багет молочный","Багет ремесленный на опаре","Багет сырный","Батон классический","Бейгл с кунжутом","Булка Много мака","Булочка для гамбургера без кунжута","Булочка для супа тёмная","Булочка для френч-дога","Булочка для хот-дога белая","Булочка с маком","Булочка суповая светлая","Мини-чиабатта","Краюшки","Пирожок с капустой фреш","Пирожок с мясом фреш","Ромовая баба","Сочник с творогом","Хлеб бездрожжевой с семечками","Хлеб злаковый","Хлеб картофельный","Хлеб кефирный","Хлеб протеиновый","Хлеб пшеничный домашний","Хлеб с семенами чиа и пажитником","Хлеб тартин ржано-пшеничный","Хлеб тартин розовый","Хлеб тостовый молочный","Хлеб тостовый слоёный фреш","Хлеб тыквенный","Хлеб чесночный","Чиабатта пшеничная смесевая"]}; REASONS=["Поломка оборудования","Нет сырья","Нет персонала","Техническая проблема","Качество продукции"]
-
+PRODUCTS={"Холодная формовка":["Булочка бриошь зерновая","Булочка ржаная","Булочка с корицей","Булочка Сладкое сердце","Венгерская ватрушка","Круассан для сэндвича","Круассан классика мини 55 г","Круассан мини 50 г","Круассан французский 70 г","Круассан французский без дефроста","Круассан французский с сыром","Лепёшка сдобная","Лепёшка сдобная с сосиской","Начинка булочка с корицей","Начинка для пирожков с курицей и сыром","Начинка маковая для улитки","Основа для слойки с вишней","Пирожок с курицей и сыром","Рогалик вишнёвый","Слойка голландская","Слойка с вишней и заварным кремом","Слойка с марсельской сосиской","Слойка шоколад-апельсин","Творожные ушки","Трубочка","Улитка с изюмом","Улитка с маком","Хачапури","Хлеб Бородинский"],"Тёплая формовка":["Багет злаковый","Багет молочный","Багет ремесленный на опаре","Багет сырный","Батон классический","Бейгл с кунжутом","Булка Много мака","Булочка для гамбургера без кунжута","Булочка для супа тёмная","Булочка для френч-дога","Булочка для хот-дога белая","Булочка с маком","Булочка суповая светлая","Мини-чиабатта","Краюшки","Пирожок с капустой фреш","Пирожок с мясом фреш","Ромовая баба","Сочник с творогом","Хлеб бездрожжевой с семечками","Хлеб злаковый","Хлеб картофельный","Хлеб кефирный","Хлеб протеиновый","Хлеб пшеничный домашний","Хлеб с семенами чиа и пажитником","Хлеб тартин ржано-пшеничный","Хлеб тартин розовый","Хлеб тостовый молочный","Хлеб тостовый слоёный фреш","Хлеб тыквенный","Хлеб чесночный","Чиабатта пшеничная смесевая"]};REASONS=["Поломка оборудования","Нет сырья","Нет персонала","Техническая проблема","Качество продукции"]
 def db():
- if not DATABASE_URL: raise RuntimeError("DATABASE_URL is not set")
+ if not DATABASE_URL:raise RuntimeError("DATABASE_URL is not set")
  return psycopg.connect(DATABASE_URL,row_factory=dict_row)
-
 def init_db():
  with db() as c:
-  c.execute("CREATE TABLE IF NOT EXISTS production (id TEXT PRIMARY KEY,user_id BIGINT NOT NULL,user_name TEXT,equipment TEXT,forming TEXT,product TEXT,start_time TEXT,end_time TEXT,quantity INTEGER,status TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL)")
-  c.execute("CREATE TABLE IF NOT EXISTS pauses (id TEXT PRIMARY KEY,user_id BIGINT NOT NULL,user_name TEXT,equipment TEXT,reason TEXT,start_time TEXT,end_time TEXT,created_at TIMESTAMPTZ NOT NULL)")
-  c.execute("CREATE INDEX IF NOT EXISTS idx_production_user_status ON production(user_id,status)")
-  c.execute("CREATE INDEX IF NOT EXISTS idx_production_created ON production(created_at)")
-  c.execute("CREATE INDEX IF NOT EXISTS idx_pauses_created ON pauses(created_at)")
-
+  c.execute("CREATE TABLE IF NOT EXISTS production (id TEXT PRIMARY KEY,user_id BIGINT NOT NULL,user_name TEXT,equipment TEXT,forming TEXT,product TEXT,start_time TEXT,end_time TEXT,quantity INTEGER,status TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL)");c.execute("CREATE TABLE IF NOT EXISTS pauses (id TEXT PRIMARY KEY,user_id BIGINT NOT NULL,user_name TEXT,equipment TEXT,reason TEXT,start_time TEXT,end_time TEXT,created_at TIMESTAMPTZ NOT NULL)");c.execute("CREATE INDEX IF NOT EXISTS idx_production_user_status ON production(user_id,status)");c.execute("CREATE INDEX IF NOT EXISTS idx_production_created ON production(created_at)");c.execute("CREATE INDEX IF NOT EXISTS idx_pauses_created ON pauses(created_at)")
 def migrate_sqlite():
- if not DB.exists(): return
+ if not DB.exists():return
  try:
-  old=sqlite3.connect(DB); old.row_factory=sqlite3.Row
-  p=old.execute("SELECT COUNT(*) n FROM production").fetchone()["n"]
-  q=old.execute("SELECT COUNT(*) n FROM pauses").fetchone()["n"]
-  if not (p or q): old.close(); return
+  old=sqlite3.connect(DB);old.row_factory=sqlite3.Row;p=old.execute("SELECT COUNT(*) n FROM production").fetchone()["n"];q=old.execute("SELECT COUNT(*) n FROM pauses").fetchone()["n"]
+  if not(p or q):old.close();return
   with db() as c:
-   existing=c.execute("SELECT COUNT(*) n FROM production").fetchone()["n"]
-   if existing==0:
-    for r in old.execute("SELECT * FROM production"):
-     c.execute("INSERT INTO production (id,user_id,user_name,equipment,forming,product,start_time,end_time,quantity,status,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING",tuple(r))
-   existing=c.execute("SELECT COUNT(*) n FROM pauses").fetchone()["n"]
-   if existing==0:
-    for r in old.execute("SELECT * FROM pauses"):
-     c.execute("INSERT INTO pauses (id,user_id,user_name,equipment,reason,start_time,end_time,created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING",tuple(r))
-  old.close(); logging.info("Legacy SQLite data migrated to PostgreSQL: production=%s pauses=%s",p,q)
- except Exception:
-  logging.exception("SQLite migration skipped")
-
-def now(): return datetime.now(TZ).strftime("%H:%M")
-def fmt(n): return f"{int(n):,}".replace(","," ")
+   if c.execute("SELECT COUNT(*) n FROM production").fetchone()["n"]==0:
+    for r in old.execute("SELECT * FROM production"):c.execute("INSERT INTO production VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",tuple(r))
+   if c.execute("SELECT COUNT(*) n FROM pauses").fetchone()["n"]==0:
+    for r in old.execute("SELECT * FROM pauses"):c.execute("INSERT INTO pauses VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",tuple(r))
+  old.close();logging.info("Legacy SQLite data migrated: production=%s pauses=%s",p,q)
+ except Exception:logging.exception("SQLite migration skipped")
+def now():return datetime.now(TZ).strftime("%H:%M")
+def fmt(n):return f"{int(n):,}".replace(","," ")
 def verify_init_data(init_data):
  if not init_data or not TOKEN:return None
  try:
-  p=dict(parse_qsl(init_data,keep_blank_values=True)); received=p.pop("hash",""); auth_date=int(p.get("auth_date","0"))
+  p=dict(parse_qsl(init_data,keep_blank_values=True));received=p.pop("hash","");auth_date=int(p.get("auth_date","0"))
   if not received or not auth_date:return None
-  secret=hmac.new(b"WebAppData",TOKEN.encode(),hashlib.sha256).digest(); check=hmac.new(secret,"\n".join(f"{k}={p[k]}" for k in sorted(p)).encode(),hashlib.sha256).hexdigest()
+  secret=hmac.new(b"WebAppData",TOKEN.encode(),hashlib.sha256).digest();check=hmac.new(secret,"\n".join(f"{k}={p[k]}" for k in sorted(p)).encode(),hashlib.sha256).hexdigest()
   if not hmac.compare_digest(check,received):return None
-  u=json.loads(p.get("user","{}")); uid=int(u.get("id",0)); return {"id":uid,"name":u.get("first_name","")+((" "+u.get("last_name")) if u.get("last_name") else "")}
+  u=json.loads(p.get("user","{}"));uid=int(u.get("id",0));return {"id":uid,"name":u.get("first_name","")+((" "+u.get("last_name")) if u.get("last_name") else "")}
  except Exception:return None
-
 def user_from_request(request):
  user=verify_init_data(request.query.get("initData","") or request.headers.get("X-Telegram-Init-Data",""))
  if user:return user
- uid=request.headers.get("X-Telegram-User-Id","").strip(); name=request.headers.get("X-Telegram-User-Name","").strip()
+ uid=request.headers.get("X-Telegram-User-Id","").strip();name=request.headers.get("X-Telegram-User-Name","").strip()
  if uid.isdigit() and int(uid)>0:return {"id":int(uid),"name":name or "Сотрудник"}
  return None
-
-def panel_keyboard(bot_username): return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📱 Открыть ФК",url=f"https://t.me/{bot_username}/production")]])
+def dash_auth(request):
+ if not DASHBOARD_API_KEY:return False
+ supplied=request.headers.get("X-API-Key","").strip() or request.query.get("api_key","").strip()
+ return bool(supplied) and hmac.compare_digest(supplied,DASHBOARD_API_KEY)
+def dash_headers():return {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"X-API-Key,Content-Type","Access-Control-Allow-Methods":"GET,OPTIONS"}
+def dash_unauth():return web.json_response({"error":"unauthorized"},status=401,headers=dash_headers())
+def dash_where(request):
+ df=request.query.get("date_from","").strip();dt=request.query.get("date_to","").strip();clauses=[];args=[]
+ if df:clauses.append("created_at >= %s");args.append(df)
+ if dt:clauses.append("created_at < %s");args.append(dt+"T23:59:59")
+ return ((" WHERE "+" AND ".join(clauses)) if clauses else ""),args
+async def dashboard_production(request):
+ if not dash_auth(request):return dash_unauth()
+ where,args=dash_where(request)
+ with db() as c:rows=c.execute("SELECT id,user_id,user_name,equipment,forming,product,start_time,end_time,quantity,status,created_at FROM production"+where+" ORDER BY created_at DESC",args).fetchall()
+ return web.json_response({"ok":True,"count":len(rows),"items":rows},headers=dash_headers())
+async def dashboard_pauses(request):
+ if not dash_auth(request):return dash_unauth()
+ where,args=dash_where(request)
+ with db() as c:rows=c.execute("SELECT id,user_id,user_name,equipment,reason,start_time,end_time,created_at FROM pauses"+where+" ORDER BY created_at DESC",args).fetchall()
+ return web.json_response({"ok":True,"count":len(rows),"items":rows},headers=dash_headers())
+async def dashboard_all(request):
+ if not dash_auth(request):return dash_unauth()
+ where,args=dash_where(request)
+ with db() as c:
+  p=c.execute("SELECT id,user_id,user_name,equipment,forming,product,start_time,end_time,quantity,status,created_at FROM production"+where+" ORDER BY created_at DESC",args).fetchall();q=c.execute("SELECT id,user_id,user_name,equipment,reason,start_time,end_time,created_at FROM pauses"+where+" ORDER BY created_at DESC",args).fetchall()
+ return web.json_response({"ok":True,"production_count":len(p),"pause_count":len(q),"production":p,"pauses":q},headers=dash_headers())
+def panel_keyboard(bot_username):return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📱 Открыть ФК",url=f"https://t.me/{bot_username}/production")]])
 def production_text(d,finish=False):
  if finish:return f"🏁 **Завершение производства**\n👤 {d['user_name']}\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 Производство: {d['start_time']}–{d['end_time']}\n🔢 Количество: {fmt(d['quantity'])} шт"
  return f"🟢 **Начало производства**\n👤 {d['user_name']}\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 Начало: {d['start_time']}"
-def pause_text(d): return f"🔴 **Критическая остановка**\n👤 {d['user_name']}\n🏭 {d['equipment']}\n❗ Причина: {d['reason']}\n🕐 Период: {d['start_time']}–{d['end_time']}"
+def pause_text(d):return f"🔴 **Критическая остановка**\n👤 {d['user_name']}\n🏭 {d['equipment']}\n❗ Причина: {d['reason']}\n🕐 Период: {d['start_time']}–{d['end_time']}"
 async def panel(m:Message):
  if m.chat.type not in ("group","supergroup"):return
- me=await m.bot.get_me(); await m.answer("📌 **ФК — производство**\n\nВсе операции выполняются в приложении. В чат попадает только итог.",reply_markup=panel_keyboard(me.username),parse_mode="Markdown")
+ me=await m.bot.get_me();await m.answer("📌 **ФК — производство**\n\nВсе операции выполняются в приложении. В чат попадает только итог.",reply_markup=panel_keyboard(me.username),parse_mode="Markdown")
 async def start(m:Message):
  if m.chat.type in ("group","supergroup"):await panel(m)
  elif m.chat.type=="private":
-  me=await m.bot.get_me(); await m.answer("📊 Откройте ФК через кнопку рабочего чата.",reply_markup=panel_keyboard(me.username))
-async def web_data(m:Message): await m.answer("📱 Операции теперь выполняются в Mini App. Откройте ФК из рабочего чата.")
+  me=await m.bot.get_me();await m.answer("📊 Откройте ФК через кнопку рабочего чата.",reply_markup=panel_keyboard(me.username))
+async def web_data(m:Message):await m.answer("📱 Операции теперь выполняются в Mini App. Откройте ФК из рабочего чата.")
 async def open_api(request):
  user=user_from_request(request)
  if not user:return web.json_response({"error":"unauthorized"},status=401)
- with db() as c: rows=c.execute("SELECT id,equipment,forming,product,start_time FROM production WHERE user_id=%s AND status='open' ORDER BY created_at DESC",(user["id"],)).fetchall()
+ with db() as c:rows=c.execute("SELECT id,equipment,forming,product,start_time FROM production WHERE user_id=%s AND status='open' ORDER BY created_at DESC",(user["id"],)).fetchall()
  return web.json_response({"items":rows})
 async def save_api(request):
  user=user_from_request(request)
  if not user:return web.json_response({"error":"unauthorized"},status=401)
  try:
-  d=await request.json(); event=d.get("event")
+  d=await request.json();event=d.get("event")
   with db() as c:
    if event=="start":
-    pid=str(uuid.uuid4()); st=d.get("start") or now(); created=datetime.now(TZ); c.execute("INSERT INTO production VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(pid,user["id"],user["name"],d.get("equipment",""),d.get("group",""),d.get("product",""),st,None,None,"open",created)); text=production_text({**d,"user_name":user["name"],"start_time":st})
+    pid=str(uuid.uuid4());st=d.get("start") or now();created=datetime.now(TZ);c.execute("INSERT INTO production VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",(pid,user["id"],user["name"],d.get("equipment",""),d.get("group",""),d.get("product",""),st,None,None,"open",created));text=production_text({**d,"user_name":user["name"],"start_time":st})
    elif event=="finish":
-    pid=d.get("open_id"); q=int(str(d.get("quantity","0")).replace(" ","")); row=c.execute("SELECT * FROM production WHERE id=%s AND user_id=%s AND status='open'",(pid,user["id"])).fetchone()
+    pid=d.get("open_id");q=int(str(d.get("quantity","0")).replace(" ",""));row=c.execute("SELECT * FROM production WHERE id=%s AND user_id=%s AND status='open'",(pid,user["id"])).fetchone()
     if not row or q<=0:return web.json_response({"error":"open_not_found"},status=404)
-    et=d.get("end") or now(); c.execute("UPDATE production SET end_time=%s,quantity=%s,status='closed' WHERE id=%s",(et,q,pid)); out=dict(row); out.update(user_name=user["name"],end_time=et,quantity=q); text=production_text(out,True)
+    et=d.get("end") or now();c.execute("UPDATE production SET end_time=%s,quantity=%s,status='closed' WHERE id=%s",(et,q,pid));out=dict(row);out.update(user_name=user["name"],end_time=et,quantity=q);text=production_text(out,True)
    elif event=="pause":
-    pid=str(uuid.uuid4()); st=d.get("start") or now(); et=d.get("end") or now(); c.execute("INSERT INTO pauses VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",(pid,user["id"],user["name"],d.get("equipment",""),d.get("reason",""),st,et,datetime.now(TZ))); text=pause_text({"user_name":user["name"],"equipment":d.get("equipment",""),"reason":d.get("reason",""),"start_time":st,"end_time":et})
+    pid=str(uuid.uuid4());st=d.get("start") or now();et=d.get("end") or now();c.execute("INSERT INTO pauses VALUES(%s,%s,%s,%s,%s,%s,%s,%s)",(pid,user["id"],user["name"],d.get("equipment",""),d.get("reason",""),st,et,datetime.now(TZ)));text=pause_text({"user_name":user["name"],"equipment":d.get("equipment",""),"reason":d.get("reason",""),"start_time":st,"end_time":et})
    else:return web.json_response({"error":"unknown_event"},status=400)
   if CHAT:await request.app["bot"].send_message(int(CHAT),text,parse_mode="Markdown")
   return web.json_response({"ok":True})
- except Exception:
-  logging.exception("save_api failed"); return web.json_response({"error":"save_failed"},status=500)
+ except Exception:logging.exception("save_api failed");return web.json_response({"error":"save_failed"},status=500)
 async def index(request):return web.FileResponse("/app/webapp/index.html")
 async def health(request):return web.Response(text="OK",content_type="text/plain")
+async def options(request):return web.Response(headers=dash_headers())
 async def http_server(bot):
- app=web.Application(); app["bot"]=bot; app.router.add_get("/",index); app.router.add_get("/health",health); app.router.add_get("/api/open",open_api); app.router.add_post("/api/save",save_api); app.router.add_static("/static","/app/webapp",show_index=False); runner=web.AppRunner(app); await runner.setup(); site=web.TCPSite(runner,"0.0.0.0",PORT); await site.start(); logging.info("Mini App server listening on %s",PORT); return runner
+ app=web.Application();app["bot"]=bot;app.router.add_get("/",index);app.router.add_get("/health",health);app.router.add_get("/api/open",open_api);app.router.add_post("/api/save",save_api);app.router.add_get("/api/dashboard/production",dashboard_production);app.router.add_get("/api/dashboard/pauses",dashboard_pauses);app.router.add_get("/api/dashboard/all",dashboard_all);app.router.add_options("/api/dashboard/production",options);app.router.add_options("/api/dashboard/pauses",options);app.router.add_options("/api/dashboard/all",options);app.router.add_static("/static","/app/webapp",show_index=False);runner=web.AppRunner(app);await runner.setup();site=web.TCPSite(runner,"0.0.0.0",PORT);await site.start();logging.info("Mini App server listening on %s",PORT);return runner
 async def main():
  if not TOKEN:raise RuntimeError("BOT_TOKEN is not set")
  if not DATABASE_URL:raise RuntimeError("DATABASE_URL is not set — create PostgreSQL in RelaxDev")
- init_db(); migrate_sqlite(); bot=Bot(TOKEN); dp=Dispatcher(); dp.message.register(start,Command("start")); dp.message.register(panel,Command("setup_production")); dp.message.register(web_data,lambda m:m.web_app_data is not None); runner=await http_server(bot)
+ init_db();migrate_sqlite();bot=Bot(TOKEN);dp=Dispatcher();dp.message.register(start,Command("start"));dp.message.register(panel,Command("setup_production"));dp.message.register(web_data,lambda m:m.web_app_data is not None);runner=await http_server(bot)
  try:await dp.start_polling(bot)
  finally:await runner.cleanup()
 if __name__=="__main__":asyncio.run(main())
