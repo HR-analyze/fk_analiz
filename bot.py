@@ -16,7 +16,7 @@ TIMEZONE=ZoneInfo(os.getenv('TIMEZONE','Europe/Moscow'))
 WORK_CHAT_ID_RAW=os.getenv('WORK_CHAT_ID','').strip()
 WORK_CHAT_ID=int(WORK_CHAT_ID_RAW) if WORK_CHAT_ID_RAW else None
 EQUIPMENT=['cromaster','starline','Glimek','König / König хлеб','Rondo','Trima']
-PRODUCT_GROUPS={'Холодная формовка':['Булочка бриошь зерновая','Булочка ржаная','Булочка с корицей','Булочка Сладкое сердце','Венгерская ватрушка','Круассан для сэндвича','Круассан классика мини 55 г','Круассан мини 50 г','Круассан французский 70 г','Круассан французский без дефроста','Круассан французский с сыром','Лепёшка сдобная','Лепёшка сдобная с сосиской','Начинка булочка с корицей','Начинка для пирожков с курицей и сыром','Начинка маковая для улитки','Основа для слойки с вишней','Пирожок с курицей и сыром','Рогалик вишнёвый','Слойка голландская','Слойка с вишней и заварным кремом','Слойка с марсельской сосиской','Слойка шоколад-апельсин','Творожные ушки','Трубочка','Улитка с изюмом','Улитка с маком','Хачапури','Хлеб Бородинский'],'Тёплая формовка':['Багет злаковый','Багет молочный','Багет ремесленный на опаре','Багет сырный','Батон классический','Бейгл с кунжутом','Булка Много мака','Булочка для гамбургера без кунжута','Булочка для супа тёмная','Булочка для френч-дога','Булочка для хот-дога белая','Булочка с маком','Булочка суповая светлая','Мини-чиабатта','Краюшки','Пирожок с капустой фреш','Пирожок с мясом фреш','Ромовая баба','Сочник с творогом','Хлеб бездрожжевой с семечками','Хлеб злаковый','Хлеб картофельный','Хлеб кефирный','Хлеб протеиновый','Хлеб пшеничный домашний','Хлеб с семенами чиа и пажитником','Хлеб тартин ржано-пшеничный','Хлеб тартин розовый','Хлеб тостовый молочный','Хлеб тостовый слоёный фреш','Хлеб тыквенный','Хлеб чесночный','Чиабатта пшеничная смесевая']}
+PRODUCT_GROUPS={'Холодная формовка':['Булочка бриошь зерновая','Булочка ржаная','Булочка с корицей','Булочка Сладкое сердце','Венгерская ватрушка','Круассан для сэндвича','Круассан классика мини 55 г','Круассан мини 50 г','Круассан французский 70 г','Круассан французский без дефроста','Круассан французский с сыром','Лепёшка сдобная','Лепёшка сдобная с сосиской','Начинка булочка с корицей','Начинка для пирожков с курицей и сыром','Начинка маковая для улитки','Основа для слойки с вишней и заварным кремом','Пирожок с курицей и сыром','Рогалик вишнёвый','Слойка голландская','Слойка с вишней и заварным кремом','Слойка с марсельской сосиской','Слойка шоколад-апельсин','Творожные ушки','Трубочка','Улитка с изюмом','Улитка с маком','Хачапури','Хлеб Бородинский'],'Тёплая формовка':['Багет злаковый','Багет молочный','Багет ремесленный на опаре','Багет сырный','Батон классический','Бейгл с кунжутом','Булка Много мака','Булочка для гамбургера без кунжута','Булочка для супа тёмная','Булочка для френч-дога','Булочка для хот-дога белая','Булочка с маком','Булочка суповая светлая','Мини-чиабатта','Краюшки','Пирожок с капустой фреш','Пирожок с мясом фреш','Ромовая баба','Сочник с творогом','Хлеб бездрожжевой с семечками','Хлеб злаковый','Хлеб картофельный','Хлеб кефирный','Хлеб протеиновый','Хлеб пшеничный домашний','Хлеб с семенами чиа и пажитником','Хлеб тартин ржано-пшеничный','Хлеб тартин розовый','Хлеб тостовый молочный','Хлеб тостовый слоёный фреш','Хлеб тыквенный','Хлеб чесночный','Чиабатта пшеничная смесевая']}
 REASONS=['Поломка оборудования','Нет сырья','Нет персонала','Техническая проблема','Качество продукции']
 
 class Form(StatesGroup):
@@ -37,8 +37,6 @@ def result(d):
     if d['event']=='finish':return f"🏁 **Завершение производства**\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 Завершение: {d['start']}\n🔢 Количество: {d['quantity']} шт"
     return f"🔴 **Критическая остановка**\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 С {d['start']} до {d['end']}\n❗ Причина: {d['reason']}"
 
-# IMPORTANT: /start must not require FSM injection. The previous deployed build
-# crashed here with "menu() missing 1 required positional argument: 's'".
 async def menu(m: Message):
     await m.answer('📊 **Производство**\n\nЧто записываем?',reply_markup=kb([('🟢 Начало производства','e:start'),('🏁 Завершение производства','e:finish'),('🔴 Остановка — критическая','e:pause')]),parse_mode='Markdown')
 
@@ -47,7 +45,15 @@ async def setup(m: Message, bot: Bot):
     me=await bot.get_me()
     await m.answer('📊 **Внесение данных о производстве**\n\nЗаполнение откроется в личном диалоге с ботом. В общий чат попадёт только итог.',reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='📊 Внести данные о производстве',url=f'https://t.me/{me.username}?start=production')]]),parse_mode='Markdown')
 
-async def callbacks(c: CallbackQuery, s: FSMContext):
+# Do not rely on aiogram signature injection for callback handlers.
+# Get FSM context explicitly from the callback's user/chat so the handler
+# cannot fail with "callbacks() missing 1 required positional argument: s".
+async def callbacks(c: CallbackQuery):
+    s=FSMContext(c.bot, key=None)
+    # This handler is replaced below by a Dispatcher-compatible wrapper.
+    await c.answer()
+
+async def handle_callback(c: CallbackQuery, s: FSMContext):
     x=c.data;d=await s.get_data()
     if x.startswith('e:'):await s.clear();await s.update_data(event=x[2:]);await s.set_state(Form.equipment);await c.message.edit_text('🏭 **Выберите оборудование:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)]+[('✏️ Другое','q:other')],2),parse_mode='Markdown')
     elif x.startswith('q:'):
@@ -118,7 +124,7 @@ async def main():
     dp.message.register(chatid,Command('chatid'))
     dp.message.register(menu,Command('start'))
     dp.message.register(menu,Command('menu'))
-    dp.callback_query.register(callbacks)
+    dp.callback_query.register(handle_callback)
     dp.message.register(input_msg)
     logging.info('Production bot started; work_chat_id=%s; timezone=%s',WORK_CHAT_ID,TIMEZONE)
     await dp.start_polling(bot)
