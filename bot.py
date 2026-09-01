@@ -7,6 +7,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message, CallbackQuery
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -45,17 +46,11 @@ async def setup(m: Message, bot: Bot):
     me=await bot.get_me()
     await m.answer('📊 **Внесение данных о производстве**\n\nЗаполнение откроется в личном диалоге с ботом. В общий чат попадёт только итог.',reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='📊 Внести данные о производстве',url=f'https://t.me/{me.username}?start=production')]]),parse_mode='Markdown')
 
-# Do not rely on aiogram signature injection for callback handlers.
-# Get FSM context explicitly from the callback's user/chat so the handler
-# cannot fail with "callbacks() missing 1 required positional argument: s".
-async def callbacks(c: CallbackQuery):
-    s=FSMContext(c.bot, key=None)
-    # This handler is replaced below by a Dispatcher-compatible wrapper.
-    await c.answer()
-
-async def handle_callback(c: CallbackQuery, s: FSMContext):
-    x=c.data;d=await s.get_data()
-    if x.startswith('e:'):await s.clear();await s.update_data(event=x[2:]);await s.set_state(Form.equipment);await c.message.edit_text('🏭 **Выберите оборудование:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)]+[('✏️ Другое','q:other')],2),parse_mode='Markdown')
+async def callbacks(c: CallbackQuery, s: FSMContext):
+    x=c.data or '';d=await s.get_data()
+    if x.startswith('e:'):
+        await s.clear();await s.update_data(event=x[2:]);await s.set_state(Form.equipment)
+        await c.message.edit_text('🏭 **Выберите оборудование:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)]+[('✏️ Другое','q:other')],2),parse_mode='Markdown')
     elif x.startswith('q:'):
         v=x[2:]
         if v=='other':await s.update_data(wait='equipment');await s.set_state(Form.other);await c.message.edit_text('🏭 Напишите название оборудования:')
@@ -119,12 +114,12 @@ async def chatid(m: Message):
 
 async def main():
     if not BOT_TOKEN:raise RuntimeError('BOT_TOKEN is not set')
-    bot=Bot(BOT_TOKEN);dp=Dispatcher()
+    bot=Bot(BOT_TOKEN);dp=Dispatcher(storage=MemoryStorage())
     dp.message.register(setup,Command('setup_production'))
     dp.message.register(chatid,Command('chatid'))
     dp.message.register(menu,Command('start'))
     dp.message.register(menu,Command('menu'))
-    dp.callback_query.register(handle_callback)
+    dp.callback_query.register(callbacks)
     dp.message.register(input_msg)
     logging.info('Production bot started; work_chat_id=%s; timezone=%s',WORK_CHAT_ID,TIMEZONE)
     await dp.start_polling(bot)
