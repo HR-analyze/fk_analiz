@@ -12,7 +12,7 @@ from aiogram.types import InlineKeyboardButton,InlineKeyboardMarkup,Message
 logging.basicConfig(level=logging.INFO)
 TOKEN=os.getenv("BOT_TOKEN","").strip();TZ=ZoneInfo(os.getenv("TIMEZONE","Europe/Moscow"));CHAT=os.getenv("WORK_CHAT_ID","").strip();PORT=int(os.getenv("PORT","8080"));DATABASE_URL=os.getenv("DATABASE_URL","").strip();DB=Path(os.getenv("DB_PATH","/app/data/fk.db"));DB.parent.mkdir(parents=True,exist_ok=True);DASHBOARD_API_KEY=os.getenv("DASHBOARD_API_KEY","").strip()
 EQUIPMENT=["cromaster","starline","Glimek","König / König хлеб","Rondo","Trima"]
-PRODUCTS={"Холодная формовка":["Булочка бриошь зерновая","Булочка ржаная","Булочка с корицей","Булочка Сладкое сердце","Венгерская ватрушка","Круассан для сэндвича","Круассан классика мини 55 г","Круассан мини 50 г","Круассан французский 70 г","Круассан французский без дефроста","Круассан французский с сыром","Лепёшка сдобная","Лепёшка сдобная с сосиской","Начинка булочка с корицей","Начинка для пирожков с курицей и сыром","Начинка маковая для улитки","Основа для слойки с вишней","Пирожок с курицей и сыром","Рогалик вишнёвый","Слойка голландская","Слойка с вишней и заварным кремом","Слойка с марсельской сосиской","Слойка шоколад-апельсин","Творожные ушки","Трубочка","Улитка с изюмом","Улитка с маком","Хачапури","Хлеб Бородинский"],"Тёплая формовка":["Багет злаковый","Багет молочный","Багет ремесленный на опаре","Багет сырный","Батон классический","Бейгл с кунжутом","Булка Много мака","Булочка для гамбургера без кунжута","Булочка для супа тёмная","Булочка для френч-дога","Булочка для хот-дога белая","Булочка с маком","Булочка суповая светлая","Мини-чиабатта","Краюшки","Пирожок с капустой фреш","Пирожок с мясом фреш","Ромовая баба","Сочник с творогом","Хлеб бездрожжевой с семечками","Хлеб злаковый","Хлеб картофельный","Хлеб кефирный","Хлеб протеиновый","Хлеб пшеничный домашний","Хлеб с семенами чиа и пажитником","Хлеб тартин ржано-пшеничный","Хлеб тартин розовый","Хлеб тостовый молочный","Хлеб тостовый слоёный фреш","Хлеб тыквенный","Хлеб чесночный","Чиабатта пшеничная смесевая"]};REASONS=["Поломка оборудования","Нет сырья","Нет персонала","Техническая проблема","Качество продукции"]
+PRODUCTS={"Холодная формовка":["Булочка бриошь зерновая","Булочка ржаная","Булочка с корицей","Булочка Сладкое сердце","Венгерская ватрушка","Круассан для сэндвича","Круассан классика мини 55 г","Круассан мини 50 г","Круассан французский 70 г","Круассан французский без дефроста","Круассан французский с сыром","Лепёшка сдобная","Лепёшка сдобная с сосиской","Начинка булочка с корицей","Начинка для пирожков с курицей и сыром","Начинка маковая для улитки","Основа для слойки с вишней","Пирожок с курицей и сыром","Рогалик вишнёвый","Слойка голландская","Слойка с вишней и заварным кремом","Слойка с марсельской сосиской","Слойка шоколад-апельсин","Творожные ушки","Трубочка","Улитка с изюмом","Улитка с маком","Хачапури","Хлеб Бородинский"],"Тёплая формовка":["Багет злаковый","Багет молочный","Багет ремесленный на опаре","Багет сырный","Батон классический","Бейгл с кунжутом","Булка Много мака","Булочка для гамбургера без кунжута","Булочка для супа тёмная","Булочка для френч-дога","Булочка для хот-дога белая","Булочка с маком","Булочка суповая светлая","Мини-чиабатта","Краюшки","Пирожок с капустой фреш","Пирожок с мясом фреш","Ромовая баба","Сочник с творогом","Хлеб бездрожжевой с семечками","Хлеб злаковый","Хлеб картофельный","Хлеб кефирный","Хлеб протеиновый","Хлеб пшеничный домашний","Хлеб с семенами чиа и пажитником","Хлеб тартин ржано-пшеничный","Хлеб тартин розовый","Хлеб тостовый молочный","Хлеб тостовый слоёный фреш","Хлеб тыквенный","Хлеб чесночный","Чиабатта пшеничная смесевая"]};REASONS=["Поломка оборудования","Нет сырья","Нет персонала","Техническая проблема","Качество продукции","Нет инвентаря"]
 def db():
  if not DATABASE_URL:raise RuntimeError("DATABASE_URL is not set")
  return psycopg.connect(DATABASE_URL,row_factory=dict_row)
@@ -59,22 +59,31 @@ def dash_where(request):
  if df:clauses.append("created_at >= %s");args.append(df)
  if dt:clauses.append("created_at < %s");args.append(dt+"T23:59:59")
  return ((" WHERE "+" AND ".join(clauses)) if clauses else ""),args
+def json_safe(rows):
+ out=[]
+ for r in rows:
+  d=dict(r)
+  for k,v in d.items():
+   if isinstance(v,datetime):d[k]=v.isoformat()
+  out.append(d)
+ return out
 async def dashboard_production(request):
  if not dash_auth(request):return dash_unauth()
  where,args=dash_where(request)
  with db() as c:rows=c.execute("SELECT id,user_id,user_name,equipment,forming,product,start_time,end_time,quantity,status,created_at FROM production"+where+" ORDER BY created_at DESC",args).fetchall()
- return web.json_response({"ok":True,"count":len(rows),"items":rows},headers=dash_headers())
+ items=json_safe(rows);return web.json_response({"ok":True,"count":len(items),"items":items},headers=dash_headers())
 async def dashboard_pauses(request):
  if not dash_auth(request):return dash_unauth()
  where,args=dash_where(request)
  with db() as c:rows=c.execute("SELECT id,user_id,user_name,equipment,reason,start_time,end_time,created_at FROM pauses"+where+" ORDER BY created_at DESC",args).fetchall()
- return web.json_response({"ok":True,"count":len(rows),"items":rows},headers=dash_headers())
+ items=json_safe(rows);return web.json_response({"ok":True,"count":len(items),"items":items},headers=dash_headers())
 async def dashboard_all(request):
  if not dash_auth(request):return dash_unauth()
  where,args=dash_where(request)
  with db() as c:
   p=c.execute("SELECT id,user_id,user_name,equipment,forming,product,start_time,end_time,quantity,status,created_at FROM production"+where+" ORDER BY created_at DESC",args).fetchall();q=c.execute("SELECT id,user_id,user_name,equipment,reason,start_time,end_time,created_at FROM pauses"+where+" ORDER BY created_at DESC",args).fetchall()
- return web.json_response({"ok":True,"production_count":len(p),"pause_count":len(q),"production":p,"pauses":q},headers=dash_headers())
+ production=json_safe(p);pauses=json_safe(q)
+ return web.json_response({"ok":True,"production_count":len(production),"pause_count":len(pauses),"production":production,"pauses":pauses},headers=dash_headers())
 def panel_keyboard(bot_username):return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="📱 Открыть ФК",url=f"https://t.me/{bot_username}/production")]])
 def production_text(d,finish=False):
  if finish:return f"🏁 **Завершение производства**\n👤 {d['user_name']}\n🏭 {d['equipment']}\n📦 {d['product']}\n🕐 Производство: {d['start_time']}–{d['end_time']}\n🔢 Количество: {fmt(d['quantity'])} шт"
@@ -92,7 +101,7 @@ async def open_api(request):
  user=user_from_request(request)
  if not user:return web.json_response({"error":"unauthorized"},status=401)
  with db() as c:rows=c.execute("SELECT id,equipment,forming,product,start_time FROM production WHERE user_id=%s AND status='open' ORDER BY created_at DESC",(user["id"],)).fetchall()
- return web.json_response({"items":rows})
+ return web.json_response({"items":json_safe(rows)})
 async def save_api(request):
  user=user_from_request(request)
  if not user:return web.json_response({"error":"unauthorized"},status=401)
@@ -118,7 +127,6 @@ async def http_server(bot):
  app=web.Application();app["bot"]=bot;app.router.add_get("/",index);app.router.add_get("/health",health);app.router.add_get("/api/open",open_api);app.router.add_post("/api/save",save_api);app.router.add_get("/api/dashboard/production",dashboard_production);app.router.add_get("/api/dashboard/pauses",dashboard_pauses);app.router.add_get("/api/dashboard/all",dashboard_all);app.router.add_options("/api/dashboard/production",options);app.router.add_options("/api/dashboard/pauses",options);app.router.add_options("/api/dashboard/all",options);app.router.add_static("/static","/app/webapp",show_index=False);runner=web.AppRunner(app);await runner.setup();site=web.TCPSite(runner,"0.0.0.0",PORT);await site.start();logging.info("Mini App server listening on %s",PORT);return runner
 async def main():
  if not TOKEN:raise RuntimeError("BOT_TOKEN is not set")
- if not DATABASE_URL:raise RuntimeError("DATABASE_URL is not set — create PostgreSQL in RelaxDev")
  init_db();migrate_sqlite();bot=Bot(TOKEN);dp=Dispatcher();dp.message.register(start,Command("start"));dp.message.register(panel,Command("setup_production"));dp.message.register(web_data,lambda m:m.web_app_data is not None);runner=await http_server(bot)
  try:await dp.start_polling(bot)
  finally:await runner.cleanup()
