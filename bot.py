@@ -46,68 +46,73 @@ async def setup(m: Message, bot: Bot):
     me=await bot.get_me()
     await m.answer('📊 **Внесение данных о производстве**\n\nЗаполнение откроется в личном диалоге с ботом. В общий чат попадёт только итог.',reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text='📊 Внести данные о производстве',url=f'https://t.me/{me.username}?start=production')]]),parse_mode='Markdown')
 
-async def callbacks(c: CallbackQuery, s: FSMContext):
-    x=c.data or '';d=await s.get_data()
-    if x.startswith('e:'):
-        await s.clear();await s.update_data(event=x[2:]);await s.set_state(Form.equipment)
-        await c.message.edit_text('🏭 **Выберите оборудование:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)]+[('✏️ Другое','q:other')],2),parse_mode='Markdown')
-    elif x.startswith('q:'):
-        v=x[2:]
-        if v=='other':await s.update_data(wait='equipment');await s.set_state(Form.other);await c.message.edit_text('🏭 Напишите название оборудования:')
-        else:await s.update_data(equipment=EQUIPMENT[int(v)]);await s.set_state(Form.group);await c.message.edit_text('📦 **Выберите вид формовки:**',reply_markup=kb([(v,f'g:{i}') for i,v in enumerate(PRODUCT_GROUPS)]),parse_mode='Markdown')
-    elif x.startswith('g:'):
-        g=list(PRODUCT_GROUPS)[int(x[2:])];await s.update_data(group=g);await s.set_state(Form.product);await c.message.edit_text('🔎 **Напишите несколько букв продукции.**\nНапример: `хлеб`, `бейгл`, `пирожок`.',parse_mode='Markdown')
-    elif x.startswith('p:'):
-        r=d.get('results',[]);v=x[2:];await s.update_data(product='Другое / нет в справочнике' if v=='other' else r[int(v)]);await s.set_state(Form.start);await c.message.edit_text('🕐 **Когда начали?**',reply_markup=kb([('🕐 Сейчас','t:now'),('⌨️ Ввести время','t:manual')]),parse_mode='Markdown')
-    elif x.startswith('t:'):
-        v=x[2:]
-        if v=='manual':await s.set_state(Form.start);await c.message.edit_text('⌨️ Напишите время, например `08:30`.',parse_mode='Markdown')
-        else:await s.update_data(start=now());await after_start(c.message,s)
-    elif x.startswith('et:'):
-        v=x[3:]
-        if v=='manual':await s.set_state(Form.end);await c.message.edit_text('⌨️ Напишите время окончания, например `09:45`.',parse_mode='Markdown')
-        else:await s.update_data(end=now());await s.set_state(Form.reason);await c.message.edit_text('❓ **Почему произошла критическая остановка?**',reply_markup=kb([(v,f'r:{i}') for i,v in enumerate(REASONS)]+[('✏️ Другая причина','r:other')]),parse_mode='Markdown')
-    elif x.startswith('r:'):
-        v=x[2:]
-        if v=='other':await s.update_data(wait='reason');await s.set_state(Form.other);await c.message.edit_text('❓ Напишите причину своими словами:')
-        else:await s.update_data(reason=REASONS[int(v)]);await preview(c.message,s)
-    elif x.startswith('c:'):
-        if x=='c:no':await s.clear();await c.message.edit_text('❌ Запись отменена.');return await c.answer()
-        if x=='c:edit':await s.set_state(Form.equipment);await c.message.edit_text('🏭 **Выберите оборудование заново:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)],2),parse_mode='Markdown');return await c.answer()
-        d=await s.get_data()
-        if not WORK_CHAT_ID:return await c.answer('WORK_CHAT_ID не задан',show_alert=True)
-        await c.bot.send_message(WORK_CHAT_ID,result(d),parse_mode='Markdown');await s.clear();await c.message.edit_text('✅ **Готово! Итог опубликован.**',parse_mode='Markdown')
+async def callbacks(c: CallbackQuery, state: FSMContext):
+    x=c.data or '';d=await state.get_data()
+    try:
+        if x.startswith('e:'):
+            await state.clear();await state.update_data(event=x[2:]);await state.set_state(Form.equipment)
+            await c.message.edit_text('🏭 **Выберите оборудование:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)]+[('✏️ Другое','q:other')],2),parse_mode='Markdown')
+        elif x.startswith('q:'):
+            v=x[2:]
+            if v=='other':await state.update_data(wait='equipment');await state.set_state(Form.other);await c.message.edit_text('🏭 Напишите название оборудования:')
+            else:await state.update_data(equipment=EQUIPMENT[int(v)]);await state.set_state(Form.group);await c.message.edit_text('📦 **Выберите вид формовки:**',reply_markup=kb([(v,f'g:{i}') for i,v in enumerate(PRODUCT_GROUPS)]),parse_mode='Markdown')
+        elif x.startswith('g:'):
+            g=list(PRODUCT_GROUPS)[int(x[2:])];await state.update_data(group=g);await state.set_state(Form.product);await c.message.edit_text('🔎 **Напишите несколько букв продукции.**\nНапример: `хлеб`, `бейгл`, `пирожок`.',parse_mode='Markdown')
+        elif x.startswith('p:'):
+            r=d.get('results',[]);v=x[2:];await state.update_data(product='Другое / нет в справочнике' if v=='other' else r[int(v)]);await state.set_state(Form.start);await c.message.edit_text('🕐 **Когда начали?**',reply_markup=kb([('🕐 Сейчас','t:now'),('⌨️ Ввести время','t:manual')]),parse_mode='Markdown')
+        elif x.startswith('t:'):
+            v=x[2:]
+            if v=='manual':await state.set_state(Form.start);await c.message.edit_text('⌨️ Напишите время, например `08:30`.',parse_mode='Markdown')
+            else:await state.update_data(start=now());await after_start(c.message,state)
+        elif x.startswith('et:'):
+            v=x[3:]
+            if v=='manual':await state.set_state(Form.end);await c.message.edit_text('⌨️ Напишите время окончания, например `09:45`.',parse_mode='Markdown')
+            else:await state.update_data(end=now());await state.set_state(Form.reason);await c.message.edit_text('❓ **Почему произошла критическая остановка?**',reply_markup=kb([(v,f'r:{i}') for i,v in enumerate(REASONS)]+[('✏️ Другая причина','r:other')]),parse_mode='Markdown')
+        elif x.startswith('r:'):
+            v=x[2:]
+            if v=='other':await state.update_data(wait='reason');await state.set_state(Form.other);await c.message.edit_text('❓ Напишите причину своими словами:')
+            else:await state.update_data(reason=REASONS[int(v)]);await preview(c.message,state)
+        elif x.startswith('c:'):
+            if x=='c:no':await state.clear();await c.message.edit_text('❌ Запись отменена.');return
+            if x=='c:edit':await state.set_state(Form.equipment);await c.message.edit_text('🏭 **Выберите оборудование заново:**',reply_markup=kb([(v,f'q:{i}') for i,v in enumerate(EQUIPMENT)],2),parse_mode='Markdown');return
+            d=await state.get_data()
+            if not WORK_CHAT_ID:await c.answer('WORK_CHAT_ID не задан',show_alert=True);return
+            await c.bot.send_message(WORK_CHAT_ID,result(d),parse_mode='Markdown');await state.clear();await c.message.edit_text('✅ **Готово! Итог опубликован.**',parse_mode='Markdown')
+    except Exception:
+        logging.exception('Callback failed: %s',x)
+        await c.answer('Ошибка. Смотрите логи бота.',show_alert=True)
+        return
     await c.answer()
 
-async def after_start(m: Message,s: FSMContext):
-    d=await s.get_data()
-    if d['event']=='finish':await s.set_state(Form.quantity);await m.edit_text('🔢 **Сколько штук произвели?**\nНапример: `8280`',parse_mode='Markdown')
-    elif d['event']=='pause':await s.set_state(Form.end);await m.edit_text('🕐 **Когда закончилась остановка?**',reply_markup=kb([('🕐 Сейчас','et:now'),('⌨️ Ввести время','et:manual')]),parse_mode='Markdown')
-    else:await preview(m,s)
+async def after_start(m: Message,state: FSMContext):
+    d=await state.get_data()
+    if d['event']=='finish':await state.set_state(Form.quantity);await m.edit_text('🔢 **Сколько штук произвели?**\nНапример: `8280`',parse_mode='Markdown')
+    elif d['event']=='pause':await state.set_state(Form.end);await m.edit_text('🕐 **Когда закончилась остановка?**',reply_markup=kb([('🕐 Сейчас','et:now'),('⌨️ Ввести время','et:manual')]),parse_mode='Markdown')
+    else:await preview(m,state)
 
-async def preview(m: Message,s: FSMContext):
-    await s.set_state(Form.confirm);await m.edit_text('**Проверьте запись:**\n\n'+result(await s.get_data()),reply_markup=kb([('✅ Всё верно — опубликовать','c:yes'),('✏️ Исправить','c:edit'),('❌ Отмена','c:no')]),parse_mode='Markdown')
+async def preview(m: Message,state: FSMContext):
+    await state.set_state(Form.confirm);await m.edit_text('**Проверьте запись:**\n\n'+result(await state.get_data()),reply_markup=kb([('✅ Всё верно — опубликовать','c:yes'),('✏️ Исправить','c:edit'),('❌ Отмена','c:no')]),parse_mode='Markdown')
 
-async def input_msg(m: Message,s: FSMContext):
+async def input_msg(m: Message,state: FSMContext):
     if m.chat.type!='private':return
-    d=await s.get_data();cur=await s.get_state();v=(m.text or '').strip();w=d.get('wait')
-    if w=='equipment':await s.update_data(equipment=v,wait=None);await s.set_state(Form.group);await m.answer('📦 **Выберите вид формовки:**',reply_markup=kb([(x,f'g:{i}') for i,x in enumerate(PRODUCT_GROUPS)]),parse_mode='Markdown');return
-    if w=='reason':await s.update_data(reason=v,wait=None);await preview(m,s);return
+    d=await state.get_data();cur=await state.get_state();v=(m.text or '').strip();w=d.get('wait')
+    if w=='equipment':await state.update_data(equipment=v,wait=None);await state.set_state(Form.group);await m.answer('📦 **Выберите вид формовки:**',reply_markup=kb([(x,f'g:{i}') for i,x in enumerate(PRODUCT_GROUPS)]),parse_mode='Markdown');return
+    if w=='reason':await state.update_data(reason=v,wait=None);await preview(m,state);return
     if cur==Form.product.state:
-        if v.lower() in ('другое','нет','нет в списке'):await s.update_data(product='Другое / нет в справочнике');await s.set_state(Form.start);await m.answer('🕐 **Когда начали?**',reply_markup=kb([('🕐 Сейчас','t:now'),('⌨️ Ввести время','t:manual')]),parse_mode='Markdown');return
+        if v.lower() in ('другое','нет','нет в списке'):await state.update_data(product='Другое / нет в справочнике');await state.set_state(Form.start);await m.answer('🕐 **Когда начали?**',reply_markup=kb([('🕐 Сейчас','t:now'),('⌨️ Ввести время','t:manual')]),parse_mode='Markdown');return
         r=[p for p in PRODUCT_GROUPS[d['group']] if v.lower() in p.lower()]
         if not r:return await m.answer('😕 Не нашёл. Попробуйте проще или напишите **другое**.',parse_mode='Markdown')
-        await s.update_data(results=r);await m.answer('🔎 **Выберите продукцию:**',reply_markup=kb([(p,f'p:{i}') for i,p in enumerate(r[:20])]+[('✏️ Другое / нет в списке','p:other')]),parse_mode='Markdown')
+        await state.update_data(results=r);await m.answer('🔎 **Выберите продукцию:**',reply_markup=kb([(p,f'p:{i}') for i,p in enumerate(r[:20])]+[('✏️ Другое / нет в списке','p:other')]),parse_mode='Markdown')
     elif cur==Form.start.state:
         if not valid(v):return await m.answer('⚠️ Напишите время в формате `08:30`.',parse_mode='Markdown')
-        await s.update_data(start=v);await after_start(m,s)
+        await state.update_data(start=v);await after_start(m,state)
     elif cur==Form.end.state:
         if not valid(v):return await m.answer('⚠️ Напишите время в формате `09:45`.',parse_mode='Markdown')
-        await s.update_data(end=v);await s.set_state(Form.reason);await m.answer('❓ **Почему произошла критическая остановка?**',reply_markup=kb([(x,f'r:{i}') for i,x in enumerate(REASONS)]+[('✏️ Другая причина','r:other')]),parse_mode='Markdown')
+        await state.update_data(end=v);await state.set_state(Form.reason);await m.answer('❓ **Почему произошла критическая остановка?**',reply_markup=kb([(x,f'r:{i}') for i,x in enumerate(REASONS)]+[('✏️ Другая причина','r:other')]),parse_mode='Markdown')
     elif cur==Form.quantity.state:
         q=v.replace(' ','').replace('шт','')
         if not q.isdigit():return await m.answer('⚠️ Введите количество цифрами, например `8280`.')
-        await s.update_data(quantity=int(q));await preview(m,s)
+        await state.update_data(quantity=int(q));await preview(m,state)
 
 async def chatid(m: Message):
     if m.chat.type in ('group','supergroup'):await m.answer(f'🆔 WORK_CHAT_ID для этого чата:\n`{m.chat.id}`',parse_mode='Markdown')
