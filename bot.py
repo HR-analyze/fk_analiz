@@ -46,7 +46,7 @@ def migrate_sqlite():
    if c.execute("SELECT COUNT(*) n FROM production").fetchone()["n"]==0:
     for r in old.execute("SELECT * FROM production"):c.execute("INSERT INTO production VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",tuple(r))
    if c.execute("SELECT COUNT(*) n FROM pauses").fetchone()["n"]==0:
-    for r in old.execute("SELECT * FROM pauses"):c.execute("INSERT INTO pauses VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",tuple(r))
+    for r in old.execute("SELECT * FROM pauses"):c.execute("INSERT INTO pauses VALUES(%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",tuple(r))
   old.close();logging.info("Legacy SQLite data migrated: production=%s pauses=%s",p,q)
  except Exception:logging.exception("SQLite migration skipped")
 def now():return datetime.now(TZ).strftime("%H:%M")
@@ -110,6 +110,11 @@ async def start(m:Message):
  if m.chat.type in ("group","supergroup"):await panel(m)
  elif m.chat.type=="private":
   me=await m.bot.get_me();await m.answer("📊 Откройте ФК через кнопку рабочего чата.",reply_markup=panel_keyboard(me.username))
+async def chatid(m:Message):
+ if m.chat.type in ("group","supergroup"):
+  await m.answer(f"🆔 ID этого чата: `{m.chat.id}`",parse_mode="Markdown")
+ else:
+  await m.answer(f"🆔 ID этого чата: `{m.chat.id}`",parse_mode="Markdown")
 async def web_data(m:Message):await m.answer("📱 Операции теперь выполняются в Mini App. Откройте ФК из рабочего чата.")
 async def open_api(request):
  user=user_from_request(request)
@@ -146,7 +151,7 @@ async def http_server(bot):
  app=web.Application();app["bot"]=bot;app.router.add_get("/",index);app.router.add_get("/health",health);app.router.add_get("/api/open",open_api);app.router.add_post("/api/save",save_api);app.router.add_get("/api/dashboard/production",dashboard_production);app.router.add_get("/api/dashboard/pauses",dashboard_pauses);app.router.add_get("/api/dashboard/all",dashboard_all);app.router.add_options("/api/dashboard/production",options);app.router.add_options("/api/dashboard/pauses",options);app.router.add_options("/api/dashboard/all",options);app.router.add_static("/static","/app/webapp",show_index=False);runner=web.AppRunner(app);await runner.setup();site=web.TCPSite(runner,"0.0.0.0",PORT);await site.start();logging.info("Mini App server listening on %s",PORT);return runner
 async def main():
  if not TOKEN:raise RuntimeError("BOT_TOKEN is not set")
- init_db();migrate_sqlite();bot=Bot(TOKEN);dp=Dispatcher();dp.message.register(start,Command("start"));dp.message.register(panel,Command("setup_production"));dp.message.register(web_data,lambda m:m.web_app_data is not None);runner=await http_server(bot)
+ init_db();migrate_sqlite();bot=Bot(TOKEN);dp=Dispatcher();dp.message.register(start,Command("start"));dp.message.register(chatid,Command("chatid"));dp.message.register(panel,Command("setup_production"));dp.message.register(web_data,lambda m:m.web_app_data is not None);runner=await http_server(bot)
  try:await dp.start_polling(bot)
  finally:await runner.cleanup()
 if __name__=="__main__":asyncio.run(main())
