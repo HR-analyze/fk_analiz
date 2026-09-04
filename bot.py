@@ -11,15 +11,14 @@ from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton,InlineKeyboardMarkup,Message
 logging.basicConfig(level=logging.INFO)
 TOKEN=os.getenv("BOT_TOKEN","").strip();TZ=ZoneInfo(os.getenv("TIMEZONE","Europe/Moscow"));CHAT=os.getenv("WORK_CHAT_ID","").strip();PORT=int(os.getenv("PORT","8080"));DATABASE_URL=os.getenv("DATABASE_URL","").strip();DB=Path(os.getenv("DB_PATH","/app/data/fk.db"));DB.parent.mkdir(parents=True,exist_ok=True);DASHBOARD_API_KEY=os.getenv("DASHBOARD_API_KEY","").strip()
-# Production reference: equipment -> products. Forming type is deliberately not collected.
 PRODUCTS={
-"König Combi Linie Plus":["Багет злаковый","Багет молочный","Багет сырный","Булочка для гамбургера без кунжута","Булочка для френч-дога","Булочка для хот-дога белая"],
+"König Combi Linie Plus":["Багет злаковый","Багет молочный","Багет сырный","Булочка для гамбургера без кунжута","Булочка для френч-дога","Булочка для хот-дога белая","Бейгл с кунжутом"],
 "König Ceres":["Багет французский","Багет ремесленный","Хлеб бездрожжевой с семечками","Хлеб гречишный","Хлеб картофельный","Хлеб кефирный","Хлеб протеиновый","Хлеб пшеничный домашний","Хлеб с семенами чиа и пажитником","Хлеб тартин ржано-пшеничный","Хлеб тартин розовый"],
-"Glimek":["Батон классический","Лепёшка сдобная","Лепёшка сдобная с сосиской","Мини-хала","Хлеб тостовый слоёный фреш"],
+"Glimek":["Батон классический","Лепёшка сдобная","Лепёшка сдобная с сосиской","Мини-хала","Хлеб тостовый слоёный фреш","Хлеб тостовый молочный","Хлеб тостовый тёмный","Хлеб чесночный","Ромовая баба"],
 "RONDO Cromaster":["Булочка бриошь зерновая","Круассан для сэндвича","Круассан французский","Круассан французский с сыром"],
-"RONDO Smartline":["Булка Много мака","Булочка Сладкое сердце","Краюшки зерновые","Мини-чиабатта","Пирожок с капустой фреш","Сочник с творогом","Чиабатта пшеничная смесевая"],
-"RONDO Starline":["Венгерская ватрушка","Основа для слойки с вишней","Слойка голландская","Слойка с марсельской сосиской","Улитка с изюмом","Улитка с маком"],
-"TRIMA":["Булочка для супа тёмная","Булочка для Тануки с кунжутом","Булочка суповая светлая"],
+"RONDO Smartline":["Булка Много мака","Краюшки зерновые","Мини-чиабатта","Пирожок с капустой фреш","Сочник с творогом","Чиабатта пшеничная смесевая"],
+"RONDO Starline":["Венгерская ватрушка","Основа для слойки с вишней","Слойка голландская","Слойка с марсельской сосиской","Улитка с изюмом","Улитка с маком","Булочка Сладкое сердце","Пекан","Косичка","Кленовый пекан","Слойка вишня двойной крем","Косичка с орехом","Самса с курицей","Хачапури","Слойка с малиной","Слойка шоколад-апельсин","Заготовка для пирожков","Заготовка для трубочек (тесто)","Творожные ушки"],
+"TRIMA":["Булочка для супа тёмная","Булочка для Тануки с кунжутом","Булочка суповая светлая","Ватрушка с творогом","Ватрушка","Рогалик с вишней","Тесто для рогалика"],
 "Варочный котёл CHEF 60LCD + миксер STARMIX":["Трубочка"],
 "Diosna":["Начинка маковая для улитки"],
 "Ротационная печь":["Улитка с маком 110 г"],
@@ -46,7 +45,7 @@ def migrate_sqlite():
    if c.execute("SELECT COUNT(*) n FROM production").fetchone()["n"]==0:
     for r in old.execute("SELECT * FROM production"):c.execute("INSERT INTO production VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",tuple(r))
    if c.execute("SELECT COUNT(*) n FROM pauses").fetchone()["n"]==0:
-    for r in old.execute("SELECT * FROM pauses"):c.execute("INSERT INTO pauses VALUES(%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",tuple(r))
+    for r in old.execute("SELECT * FROM pauses"):c.execute("INSERT INTO pauses VALUES(%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",tuple(r))
   old.close();logging.info("Legacy SQLite data migrated: production=%s pauses=%s",p,q)
  except Exception:logging.exception("SQLite migration skipped")
 def now():return datetime.now(TZ).strftime("%H:%M")
@@ -111,10 +110,7 @@ async def start(m:Message):
  elif m.chat.type=="private":
   me=await m.bot.get_me();await m.answer("📊 Откройте ФК через кнопку рабочего чата.",reply_markup=panel_keyboard(me.username))
 async def chatid(m:Message):
- if m.chat.type in ("group","supergroup"):
-  await m.answer(f"🆔 ID этого чата: `{m.chat.id}`",parse_mode="Markdown")
- else:
-  await m.answer(f"🆔 ID этого чата: `{m.chat.id}`",parse_mode="Markdown")
+ await m.answer(f"🆔 ID этого чата: `{m.chat.id}`",parse_mode="Markdown")
 async def web_data(m:Message):await m.answer("📱 Операции теперь выполняются в Mini App. Откройте ФК из рабочего чата.")
 async def open_api(request):
  user=user_from_request(request)
@@ -154,4 +150,4 @@ async def main():
  init_db();migrate_sqlite();bot=Bot(TOKEN);dp=Dispatcher();dp.message.register(start,Command("start"));dp.message.register(chatid,Command("chatid"));dp.message.register(panel,Command("setup_production"));dp.message.register(web_data,lambda m:m.web_app_data is not None);runner=await http_server(bot)
  try:await dp.start_polling(bot)
  finally:await runner.cleanup()
-if __name__=="__main__":asyncio.run(main())
+if __name__=="__main__":asyncio.run(main)
