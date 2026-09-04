@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ФК — аналитика производства</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📊</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="page-head">
+    <h1>Аналитический отчёт по производству</h1>
+    <p class="page-sub" id="periodLine">Загрузка данных…</p>
+  </header>
+
+  <section class="panel filters">
+    <label class="field"><span>Дата от</span><input type="date" id="dateFrom"></label>
+    <label class="field"><span>до</span><input type="date" id="dateTo"></label>
+    <label class="field"><span>Оборудование</span><select id="equipment"><option value="all">Все</option></select></label>
+    <label class="field"><span>Продукт</span><select id="product"><option value="all">Все</option></select></label>
+    <label class="field"><span>Смена</span><select id="shift">
+      <option value="all">Все</option>
+      <option value="day">День (08:00–20:00)</option>
+      <option value="night">Ночь (20:00–08:00)</option>
+    </select></label>
+    <div class="field actions">
+      <button class="btn primary" id="apply">Применить</button>
+      <button class="btn" id="reset">Сброс</button>
+    </div>
+  </section>
+
+  <div id="alert" class="alert" hidden></div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid-2">
+    <article class="panel"><header class="panel-head"><h2>Выпуск по дням</h2><span class="unit">шт</span></header><div id="chartDaily" class="chart"></div></article>
+    <article class="panel"><header class="panel-head"><h2>Производительность по часам</h2><span class="unit">шт/час (средняя)</span></header><div id="chartHourly" class="chart"></div></article>
+  </section>
+
+  <section class="grid-2">
+    <article class="panel"><header class="panel-head"><h2>Выпуск по оборудованию</h2><span class="unit">шт</span></header><div id="chartEquipment" class="chart"></div></article>
+    <article class="panel"><header class="panel-head"><h2>Топ продуктов</h2><span class="unit">шт</span></header><div id="chartProducts" class="chart"></div></article>
+  </section>
+
+  <section class="grid-2">
+    <article class="panel"><header class="panel-head"><h2>Распределение простоев по причинам</h2><span class="unit">минуты</span></header><div id="chartReasons" class="chart"></div></article>
+    <article class="panel"><header class="panel-head"><h2>Эффективность: работа vs простои</h2><span class="unit">минуты</span></header><div id="chartWork" class="chart"></div></article>
+  </section>
+
+  <section class="panel">
+    <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">операции, выпуск, длительность</span></header>
+    <div id="dailyChips" class="chips"></div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-head"><h2>Сводка по оборудованию</h2><span class="unit">загрузка и простои</span></header>
+    <div class="table-wrap"><table class="table" id="equipmentTable"></table></div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-head"><h2>Тайминги по продуктам</h2><span class="unit">средние показатели за период</span></header>
+    <div class="table-wrap"><table class="table" id="productTable"></table></div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-head"><h2>Детализация операций</h2><span class="unit">последние записи</span></header>
+    <div class="table-wrap"><table class="table" id="detailTable"></table></div>
+  </section>
+
+  <footer class="page-foot">
+    <span id="sourceLine">—</span>
+    <button class="btn" id="refresh">Обновить сейчас</button>
+  </footer>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
