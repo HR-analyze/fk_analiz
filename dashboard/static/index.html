@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ФК — аналитика производства</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📊</text></svg>">
 <link rel="stylesheet" href="/static/style.css">
@@ -14,53 +14,90 @@
     <p class="page-sub" id="periodLine">Загрузка данных…</p>
   </header>
 
-  <section class="panel filters">
-    <label class="field"><span>Дата от</span><input type="date" id="dateFrom"></label>
-    <label class="field"><span>до</span><input type="date" id="dateTo"></label>
-    <label class="field"><span>Оборудование</span><select id="equipment"><option value="all">Все</option></select></label>
-    <label class="field"><span>Продукт</span><select id="product"><option value="all">Все</option></select></label>
-    <label class="field"><span>Смена</span><select id="shift">
-      <option value="all">Все</option>
-      <option value="day">День (08:00–20:00)</option>
-      <option value="night">Ночь (20:00–08:00)</option>
-    </select></label>
-    <div class="field actions">
-      <button class="btn primary" id="apply">Применить</button>
-      <button class="btn" id="reset">Сброс</button>
+  <details class="panel filters" id="filterPanel">
+    <summary class="filters-toggle">
+      <span>Фильтры</span>
+      <span class="filters-hint" id="filterHint">все данные</span>
+    </summary>
+    <div class="filters-body">
+      <label class="field"><span>Дата от</span><input type="date" id="dateFrom"></label>
+      <label class="field"><span>до</span><input type="date" id="dateTo"></label>
+      <label class="field"><span>Оборудование</span><select id="equipment"><option value="all">Все</option></select></label>
+      <label class="field"><span>Продукт</span><select id="product"><option value="all">Все</option></select></label>
+      <label class="field"><span>Сотрудник</span><select id="employee"><option value="all">Все</option></select></label>
+      <label class="field"><span>Смена</span><select id="shift">
+        <option value="all">Все</option>
+        <option value="day">День 08–20</option>
+        <option value="night">Ночь 20–08</option>
+      </select></label>
+      <label class="field"><span>Час</span><select id="hour"><option value="">Все</option></select></label>
+      <div class="field actions">
+        <button class="btn primary" id="apply">Применить</button>
+        <button class="btn" id="reset">Сброс</button>
+      </div>
     </div>
-  </section>
+  </details>
 
+  <div id="chips" class="chips-bar" hidden></div>
   <div id="alert" class="alert" hidden></div>
 
   <section class="kpis" id="kpis"></section>
 
   <section class="grid-2">
-    <article class="panel"><header class="panel-head"><h2>Выпуск по дням</h2><span class="unit">шт</span></header><div id="chartDaily" class="chart"></div></article>
-    <article class="panel"><header class="panel-head"><h2>Производительность по часам</h2><span class="unit">шт/час (средняя)</span></header><div id="chartHourly" class="chart"></div></article>
+    <article class="panel">
+      <header class="panel-head"><h2>Выпуск по дням</h2><span class="unit">шт · нажми на столбец</span></header>
+      <div id="chartDaily" class="chart"></div>
+    </article>
+    <article class="panel">
+      <header class="panel-head"><h2>Производительность по часам</h2><span class="unit">шт/час · нажми на столбец</span></header>
+      <div id="chartHourly" class="chart"></div>
+    </article>
   </section>
 
   <section class="grid-2">
-    <article class="panel"><header class="panel-head"><h2>Выпуск по оборудованию</h2><span class="unit">шт</span></header><div id="chartEquipment" class="chart"></div></article>
-    <article class="panel"><header class="panel-head"><h2>Топ продуктов</h2><span class="unit">шт</span></header><div id="chartProducts" class="chart"></div></article>
+    <article class="panel">
+      <header class="panel-head"><h2>Выпуск по оборудованию</h2><span class="unit">шт · нажми на столбец</span></header>
+      <div id="chartEquipment" class="chart"></div>
+    </article>
+    <article class="panel">
+      <header class="panel-head"><h2>Топ продуктов</h2><span class="unit">шт · нажми на столбец</span></header>
+      <div id="chartProducts" class="chart"></div>
+    </article>
   </section>
 
   <section class="grid-2">
-    <article class="panel"><header class="panel-head"><h2>Распределение простоев по причинам</h2><span class="unit">минуты</span></header><div id="chartReasons" class="chart"></div></article>
-    <article class="panel"><header class="panel-head"><h2>Эффективность: работа vs простои</h2><span class="unit">минуты</span></header><div id="chartWork" class="chart"></div></article>
+    <article class="panel">
+      <header class="panel-head"><h2>Выпуск по сотрудникам</h2><span class="unit">шт · нажми на столбец</span></header>
+      <div id="chartEmployees" class="chart"></div>
+    </article>
+    <article class="panel">
+      <header class="panel-head"><h2>Распределение простоев по причинам</h2><span class="unit">минуты</span></header>
+      <div id="chartReasons" class="chart"></div>
+    </article>
   </section>
 
   <section class="panel">
-    <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">операции, выпуск, длительность</span></header>
+    <header class="panel-head"><h2>Эффективность: работа vs простои</h2><span class="unit">минуты</span></header>
+    <div id="chartWork" class="chart"></div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">нажми на карточку</span></header>
     <div id="dailyChips" class="chips"></div>
   </section>
 
   <section class="panel">
-    <header class="panel-head"><h2>Сводка по оборудованию</h2><span class="unit">загрузка и простои</span></header>
+    <header class="panel-head"><h2>Сводка по сотрудникам</h2><span class="unit">нажми на строку</span></header>
+    <div class="table-wrap"><table class="table" id="employeeTable"></table></div>
+  </section>
+
+  <section class="panel">
+    <header class="panel-head"><h2>Сводка по оборудованию</h2><span class="unit">нажми на строку</span></header>
     <div class="table-wrap"><table class="table" id="equipmentTable"></table></div>
   </section>
 
   <section class="panel">
-    <header class="panel-head"><h2>Тайминги по продуктам</h2><span class="unit">средние показатели за период</span></header>
+    <header class="panel-head"><h2>Тайминги по продуктам</h2><span class="unit">нажми на строку</span></header>
     <div class="table-wrap"><table class="table" id="productTable"></table></div>
   </section>
 
@@ -71,9 +108,10 @@
 
   <footer class="page-foot">
     <span id="sourceLine">—</span>
-    <button class="btn" id="refresh">Обновить сейчас</button>
+    <button class="btn" id="refresh">Обновить</button>
   </footer>
 </main>
+<div id="tip" class="tip" hidden></div>
 <script src="/static/app.js"></script>
 </body>
 </html>

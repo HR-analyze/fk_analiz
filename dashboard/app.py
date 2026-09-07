@@ -14,6 +14,8 @@ log = logging.getLogger("fk.dashboard")
 PORT = int(os.getenv("PORT", "8090"))
 STATIC = Path(__file__).parent / "static"
 REFRESH_SECONDS = int(os.getenv("REFRESH_SECONDS", "60"))
+# Даты, которые дашборд не показывает. База при этом не трогается — фильтр только на чтении.
+EXCLUDE_DATES = tuple(d.strip() for d in os.getenv("EXCLUDE_DATES", "").split(",") if d.strip())
 source = DataSource()
 
 
@@ -42,7 +44,7 @@ async def meta(request):
         "timezone": str(TZ),
         "refresh_seconds": REFRESH_SECONDS,
         "source": source.describe(),
-        **aggregate.build_meta(snapshot),
+        **aggregate.build_meta(snapshot, EXCLUDE_DATES),
     }))
 
 
@@ -55,10 +57,14 @@ async def summary(request):
         equipment=request.query.get("equipment", "all").strip(),
         product=request.query.get("product", "all").strip(),
         shift=request.query.get("shift", "all").strip(),
+        employee=request.query.get("employee", "all").strip(),
+        hour=request.query.get("hour", "").strip(),
+        exclude_dates=EXCLUDE_DATES,
     )
     payload = aggregate.build_summary(production, pauses)
     payload["ok"] = True
     payload["source"] = source.describe()
+    payload["excluded_dates"] = list(EXCLUDE_DATES)
     return no_store(web.json_response(payload))
 
 
