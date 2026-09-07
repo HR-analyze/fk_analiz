@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 HHMM = re.compile(r"^(\d{1,2})[:.\-](\d{2})")
 DAY_SHIFT = (8 * 60, 20 * 60)  # 08:00–19:59 — день, остальное — ночь
+WEEKDAYS = ("пн", "вт", "ср", "чт", "пт", "сб", "вс")
 
 
 def parse_hhmm(value):
@@ -104,7 +105,7 @@ def _sum_by(rows, key, value_fn, limit=None):
     return items[:limit] if limit else items
 
 
-def daily_output(production, pauses):
+def daily_output(production, pauses, plans=None, plan_filters=None):
     acc = {}
     for r in production:
         d = acc.setdefault(r["date"], {"date": r["date"], "ops": 0, "qty": 0, "durations": [], "stop": 0})
@@ -116,14 +117,24 @@ def daily_output(production, pauses):
     for r in pauses:
         d = acc.setdefault(r["date"], {"date": r["date"], "ops": 0, "qty": 0, "durations": [], "stop": 0})
         d["stop"] += duration_min(r["start_time"], r["end_time"])
+    filters = dict(plan_filters or {})
+    filters.pop("date_from", None)
+    filters.pop("date_to", None)
     out = []
     for d in sorted(acc.values(), key=lambda x: x["date"]):
+        plan = 0
+        if plans:
+            per_day, _ = plan_for_period(plans, d["date"], d["date"], **filters)
+            plan = sum(v["plan"] for v in per_day.values())
         out.append({
             "date": d["date"],
+            "weekday": WEEKDAYS[date.fromisoformat(d["date"]).weekday()] if d["date"] else "",
             "ops": d["ops"],
             "qty": d["qty"],
             "avg_duration": round(_avg(d["durations"])),
             "stop": d["stop"],
+            "plan": plan,
+            "done": round(d["qty"] / plan * 100, 1) if plan else None,
         })
     return out
 
@@ -265,7 +276,74 @@ def employee_timings(production, pauses):
     return rows
 
 
-def build_summary(production, pauses, detail_limit=300):
+def plan_for_period(plans, date_from="", date_to="", equipment="all", product="all",
+                    exclude_dates=()):
+    """Складывает план по датам периода. Ключ в хранилище: "оборудование|продукт"."""
+    excluded = set(exclude_dates or ())
+    acc, days = {}, []
+    for day, items in (plans or {}).items():
+        if day in excluded:
+            continue
+        if date_from and day < date_from:
+            continue
+        if date_to and day > date_to:
+            continue
+        days.append(day)
+        for key, qty in items.items():
+            eq, _, pr = str(key).partition("|")
+            if equipment not in ("all", "") and eq != equipment:
+                continue
+            if product not in ("all", "") and pr != product:
+                continue
+            slot = acc.setdefault((eq, pr), {"equipment": eq, "product": pr, "plan": 0})
+            slot["plan"] += int(qty or 0)
+    return acc, sorted(days)
+
+
+def plan_vs_fact(production, plans, date_from="", date_to="", equipment="all",
+                 product="all", exclude_dates=()):
+    acc, days = plan_for_period(plans, date_from, date_to, equipment, product, exclude_dates)
+    for r in production:
+        slot = acc.setdefault((r["equipment"], r["product"]),
+                              {"equipment": r["equipment"], "product": r["product"], "plan": 0})
+        slot["fact"] = slot.get("fact", 0) + r["qty"]
+
+    rows = []
+    for slot in acc.values():
+        plan = slot.get("plan", 0)
+        fact = slot.get("fact", 0)
+        rows.append({
+            "equipment": slot["equipment"],
+            "product": slot["product"],
+            "plan": plan,
+            "fact": fact,
+            "diff": fact - plan,
+            "done": round(fact / plan * 100, 1) if plan else None,
+        })
+    # Сначала самые крупные отставания, затем всё остальное по факту.
+    rows.sort(key=lambda x: (x["diff"] if x["plan"] else 10**12, -x["fact"]))
+    total_plan = sum(r["plan"] for r in rows)
+    total_fact = sum(r["fact"] for r in rows)
+    planned = [r for r in rows if r["plan"] > 0]
+    # Недобор считаем по отстающим позициям: перевыполнение по одной номенклатуре
+    # не закрывает провал по другой — на производстве это разные линии и заказы.
+    shortfall = sum(r["plan"] - r["fact"] for r in planned if r["fact"] < r["plan"])
+    return {
+        "has_plan": total_plan > 0,
+        "plan_days": days,
+        "total_plan": total_plan,
+        "total_fact": total_fact,
+        "diff": total_fact - total_plan,
+        "done": round(total_fact / total_plan * 100, 1) if total_plan else None,
+        "positions": len(planned),
+        "positions_done": sum(1 for r in planned if r["fact"] >= r["plan"]),
+        "shortfall": shortfall,
+        "rows": rows[:40],
+        "behind": [r for r in planned if r["fact"] < r["plan"]][:10],
+    }
+
+
+def build_summary(production, pauses, detail_limit=300, plans=None, plan_filters=None):
     durations = [duration_min(r["start_time"], r["end_time"]) for r in production]
     work_minutes = sum(durations)
     stop_minutes = sum(duration_min(r["start_time"], r["end_time"]) for r in pauses)
@@ -278,6 +356,11 @@ def build_summary(production, pauses, detail_limit=300):
     total = work_minutes + stop_minutes
 
     detail = sorted(production, key=lambda r: r["created_at"], reverse=True)[:detail_limit]
+    hourly = hourly_productivity(production)
+    worked = [h["value"] for h in hourly if h["value"] > 0]
+    # Цель по часам — средняя за период: столбцы ниже неё и есть провалы.
+    hourly_target = round(sum(worked) / len(worked), 1) if worked else 0.0
+    pf = plan_vs_fact(production, plans or {}, **(plan_filters or {}))
 
     return {
         "kpi": {
@@ -291,8 +374,11 @@ def build_summary(production, pauses, detail_limit=300):
             "utilization": round(work_minutes / total * 100, 1) if total else 0.0,
             "open_operations": sum(1 for r in production if r["status"] != "closed"),
         },
-        "daily": daily_output(production, pauses),
-        "hourly": hourly_productivity(production),
+        "daily": daily_output(production, pauses, plans, plan_filters),
+        "hourly": hourly,
+        "hourly_target": hourly_target,
+        "hourly_below": sum(1 for h in hourly if 0 < h["value"] < hourly_target),
+        "plan": pf,
         "by_equipment": _sum_by(production, "equipment", lambda r: r["qty"]),
         "top_products": _sum_by(production, "product", lambda r: r["qty"], limit=12),
         "pause_reasons": _sum_by(pauses, "reason", lambda r: duration_min(r["start_time"], r["end_time"])),

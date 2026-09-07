@@ -1,6 +1,7 @@
 // Валидированная категориальная палитра (dataviz: все гейты пройдены на светлой поверхности).
 const PIE_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300',
                     '#4a3aa7', '#e34948', '#0f766e', '#9a3412', '#6d28d9', '#be123c'];
+const BELOW_COLOR = '#e34948';   // статусный: час ниже средней
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 const num = (v) => Number(v || 0).toLocaleString('ru-RU');
@@ -20,6 +21,12 @@ const SHIFT_NAMES = { all: 'все смены', day: 'дневная смена'
 let meta = null;
 let timer = null;
 let lastData = null;
+
+const store = {
+  get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* приватный режим */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } },
+};
 
 function formatMoment(iso) {
   if (!iso) return '—';
@@ -61,7 +68,8 @@ function barChart(items, opts = {}) {
   const padB = rotate ? (narrow ? 78 : 92) : 38;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
-  const max = niceMax(Math.max(...items.map((i) => i.value)));
+  const target = Number(opts.target) || 0;
+  const max = niceMax(Math.max(...items.map((i) => i.value), target));
   const slot = plotW / items.length;
   const barW = Math.max(4, Math.min(slot * 0.62, 62));
   const labelEvery = narrow && items.length > 14 ? Math.ceil(items.length / 8) : 1;
@@ -78,14 +86,17 @@ function barChart(items, opts = {}) {
     const h = max ? (item.value / max) * plotH : 0;
     const x = padL + slot * i + (slot - barW) / 2;
     const y = padT + plotH - h;
+    const below = target > 0 && item.value > 0 && item.value < target;
+    const fill = below ? BELOW_COLOR : color;
     const active = opts.activeValue !== undefined && String(item.key ?? item.label) === String(opts.activeValue);
     const attrs = opts.filterKey
-      ? ` data-filter="${esc(opts.filterKey)}" data-value="${esc(item.key ?? item.label)}"`
+      ? ` data-filter="${esc(opts.filterKey)}" data-value="${esc(item.key ?? item.label)}" role="button" tabindex="0"`
       : '';
-    const label = `${item.label}: ${dec(item.value)}${opts.unit ? ' ' + opts.unit : ''}`;
+    const tip = `${item.label}: ${dec(item.value)}${opts.unit ? ' ' + opts.unit : ''}`
+      + (below ? ` · ниже средней на ${dec(target - item.value)}` : '');
     // Прозрачная зона на всю колонку — палец на мобилке попадает даже мимо самого столбца.
-    parts.push(`<rect class="hit${opts.filterKey ? ' clickable' : ''}${active ? ' active' : ''}" x="${(padL + slot * i).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent"${attrs} data-tip="${esc(label)}"/>`);
-    parts.push(`<rect class="bar${active ? ' active' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h, item.value > 0 ? 2 : 0).toFixed(1)}" rx="4" fill="${color}" pointer-events="none"/>`);
+    parts.push(`<rect class="hit${opts.filterKey ? ' clickable' : ''}${active ? ' active' : ''}" x="${(padL + slot * i).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent"${attrs} data-tip="${esc(tip)}"/>`);
+    parts.push(`<rect class="bar${active ? ' active' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h, item.value > 0 ? 2 : 0).toFixed(1)}" rx="4" fill="${fill}" pointer-events="none"/>`);
     if (i % labelEvery === 0) {
       const lx = padL + slot * i + slot / 2;
       if (rotate) {
@@ -95,6 +106,13 @@ function barChart(items, opts = {}) {
       }
     }
   });
+
+  if (target > 0) {
+    const ty = padT + plotH - (target / max) * plotH;
+    parts.push(`<line x1="${padL}" y1="${ty.toFixed(1)}" x2="${W - padR}" y2="${ty.toFixed(1)}" stroke="#101828" stroke-width="1.5" stroke-dasharray="6 4" pointer-events="none"/>`);
+    parts.push(`<rect x="${padL + 4}" y="${(ty - 17).toFixed(1)}" width="${narrow ? 132 : 150}" height="15" rx="4" fill="#101828" pointer-events="none"/>`);
+    parts.push(`<text x="${padL + 10}" y="${(ty - 6).toFixed(1)}" font-size="${font - 0.5}" fill="#fff" pointer-events="none">средняя ${esc(dec(target))}${opts.unit ? ' ' + opts.unit : ''}</text>`);
+  }
 
   parts.push(`<line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#d9dfe8" stroke-width="1" pointer-events="none"/>`);
   return `<svg viewBox="0 0 ${W} ${H}" role="img">${parts.join('')}</svg>`;
@@ -138,7 +156,7 @@ function pieChart(items, opts = {}) {
   return `<svg viewBox="0 0 ${W} ${H}" role="img">${parts.join('')}</svg><div class="legend">${legend}</div>`;
 }
 
-/* ─── таблицы и карточки ──────────────────────────────────────────────────── */
+/* ─── таблицы ─────────────────────────────────────────────────────────────── */
 
 function renderTable(el, columns, rows, cells, rowFilter) {
   if (!rows.length) {
@@ -149,7 +167,7 @@ function renderTable(el, columns, rows, cells, rowFilter) {
   const body = rows.map((row) => {
     const f = rowFilter ? rowFilter(row) : null;
     const active = f && String(FILTERS[f.key]) === String(f.value);
-    const attrs = f ? ` class="row-click${active ? ' active' : ''}" data-filter="${esc(f.key)}" data-value="${esc(f.value)}"` : '';
+    const attrs = f ? ` class="row-click${active ? ' active' : ''}" data-filter="${esc(f.key)}" data-value="${esc(f.value)}" role="button" tabindex="0"` : '';
     return `<tr${attrs}>` + cells(row).map((v, i) =>
       `<td${columns[i].num ? ' class="num"' : ''} data-label="${esc(columns[i].title)}">${v}</td>`).join('') + '</tr>';
   }).join('');
@@ -168,6 +186,102 @@ function renderKpis(k) {
   $('kpis').innerHTML = cards.map(([label, value, note]) =>
     `<div class="kpi"><div class="k-label">${esc(label)}</div><div class="k-value">${esc(value)}</div><div class="k-note">${esc(note)}</div></div>`
   ).join('');
+}
+
+/* ─── план / факт ─────────────────────────────────────────────────────────── */
+
+function planClass(done) {
+  if (done === null || done === undefined) return '';
+  if (done >= 100) return ' ok';
+  if (done >= 90) return ' warn';
+  return ' bad';
+}
+
+function renderPlan(p) {
+  const tiles = $('planTiles');
+  const table = $('planTable');
+  const panel = $('planPanel');
+  if (!p || !p.has_plan) {
+    tiles.innerHTML = '<div class="plan-empty">План на выбранный период не загружен. Заполни колонку «План количество» в шаблоне и загрузи файл.</div>';
+    $('planDates').textContent = 'план не загружен';
+    panel.hidden = true;
+    return;
+  }
+  const short = Number(p.shortfall || 0);
+  const missing = p.positions - p.positions_done;
+  tiles.innerHTML = [
+    ['План', num(p.total_plan) + ' шт', `позиций: ${num(p.positions)}`, ''],
+    ['Факт', num(p.total_fact) + ' шт', p.diff >= 0 ? `+${num(p.diff)} шт к плану` : `${num(p.diff)} шт`, ''],
+    ['Выполнение', p.done === null ? '—' : dec(p.done) + '%', `закрыто позиций: ${num(p.positions_done)} из ${num(p.positions)}`, planClass(p.done)],
+    ['Недобор по позициям', short ? num(short) + ' шт' : 'нет',
+     short ? `не закрыто позиций: ${num(missing)}` : 'все позиции закрыты',
+     short ? (missing > p.positions / 4 ? ' bad' : ' warn') : ' ok'],
+  ].map(([label, value, note, cls]) =>
+    `<div class="plan-tile${cls}"><div class="k-label">${esc(label)}</div><div class="k-value">${esc(value)}</div><div class="k-note">${esc(note)}</div></div>`
+  ).join('');
+  const periodDays = (lastData && lastData.daily ? lastData.daily.length : 0) || p.plan_days.length;
+  const gap = periodDays > p.plan_days.length
+    ? ` ⚠ в периоде ${periodDays} дн. — факт больше плана просто из-за разницы дней`
+    : '';
+  $('planDates').textContent = `план на ${p.plan_days.length} дн.: ${p.plan_days.join(', ')}${gap}`;
+
+  panel.hidden = false;
+  renderTable(table,
+    [{ title: 'Продукт' }, { title: 'Оборудование' }, { title: 'План', num: true },
+     { title: 'Факт', num: true }, { title: 'Разница', num: true }, { title: 'Выполнение', num: true }],
+    p.rows,
+    (r) => [`<span class="tag">${esc(r.product)}</span>`, esc(r.equipment), num(r.plan), num(r.fact),
+            `<span class="delta${r.diff < 0 ? ' bad' : ' ok'}">${r.diff >= 0 ? '+' : ''}${num(r.diff)}</span>`,
+            r.done === null ? '—' : `<span class="delta${planClass(r.done).trim() ? planClass(r.done) : ''}">${dec(r.done)}%</span>`],
+    (r) => ({ key: 'product', value: r.product }));
+}
+
+async function refreshPlanState() {
+  try {
+    const r = await fetch('/api/plan', { cache: 'no-store' });
+    const d = await r.json();
+    const note = $('planNote');
+    if (!d.upload_enabled) {
+      $('planUploadBtn').disabled = true;
+      note.textContent = 'загрузка выключена: на сервере не задан PLAN_UPLOAD_TOKEN';
+      return;
+    }
+    $('planUploadBtn').disabled = false;
+    note.textContent = d.dates.length
+      ? `загружено дат: ${d.dates.length} (${d.dates.slice(-3).join(', ')}${d.dates.length > 3 ? ' …' : ''}), позиций: ${d.positions}`
+      : 'планов пока нет';
+  } catch (e) {
+    $('planNote').textContent = 'не удалось получить состояние планов';
+  }
+}
+
+async function uploadPlan(file) {
+  let token = store.get('fk_plan_token');
+  if (!token) {
+    token = (window.prompt('Ключ загрузки плана (PLAN_UPLOAD_TOKEN из .env)') || '').trim();
+    if (!token) return;
+  }
+  const note = $('planNote');
+  note.textContent = 'загружаю…';
+  const form = new FormData();
+  form.append('file', file, file.name);
+  // В шаблоне «Дата план» — формула =TODAY(); если Excel не сохранил значение,
+  // сервер возьмёт эту дату.
+  form.append('date', $('planDate').value || '');
+  try {
+    const r = await fetch('/api/plan/upload', { method: 'POST', body: form, headers: { 'X-Plan-Token': token } });
+    const d = await r.json();
+    if (!r.ok || !d.ok) {
+      if (r.status === 401) store.del('fk_plan_token');
+      throw new Error(d.error || 'ошибка загрузки');
+    }
+    store.set('fk_plan_token', token);
+    note.textContent = `загружено: ${d.loaded_positions} позиций на ${d.loaded_dates.join(', ')}`;
+    await refreshPlanState();
+    await loadSummary(false);
+  } catch (e) {
+    note.textContent = '⚠️ ' + e.message;
+  }
 }
 
 /* ─── фильтры ─────────────────────────────────────────────────────────────── */
@@ -268,6 +382,7 @@ function readControls() {
 function render(data) {
   lastData = data;
   renderKpis(data.kpi);
+  renderPlan(data.plan);   // читает lastData.daily для предупреждения о разнице дней
 
   $('chartDaily').innerHTML = barChart(
     data.daily.map((d) => ({ label: d.date.slice(5), key: d.date, value: d.qty })),
@@ -276,7 +391,11 @@ function render(data) {
 
   $('chartHourly').innerHTML = barChart(
     data.hourly.map((h, i) => ({ label: h.label, key: String(i), value: h.value })),
-    { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: 'шт/ч', activeValue: FILTERS.hour });
+    { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: 'шт/ч',
+      target: data.hourly_target, activeValue: FILTERS.hour });
+  $('hourlyNote').textContent = data.hourly_target
+    ? `шт/час · средняя ${dec(data.hourly_target)} · ниже неё часов: ${num(data.hourly_below)} (красные)`
+    : 'шт/час · нажми на столбец';
 
   const cap = isNarrow() ? 8 : 12;
   $('chartEquipment').innerHTML = barChart(data.by_equipment.slice(0, cap),
@@ -289,10 +408,21 @@ function render(data) {
   $('chartReasons').innerHTML = pieChart(data.pause_reasons);
   $('chartWork').innerHTML = pieChart(data.work_vs_stop, { donut: true, colors: ['#2a78d6', '#e34948'] });
 
-  $('dailyChips').innerHTML = data.daily.length
+  // Сводка по дням: крупный факт, полоска доли от лучшего дня, план отдельной строкой.
+  const best = Math.max(1, ...data.daily.map((d) => d.qty));
+  $('dailyCards').innerHTML = data.daily.length
     ? data.daily.map((d) => {
         const active = FILTERS.dateFrom === d.date && FILTERS.dateTo === d.date;
-        return `<button class="chip${active ? ' active' : ''}" data-filter="date" data-value="${esc(d.date)}"><b>${esc(d.date.slice(5))}</b> · оп: ${num(d.ops)}, шт: ${num(d.qty)}, ср.длит: ${num(d.avg_duration)} мин, простои: ${num(d.stop)} мин</button>`;
+        const planRow = d.plan
+          ? `<div class="dc-plan${planClass(d.done)}"><span>план ${num(d.plan)}</span><b>${dec(d.done)}%</b></div>`
+          : '';
+        return `<button class="daycard${active ? ' active' : ''}" data-filter="date" data-value="${esc(d.date)}" role="button" tabindex="0">
+          <div class="dc-top"><span class="dc-date">${esc(d.date.slice(5))}</span><span class="dc-wd">${esc(d.weekday || '')}</span></div>
+          <div class="dc-qty">${num(d.qty)}<small>шт</small></div>
+          <div class="dc-meter"><i style="width:${(d.qty / best * 100).toFixed(1)}%"></i></div>
+          ${planRow}
+          <div class="dc-foot"><span>${num(d.ops)} оп.</span><span>${num(d.avg_duration)} мин</span><span class="${d.stop ? 'dc-stop' : ''}">${d.stop ? hm(d.stop) : 'без простоев'}</span></div>
+        </button>`;
       }).join('')
     : '<div class="empty">Нет данных за выбранный период</div>';
 
@@ -387,6 +517,55 @@ function moveTip(e, text) {
 
 function hideTip() { $('tip').hidden = true; }
 
+/* ─── нажатия ─────────────────────────────────────────────────────────────── */
+
+function actionTarget(node) {
+  // closest() на SVG-элементах есть не везде — поднимаемся вручную по parentNode.
+  let el = node;
+  while (el && el !== document) {
+    if (el.dataset && (el.dataset.filter || el.dataset.clear)) return el;
+    el = el.parentNode || (el.correspondingUseElement && el.correspondingUseElement.parentNode);
+  }
+  return null;
+}
+
+function runAction(el) {
+  hideTip();
+  if (el.dataset.clear) clearFilter(el.dataset.clear);
+  else if (el.dataset.filter) setFilter(el.dataset.filter, el.dataset.value);
+}
+
+function bindTaps() {
+  // pointerup вместо click: в мобильных браузерах click с не-интерактивных
+  // элементов (SVG, tr) до document доходит не всегда, pointerup — всегда.
+  let start = null;
+  document.addEventListener('pointerdown', (e) => {
+    start = { x: e.clientX, y: e.clientY, el: actionTarget(e.target) };
+  }, true);
+  document.addEventListener('pointerup', (e) => {
+    const el = actionTarget(e.target);
+    if (!el || !start || start.el !== el) { start = null; return; }
+    const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+    start = null;
+    if (moved > 12) return;             // это был скролл, а не нажатие
+    e.preventDefault();
+    runAction(el);
+  }, true);
+  document.addEventListener('pointercancel', () => { start = null; }, true);
+  // Клавиатура и мышь там, где pointer-события не поддерживаются.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = actionTarget(e.target);
+    if (el) { e.preventDefault(); runAction(el); }
+  });
+  if (!window.PointerEvent) {
+    document.addEventListener('click', (e) => {
+      const el = actionTarget(e.target);
+      if (el) runAction(el);
+    });
+  }
+}
+
 /* ─── старт ───────────────────────────────────────────────────────────────── */
 
 function fillSelect(el, values, all) {
@@ -394,27 +573,28 @@ function fillSelect(el, values, all) {
 }
 
 function bindEvents() {
-  // Клик по столбцу графика, чипу дня или строке таблицы = фильтр.
-  document.addEventListener('click', (e) => {
-    const clear = e.target.closest('[data-clear]');
-    if (clear) { clearFilter(clear.dataset.clear); return; }
-    const hit = e.target.closest('[data-filter]');
-    if (hit) { hideTip(); setFilter(hit.dataset.filter, hit.dataset.value); }
-  });
+  bindTaps();
 
   document.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch') return;      // на тапе тултип только мешает
-    const mark = e.target.closest('[data-tip]');
+    const mark = e.target.closest ? e.target.closest('[data-tip]') : null;
     if (mark) moveTip(e, mark.dataset.tip); else hideTip();
   });
-  document.addEventListener('pointerleave', hideTip);
   window.addEventListener('blur', hideTip);
+  window.addEventListener('scroll', hideTip, { passive: true });
 
   $('apply').addEventListener('click', () => { readControls(); loadSummary(false); });
   $('reset').addEventListener('click', () => { resetFilters(); syncControls(); loadSummary(false); });
   $('refresh').addEventListener('click', () => loadSummary(true));
   ['dateFrom', 'dateTo', 'equipment', 'product', 'employee', 'shift', 'hour'].forEach((id) =>
     $(id).addEventListener('change', () => { readControls(); loadSummary(false); }));
+
+  $('planUploadBtn').addEventListener('click', () => $('planFile').click());
+  $('planFile').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) uploadPlan(file);
+    e.target.value = '';
+  });
 
   let width = window.innerWidth;
   window.addEventListener('resize', () => {
@@ -442,10 +622,12 @@ async function init() {
   if (meta.date_min) { $('dateFrom').min = meta.date_min; $('dateTo').min = meta.date_min; }
   if (meta.date_max) { $('dateFrom').max = meta.date_max; $('dateTo').max = meta.date_max; }
   if (!isNarrow()) $('filterPanel').open = true;
+  $('planDate').value = (meta && meta.date_max) || new Date().toISOString().slice(0, 10);
 
   resetFilters();
   syncControls();
   bindEvents();
+  await refreshPlanState();
   await loadSummary(false);
 
   const every = Math.max(15, Number(meta.refresh_seconds) || 60) * 1000;
