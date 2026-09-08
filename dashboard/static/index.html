@@ -20,6 +20,12 @@
     <p class="page-sub" id="periodLine">Загрузка данных…</p>
   </header>
 
+  <nav class="tabs" id="tabs" role="tablist">
+    <button class="tab active" role="tab" data-tab="dashboard">Дашборд</button>
+    <button class="tab" role="tab" data-tab="plan">План / факт</button>
+    <button class="tab" role="tab" data-tab="history">История загрузок</button>
+  </nav>
+
   <details class="panel filters" id="filterPanel">
     <summary class="filters-toggle">
       <span>Фильтры</span>
@@ -45,97 +51,120 @@
   </details>
 
   <div id="chips" class="chips-bar" hidden></div>
-
-  <section class="panel planbar" id="planBar">
-    <header class="panel-head">
-      <h2>План / факт</h2>
-      <span class="unit" id="planDates">план не загружен</span>
-    </header>
-    <div class="plan-tiles" id="planTiles"></div>
-    <div class="plan-actions">
-      <label class="field"><span>Дата плана</span><input type="date" id="planDate"></label>
-      <button class="btn" id="planUploadBtn">Загрузить план (.xlsx)</button>
-      <input type="file" id="planFile" accept=".xlsx,.xlsm" hidden>
-      <span class="plan-note" id="planNote"></span>
-    </div>
-  </section>
-
   <div id="alert" class="alert" hidden></div>
 
-  <section class="kpis" id="kpis"></section>
+  <!-- ── Дашборд ─────────────────────────────────────────────────────────── -->
+  <div class="tab-page" data-page="dashboard">
+    <section class="kpis" id="kpis"></section>
 
-  <section class="grid-2">
-    <article class="panel" data-widget="daily">
-      <header class="panel-head"><h2>Выпуск по дням</h2><span class="unit">шт · нажми на столбец</span></header>
-      <div id="chartDaily" class="chart"></div>
-    </article>
-    <article class="panel" data-widget="hourly">
-      <header class="panel-head"><h2>Производительность по часам</h2><span class="unit" id="hourlyNote">шт/час · нажми на столбец</span></header>
-      <div id="chartHourly" class="chart"></div>
-    </article>
-  </section>
+    <section class="grid-2">
+      <article class="panel" data-widget="daily">
+        <header class="panel-head"><h2>Выпуск по дням</h2><span class="unit">шт · нажми на столбец</span></header>
+        <div id="chartDaily" class="chart"></div>
+      </article>
+      <article class="panel" data-widget="hourly">
+        <header class="panel-head"><h2>Производительность по часам</h2><span class="unit" id="hourlyNote">шт/час · нажми на столбец</span></header>
+        <div id="chartHourly" class="chart"></div>
+      </article>
+    </section>
 
-  <section class="grid-2">
-    <article class="panel" data-widget="equipment">
-      <header class="panel-head"><h2>Выпуск по оборудованию</h2><span class="unit">шт · нажми на столбец</span></header>
-      <div id="chartEquipment" class="chart"></div>
-    </article>
-    <article class="panel" data-widget="products">
-      <header class="panel-head"><h2>Топ продуктов</h2><span class="unit">шт · нажми на столбец</span></header>
-      <div id="chartProducts" class="chart"></div>
-    </article>
-  </section>
+    <section class="grid-2">
+      <article class="panel" data-widget="equipment">
+        <header class="panel-head"><h2>Выпуск по оборудованию</h2><span class="unit">шт · нажми на столбец</span></header>
+        <div id="chartEquipment" class="chart"></div>
+      </article>
+      <article class="panel" data-widget="products">
+        <header class="panel-head"><h2>Топ продуктов</h2><span class="unit">шт · нажми на столбец</span></header>
+        <div id="chartProducts" class="chart"></div>
+      </article>
+    </section>
 
-  <section class="grid-2">
-    <article class="panel" data-widget="employees">
-      <header class="panel-head"><h2>Выпуск по сотрудникам</h2><span class="unit">шт · нажми на столбец</span></header>
-      <div id="chartEmployees" class="chart"></div>
-    </article>
-    <article class="panel" data-widget="reasons">
-      <header class="panel-head"><h2>Распределение простоев по причинам</h2><span class="unit">минуты</span></header>
-      <div id="chartReasons" class="chart"></div>
-    </article>
-  </section>
+    <section class="grid-2">
+      <article class="panel" data-widget="employees">
+        <header class="panel-head"><h2>Выпуск по сотрудникам</h2><span class="unit">шт · нажми на столбец</span></header>
+        <div id="chartEmployees" class="chart"></div>
+      </article>
+      <article class="panel" data-widget="reasons">
+        <header class="panel-head"><h2>Распределение простоев по причинам</h2><span class="unit">минуты</span></header>
+        <div id="chartReasons" class="chart"></div>
+      </article>
+    </section>
 
-  <section class="panel" data-widget="work_vs_stop">
-    <header class="panel-head"><h2>Эффективность: работа vs простои</h2><span class="unit">минуты</span></header>
-    <div id="chartWork" class="chart"></div>
-  </section>
+    <section class="panel" data-widget="work_vs_stop">
+      <header class="panel-head"><h2>Эффективность: работа vs простои</h2><span class="unit">минуты</span></header>
+      <div id="chartWork" class="chart"></div>
+    </section>
 
-  <section class="panel" id="analysisPanel">
-    <header class="panel-head"><h2>Сводка фактов</h2><span class="unit">попадает в PDF</span></header>
-    <div id="analysis" class="analysis"></div>
-  </section>
+    <section class="panel" id="analysisPanel">
+      <header class="panel-head"><h2>Сводка фактов</h2><span class="unit">попадает в PDF</span></header>
+      <div id="analysis" class="analysis"></div>
+    </section>
 
-  <section class="panel" data-widget="daily">
-    <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">нажми на карточку</span></header>
-    <div id="dailyCards" class="daycards"></div>
-  </section>
+    <section class="panel" data-widget="daily">
+      <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">нажми на карточку</span></header>
+      <div id="dailyCards" class="daycards"></div>
+    </section>
 
-  <section class="panel" id="planPanel" hidden data-widget="plan">
-    <header class="panel-head"><h2>План / факт по позициям</h2><span class="unit">нажми на строку</span></header>
-    <div class="table-wrap"><table class="table" id="planTable"></table></div>
-  </section>
+    <section class="panel" data-widget="employee_timings">
+      <header class="panel-head"><h2>Сводка по сотрудникам</h2><span class="unit">нажми на строку</span></header>
+      <div class="table-wrap"><table class="table" id="employeeTable"></table></div>
+    </section>
 
-  <section class="panel" data-widget="employee_timings">
-    <header class="panel-head"><h2>Сводка по сотрудникам</h2><span class="unit">нажми на строку</span></header>
-    <div class="table-wrap"><table class="table" id="employeeTable"></table></div>
-  </section>
+    <section class="panel" data-widget="equipment_timings">
+      <header class="panel-head"><h2>Сводка по оборудованию</h2><span class="unit">нажми на строку</span></header>
+      <div class="table-wrap"><table class="table" id="equipmentTable"></table></div>
+    </section>
 
-  <section class="panel" data-widget="equipment_timings">
-    <header class="panel-head"><h2>Сводка по оборудованию</h2><span class="unit">нажми на строку</span></header>
-    <div class="table-wrap"><table class="table" id="equipmentTable"></table></div>
-  </section>
+    <section class="panel" data-widget="product_timings">
+      <header class="panel-head"><h2>Тайминги по продуктам</h2><span class="unit">нажми на строку</span></header>
+      <div class="table-wrap"><table class="table" id="productTable"></table></div>
+    </section>
 
-  <section class="panel" data-widget="product_timings">
-    <header class="panel-head"><h2>Тайминги по продуктам</h2><span class="unit">нажми на строку</span></header>
-    <div class="table-wrap"><table class="table" id="productTable"></table></div>
-  </section>
+    <section class="panel" data-widget="detail">
+      <header class="panel-head"><h2>Детализация операций</h2><span class="unit">последние записи</span></header>
+      <div class="table-wrap"><table class="table" id="detailTable"></table></div>
+    </section>
+  </div>
 
-  <section class="panel" data-widget="detail">
-    <header class="panel-head"><h2>Детализация операций</h2><span class="unit">последние записи</span></header>
-    <div class="table-wrap"><table class="table" id="detailTable"></table></div>
-  </section>
+  <!-- ── План / факт ─────────────────────────────────────────────────────── -->
+  <div class="tab-page" data-page="plan" hidden>
+    <section class="panel">
+      <header class="panel-head"><h2>Загрузка плана</h2><span class="unit" id="planNote"></span></header>
+      <div class="drop" id="dropzone" tabindex="0" role="button"
+           aria-label="Перетащи файл плана сюда или нажми, чтобы выбрать">
+        <div class="drop-icon">⤵</div>
+        <div class="drop-title">Перетащи сюда файл плана</div>
+        <div class="drop-sub">или нажми, чтобы выбрать · .xlsx, .xlsm</div>
+        <input type="file" id="planFile" accept=".xlsx,.xlsm" hidden>
+      </div>
+      <div class="plan-actions">
+        <label class="field"><span>Дата плана</span><input type="date" id="planDate"></label>
+        <span class="plan-hint">Подставляется в строки, где «Дата план» пустая — в шаблоне там формула <code>=TODAY()</code>.</span>
+      </div>
+      <div id="uploadResult" class="upload-result" hidden></div>
+    </section>
+
+    <section class="panel" id="planBar">
+      <header class="panel-head"><h2>План / факт</h2><span class="unit" id="planDates">план не загружен</span></header>
+      <div class="plan-tiles" id="planTiles"></div>
+    </section>
+
+    <section class="panel" id="planPanel" data-widget="plan" hidden>
+      <header class="panel-head"><h2>План / факт по позициям</h2><span class="unit">нажми на строку</span></header>
+      <div class="table-wrap"><table class="table" id="planTable"></table></div>
+    </section>
+  </div>
+
+  <!-- ── История загрузок ────────────────────────────────────────────────── -->
+  <div class="tab-page" data-page="history" hidden>
+    <section class="panel">
+      <header class="panel-head">
+        <h2>История загрузок плана</h2>
+        <span class="unit" id="historyNote"></span>
+      </header>
+      <div class="table-wrap"><table class="table" id="historyTable"></table></div>
+    </section>
+  </div>
 
   <footer class="page-foot">
     <span id="sourceLine">—</span>

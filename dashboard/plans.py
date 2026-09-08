@@ -142,59 +142,79 @@ def parse_workbook(stream, default_date=""):
     return plans
 
 
+HISTORY_LIMIT = int(os.getenv("PLAN_HISTORY_LIMIT", "200"))
+
+
+def _read():
+    if not PLAN_FILE.exists():
+        return {}
+    try:
+        with open(PLAN_FILE, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        log.exception("не удалось прочитать %s", PLAN_FILE)
+        return {}
+
+
+def _write(payload):
+    PLAN_FILE.parent.mkdir(parents=True, exist_ok=True)
+    # Пишем через временный файл, чтобы не оставить обрезанный JSON при сбое.
+    fd, tmp = tempfile.mkstemp(dir=str(PLAN_FILE.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False)
+        os.replace(tmp, PLAN_FILE)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
 def load():
     with _lock:
-        if not PLAN_FILE.exists():
-            return {}
-        try:
-            with open(PLAN_FILE, encoding="utf-8") as fh:
-                data = json.load(fh)
-            return data.get("plans", {}) if isinstance(data, dict) else {}
-        except Exception:
-            log.exception("не удалось прочитать %s", PLAN_FILE)
-            return {}
+        return _read().get("plans", {})
+
+
+def history():
+    with _lock:
+        entries = _read().get("history", [])
+    return list(reversed(entries))          # свежие сверху
+
+
+def log_upload(entry):
+    """Журнал загрузок: и удачных, и отклонённых — чтобы было видно, что пробовали залить."""
+    with _lock:
+        stored = _read()
+        entries = stored.get("history", [])
+        entries.append({"at": datetime.now().isoformat(timespec="seconds"), **entry})
+        stored["history"] = entries[-HISTORY_LIMIT:]
+        stored.setdefault("plans", {})
+        _write(stored)
 
 
 def save(new_plans, source=""):
     """Планы накапливаются: загрузка перезаписывает только присланные даты."""
     with _lock:
-        current = {}
-        if PLAN_FILE.exists():
-            try:
-                with open(PLAN_FILE, encoding="utf-8") as fh:
-                    stored = json.load(fh)
-                current = stored.get("plans", {}) if isinstance(stored, dict) else {}
-            except Exception:
-                log.exception("повреждённый %s — перезаписываю", PLAN_FILE)
+        stored = _read()
+        current = stored.get("plans", {})
+        replaced = {d: sum(current[d].values()) for d in new_plans if d in current}
         current.update(new_plans)
-        payload = {"updated_at": datetime.now().isoformat(timespec="seconds"),
-                   "source": source, "plans": current}
-        PLAN_FILE.parent.mkdir(parents=True, exist_ok=True)
-        # Пишем через временный файл, чтобы не оставить обрезанный JSON при сбое.
-        fd, tmp = tempfile.mkstemp(dir=str(PLAN_FILE.parent), suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                json.dump(payload, fh, ensure_ascii=False)
-            os.replace(tmp, PLAN_FILE)
-        except Exception:
-            os.path.exists(tmp) and os.unlink(tmp)
-            raise
-        return current
+        stored.update({"updated_at": datetime.now().isoformat(timespec="seconds"),
+                       "source": source, "plans": current})
+        _write(stored)
+        return current, replaced
 
 
 def delete_dates(dates):
     with _lock:
-        if not PLAN_FILE.exists():
-            return {}
-        with open(PLAN_FILE, encoding="utf-8") as fh:
-            stored = json.load(fh)
-        plans = stored.get("plans", {}) if isinstance(stored, dict) else {}
-        for d in dates:
-            plans.pop(d, None)
-        stored = {"updated_at": datetime.now().isoformat(timespec="seconds"),
-                  "source": stored.get("source", ""), "plans": plans}
-        fd, tmp = tempfile.mkstemp(dir=str(PLAN_FILE.parent), suffix=".tmp")
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(stored, fh, ensure_ascii=False)
-        os.replace(tmp, PLAN_FILE)
+        stored = _read()
+        plans = stored.get("plans", {})
+        removed = [d for d in dates if plans.pop(d, None) is not None]
+        stored.update({"updated_at": datetime.now().isoformat(timespec="seconds"), "plans": plans})
+        entries = stored.get("history", [])
+        entries.append({"at": datetime.now().isoformat(timespec="seconds"), "action": "delete",
+                        "ok": True, "file": "", "dates": removed, "positions": 0})
+        stored["history"] = entries[-HISTORY_LIMIT:]
+        _write(stored)
         return plans
