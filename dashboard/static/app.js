@@ -220,6 +220,7 @@ function renderPlan(p) {
   const table = $('planTable');
   const panel = $('planPanel');
   if (!p || !p.has_plan) {
+    $('planSkew').hidden = true;
     tiles.innerHTML = '<div class="plan-empty">План на выбранный период не загружен. Заполни колонку «План количество» в шаблоне и загрузи файл.</div>';
     $('planDates').textContent = 'план не загружен';
     panel.hidden = true;
@@ -227,11 +228,17 @@ function renderPlan(p) {
   }
   const short = Number(p.shortfall || 0);
   const missing = p.positions - p.positions_done;
+  // План разрезается только по дате, оборудованию и продукту. При фильтре по
+  // сотруднику, смене или часу факт сужается, а план нет — это уже не «выполнение».
+  const skew = p.unsupported_filters || [];
+  const doneLabel = skew.length ? 'Доля от полного плана' : 'Выполнение';
   tiles.innerHTML = [
     ['План', num(p.total_plan), 'шт', `позиций: ${num(p.positions)}`, ''],
     ['Факт', num(p.total_fact), 'шт', p.diff >= 0 ? `+${num(p.diff)} шт к плану` : `${num(p.diff)} шт`, ''],
-    ['Выполнение', p.done === null ? '—' : dec(p.done), p.done === null ? '' : '%',
-     `закрыто позиций: ${num(p.positions_done)} из ${num(p.positions)}`, planClass(p.done)],
+    [doneLabel, p.done === null ? '—' : dec(p.done), p.done === null ? '' : '%',
+     skew.length ? 'план по этому фильтру не разрезается'
+                 : `закрыто позиций: ${num(p.positions_done)} из ${num(p.positions)}`,
+     skew.length ? ' warn' : planClass(p.done)],
     ['Недобор по позициям', short ? num(short) : 'нет', short ? 'шт' : '',
      short ? `не закрыто позиций: ${num(missing)}` : 'все позиции закрыты',
      short ? (missing > p.positions / 4 ? ' bad' : ' warn') : ' ok'],
@@ -247,6 +254,16 @@ function renderPlan(p) {
     ? ` ⚠ в периоде ${periodDays} дн. — факт больше плана просто из-за разницы дней`
     : '';
   $('planDates').textContent = `план на ${p.plan_days.length} дн.: ${p.plan_days.join(', ')}${gap}`;
+
+  const warn = $('planSkew');
+  if (skew.length) {
+    warn.hidden = false;
+    warn.textContent = `⚠️ В файле плана нет разреза по ${skew.join(', ')}. ` +
+      `Факт сужен фильтром, а план взят целиком — проценты ниже реальных. ` +
+      `Для честного сравнения сними ${skew.length > 1 ? 'эти фильтры' : 'этот фильтр'}.`;
+  } else {
+    warn.hidden = true;
+  }
 
   panel.hidden = false;
   renderTable(table,
