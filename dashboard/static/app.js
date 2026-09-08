@@ -284,6 +284,44 @@ async function uploadPlan(file) {
   }
 }
 
+/* ─── выгрузки ────────────────────────────────────────────────────────────── */
+
+function download(url) {
+  // Content-Disposition: attachment — браузер скачивает файл и остаётся на странице.
+  const a = document.createElement('a');
+  a.href = url;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function exportWidget(widget) {
+  download(`/api/export/xlsx?widget=${encodeURIComponent(widget)}&` + query(false));
+}
+
+function mountExportButtons() {
+  document.querySelectorAll('.panel[data-widget]').forEach((panel) => {
+    const head = panel.querySelector('.panel-head');
+    if (!head || head.querySelector('.export-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'export-btn';
+    btn.type = 'button';
+    btn.title = 'Выгрузить в Excel с текущими фильтрами';
+    btn.textContent = '⤓ Excel';
+    btn.addEventListener('click', () => exportWidget(panel.dataset.widget));
+    head.appendChild(btn);
+  });
+}
+
+function renderAnalysis(blocks) {
+  const el = $('analysis');
+  if (!blocks || !blocks.length) { el.innerHTML = '<div class="empty">Нет данных за выбранный период</div>'; return; }
+  el.innerHTML = blocks.map(([heading, lines]) =>
+    `<section class="an-block"><h3>${esc(heading)}</h3><ul>` +
+    lines.map((l) => `<li>${esc(l)}</li>`).join('') + '</ul></section>').join('');
+}
+
 /* ─── фильтры ─────────────────────────────────────────────────────────────── */
 
 function activeFilters() {
@@ -458,6 +496,9 @@ function render(data) {
             esc(r.start_time || '—'), esc(r.end_time || '—'), num(r.qty),
             r.status === 'closed' ? 'завершена' : esc(r.status), esc(r.user_name)]);
 
+  renderAnalysis(data.analysis);
+  mountExportButtons();
+
   const src = data.source || {};
   const fetched = formatMoment(src.fetched_at);
   const modes = { db: 'PostgreSQL (только чтение)', api: 'API бота', demo: 'тестовые данные (demo)' };
@@ -589,6 +630,8 @@ function bindEvents() {
   ['dateFrom', 'dateTo', 'equipment', 'product', 'employee', 'shift', 'hour'].forEach((id) =>
     $(id).addEventListener('change', () => { readControls(); loadSummary(false); }));
 
+  $('exportPdf').addEventListener('click', () => download('/api/export/pdf?' + query(false)));
+  $('exportAll').addEventListener('click', () => exportWidget('all'));
   $('planUploadBtn').addEventListener('click', () => $('planFile').click());
   $('planFile').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];

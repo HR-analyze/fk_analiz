@@ -10,7 +10,13 @@
 <body>
 <main class="wrap">
   <header class="page-head">
-    <h1>Аналитический отчёт по производству</h1>
+    <div class="head-row">
+      <h1>Аналитический отчёт по производству</h1>
+      <div class="head-actions">
+        <button class="btn primary" id="exportPdf">Скачать PDF</button>
+        <button class="btn" id="exportAll">Excel: всё</button>
+      </div>
+    </div>
     <p class="page-sub" id="periodLine">Загрузка данных…</p>
   </header>
 
@@ -59,69 +65,74 @@
   <section class="kpis" id="kpis"></section>
 
   <section class="grid-2">
-    <article class="panel">
+    <article class="panel" data-widget="daily">
       <header class="panel-head"><h2>Выпуск по дням</h2><span class="unit">шт · нажми на столбец</span></header>
       <div id="chartDaily" class="chart"></div>
     </article>
-    <article class="panel">
+    <article class="panel" data-widget="hourly">
       <header class="panel-head"><h2>Производительность по часам</h2><span class="unit" id="hourlyNote">шт/час · нажми на столбец</span></header>
       <div id="chartHourly" class="chart"></div>
     </article>
   </section>
 
   <section class="grid-2">
-    <article class="panel">
+    <article class="panel" data-widget="equipment">
       <header class="panel-head"><h2>Выпуск по оборудованию</h2><span class="unit">шт · нажми на столбец</span></header>
       <div id="chartEquipment" class="chart"></div>
     </article>
-    <article class="panel">
+    <article class="panel" data-widget="products">
       <header class="panel-head"><h2>Топ продуктов</h2><span class="unit">шт · нажми на столбец</span></header>
       <div id="chartProducts" class="chart"></div>
     </article>
   </section>
 
   <section class="grid-2">
-    <article class="panel">
+    <article class="panel" data-widget="employees">
       <header class="panel-head"><h2>Выпуск по сотрудникам</h2><span class="unit">шт · нажми на столбец</span></header>
       <div id="chartEmployees" class="chart"></div>
     </article>
-    <article class="panel">
+    <article class="panel" data-widget="reasons">
       <header class="panel-head"><h2>Распределение простоев по причинам</h2><span class="unit">минуты</span></header>
       <div id="chartReasons" class="chart"></div>
     </article>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-widget="work_vs_stop">
     <header class="panel-head"><h2>Эффективность: работа vs простои</h2><span class="unit">минуты</span></header>
     <div id="chartWork" class="chart"></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="analysisPanel">
+    <header class="panel-head"><h2>Сводка фактов</h2><span class="unit">попадает в PDF</span></header>
+    <div id="analysis" class="analysis"></div>
+  </section>
+
+  <section class="panel" data-widget="daily">
     <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">нажми на карточку</span></header>
     <div id="dailyCards" class="daycards"></div>
   </section>
 
-  <section class="panel" id="planPanel" hidden>
+  <section class="panel" id="planPanel" hidden data-widget="plan">
     <header class="panel-head"><h2>План / факт по позициям</h2><span class="unit">нажми на строку</span></header>
     <div class="table-wrap"><table class="table" id="planTable"></table></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-widget="employee_timings">
     <header class="panel-head"><h2>Сводка по сотрудникам</h2><span class="unit">нажми на строку</span></header>
     <div class="table-wrap"><table class="table" id="employeeTable"></table></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-widget="equipment_timings">
     <header class="panel-head"><h2>Сводка по оборудованию</h2><span class="unit">нажми на строку</span></header>
     <div class="table-wrap"><table class="table" id="equipmentTable"></table></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-widget="product_timings">
     <header class="panel-head"><h2>Тайминги по продуктам</h2><span class="unit">нажми на строку</span></header>
     <div class="table-wrap"><table class="table" id="productTable"></table></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" data-widget="detail">
     <header class="panel-head"><h2>Детализация операций</h2><span class="unit">последние записи</span></header>
     <div class="table-wrap"><table class="table" id="detailTable"></table></div>
   </section>
