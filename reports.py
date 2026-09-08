@@ -38,16 +38,32 @@ def report_period(kind: str, now=None):
     return start, end
 
 
+def _as_dt(value):
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value))
+        return dt if dt.tzinfo else dt.replace(tzinfo=TZ)
+    except ValueError:
+        return None
+
+
 async def fetch_dashboard(start, end):
     if not API_KEY:
         raise RuntimeError("DASHBOARD_API_KEY is required")
-    params = {"date_from": start.isoformat(), "date_to": (end - timedelta(seconds=1)).date().isoformat()}
+    # Existing dashboard API accepts date ranges, so request the whole calendar day
+    # and apply the exact operational 08:00–20:00 boundary locally.
+    day_start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    params = {"date_from": day_start.isoformat(), "date_to": day_start.date().isoformat()}
     headers = {"X-API-Key": API_KEY}
     timeout = aiohttp.ClientTimeout(total=30)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         async with session.get(f"{API_URL}/api/dashboard/all", params=params, headers=headers) as response:
             response.raise_for_status()
-            return await response.json()
+            data = await response.json()
+    data["production"] = [x for x in data.get("production", []) if start <= (_as_dt(x.get("created_at")) or start) < end]
+    data["pauses"] = [x for x in data.get("pauses", []) if start <= (_as_dt(x.get("created_at")) or start) < end]
+    return data
 
 
 def _fmt(value):
