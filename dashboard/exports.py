@@ -17,9 +17,16 @@ def _pct(value, total):
     return round(value / total * 100, 1) if total else None
 
 
+def _done_column(summary):
+    """При фильтре, которого нет в плане, столбец процента — не «выполнение»."""
+    skew = (summary.get("plan") or {}).get("unsupported_filters") or []
+    return ("Доля от полного плана, %" if skew else "Выполнение, %"), skew
+
+
 def widget_rows(summary, widget):
     """(заголовок, колонки, строки) для одного виджета дашборда."""
     k = summary["kpi"]
+    done_column, _ = _done_column(summary)
     if widget == "kpi":
         return "KPI", ["Показатель", "Значение"], [
             ["Операций", k["operations"]],
@@ -34,7 +41,7 @@ def widget_rows(summary, widget):
         ]
     if widget == "daily":
         return "Выпуск по дням", ["Дата", "День", "Операций", "Выпуск, шт", "План, шт",
-                                  "Выполнение, %", "Ср. длительность, мин", "Простои, мин"], [
+                                  done_column, "Ср. длительность, мин", "Простои, мин"], [
             [d["date"], d["weekday"], d["ops"], d["qty"], d["plan"] or "", d["done"] if d["done"] is not None else "",
              d["avg_duration"], d["stop"]] for d in summary["daily"]]
     if widget == "hourly":
@@ -73,7 +80,7 @@ def widget_rows(summary, widget):
             for r in summary["product_timings"]]
     if widget == "plan":
         plan = summary.get("plan") or {}
-        return "План и факт", ["Продукт", "Оборудование", "План, шт", "Факт, шт", "Разница, шт", "Выполнение, %"], [
+        return "План и факт", ["Продукт", "Оборудование", "План, шт", "Факт, шт", "Разница, шт", done_column], [
             [r["product"], r["equipment"], r["plan"], r["fact"], r["diff"],
              r["done"] if r["done"] is not None else ""] for r in plan.get("rows", [])]
     if widget == "detail":
@@ -126,6 +133,11 @@ def build_xlsx(summary, widget, filters):
     for row in filter_rows(filters):
         ws.append(row)
     ws.append(["Выгружено", datetime.now(TZ).strftime("%d.%m.%Y %H:%M")])
+    _, skew = _done_column(summary)
+    if skew:
+        ws.append([])
+        ws.append(["Внимание", "В файле плана нет разреза по " + ", ".join(skew) + "."])
+        ws.append(["", "Факт сужен фильтром, план взят целиком — проценты ниже реальных."])
     for idx in (1, 2):
         ws.cell(row=1, column=idx).fill = head_fill
         ws.cell(row=1, column=idx).font = head_font

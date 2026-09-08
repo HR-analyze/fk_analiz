@@ -171,6 +171,13 @@ async def collect(request):
     }
     stored_plans = await asyncio.to_thread(plan_store.load)
     payload = aggregate.build_summary(production, pauses, plans=stored_plans, plan_filters=plan_filters)
+    # В файле плана есть только дата, оборудование и продукт. Фильтры по сотруднику,
+    # смене и часу сужают факт, но не план, поэтому сравнение перестаёт быть
+    # «выполнением» — об этом надо сказать прямо, а не показывать цифру молча.
+    payload["plan"]["unsupported_filters"] = [
+        name for name, value in (("сотруднику", args["employee"] not in ("all", "")),
+                                 ("смене", args["shift"] not in ("all", "")),
+                                 ("часу", bool(args["hour"]))) if value]
     payload["source"] = source.describe()
     payload["excluded_dates"] = list(EXCLUDE_DATES)
 

@@ -468,9 +468,15 @@ def build_analysis(summary, filters=None):
 
     plan = summary.get("plan") or {}
     if plan.get("has_plan"):
+        skew = plan.get("unsupported_filters") or []
         rows = [
             f"План: {n(plan['total_plan'])} шт на даты {', '.join(plan['plan_days'])}.",
-            f"Факт: {n(plan['total_fact'])} шт, выполнение {plan['done']}%.",
+            (f"Факт: {n(plan['total_fact'])} шт, доля от полного плана {plan['done']}%."
+             if skew else f"Факт: {n(plan['total_fact'])} шт, выполнение {plan['done']}%."),]
+        if skew:
+            rows.append("В файле плана нет разреза по " + ", ".join(skew)
+                        + ": факт сужен фильтром, план взят целиком.")
+        rows += [
             f"Закрыто позиций: {plan['positions_done']} из {plan['positions']}.",
             f"Недобор по отстающим позициям: {n(plan['shortfall'])} шт.",
         ]
