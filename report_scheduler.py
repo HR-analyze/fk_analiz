@@ -20,11 +20,18 @@ async def send(kind: str):
     if not TOKEN or not CHAT:
         raise RuntimeError("BOT_TOKEN and WORK_CHAT_ID are required for reports")
     pdf, start, end = await build_report(kind)
-    caption = (
-        f"📊 Оперативная сводка за {start:%d.%m.%Y} ({start:%H:%M}–{end:%H:%M})"
-        if kind == "operational"
-        else f"📊 Итоговая сводка за {start:%d.%m.%Y} (00:00–24:00)"
-    )
+    if kind == "operational":
+        caption = (
+            f"📊 Оперативная сводка за {start:%d.%m.%Y}\n"
+            f"Период: {start:%H:%M}–{end:%H:%M}\n"
+            "Краткий отчёт о производстве за текущий день."
+        )
+    else:
+        caption = (
+            f"📊 Итоговая сводка за {start:%d.%m.%Y}\n"
+            "Период: 00:00–24:00\n"
+            "Итоговый отчёт о производстве за полный предыдущий день."
+        )
     filename = f"fk_{kind}_{start:%Y%m%d}.pdf"
     bot = Bot(TOKEN)
     try:
@@ -36,7 +43,7 @@ async def send(kind: str):
 
 
 async def scheduler_loop():
-    log.info("Production report scheduler started: operational 20:00, final 00:05 (%s)", TZ.key)
+    log.info("Production report scheduler started: operational 20:00, final 08:00 (%s)", TZ.key)
     last_operational = None
     last_final = None
     while True:
@@ -47,7 +54,7 @@ async def scheduler_loop():
                 await send("operational")
             except Exception:
                 log.exception("Operational report failed")
-        if now.hour == 0 and now.minute == 5 and last_final != now.date():
+        if now.hour == 8 and now.minute == 0 and last_final != now.date():
             last_final = now.date()
             try:
                 await send("final")
