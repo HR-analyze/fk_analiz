@@ -591,12 +591,15 @@ function render(data) {
   $('chartWork').innerHTML = pieChart(data.work_vs_stop, { donut: true, colors: ['#2a78d6', '#e34948'] });
 
   // Сводка по дням: крупный факт, полоска доли от лучшего дня, план отдельной строкой.
+  // Процент считается из того же суженного факта и полного плана, что и на вкладке
+  // «План / факт», поэтому при неподдерживаемом фильтре он тут тоже не «выполнение».
+  const daySkew = ((data.plan || {}).unsupported_filters || []).length > 0;
   const best = Math.max(1, ...data.daily.map((d) => d.qty));
   $('dailyCards').innerHTML = data.daily.length
     ? data.daily.map((d) => {
         const active = FILTERS.dateFrom === d.date && FILTERS.dateTo === d.date;
         const planRow = d.plan
-          ? `<div class="dc-plan${planClass(d.done)}"><span>план ${num(d.plan)}</span><b>${dec(d.done)}%</b></div>`
+          ? `<div class="dc-plan${daySkew ? '' : planClass(d.done)}" ${daySkew ? 'title="План не разрезается по выбранному фильтру — это доля от полного плана"' : ''}><span>план ${num(d.plan)}</span><b>${daySkew ? 'доля ' : ''}${dec(d.done)}%</b></div>`
           : '';
         return `<button class="daycard${active ? ' active' : ''}" data-filter="date" data-value="${esc(d.date)}" role="button" tabindex="0">
           <div class="dc-top"><span class="dc-date">${esc(d.date.slice(5))}</span><span class="dc-wd">${esc(d.weekday || '')}</span></div>
