@@ -62,8 +62,8 @@ function barChart(items, opts = {}) {
   const rotate = opts.rotate === undefined ? items.length > 12 : !!opts.rotate;
   const W = narrow ? 460 : 760;
   const H = opts.height || (narrow ? 260 : 310);
-  const padL = narrow ? 52 : 64;
-  const padR = 10;
+  const padL = narrow ? 56 : 64;
+  const padR = narrow ? 14 : 10;
   const padT = 12;
   const padB = rotate ? (narrow ? 78 : 92) : 38;
   const plotW = W - padL - padR;
@@ -100,7 +100,8 @@ function barChart(items, opts = {}) {
     if (i % labelEvery === 0) {
       const lx = padL + slot * i + slot / 2;
       if (rotate) {
-        parts.push(`<text transform="translate(${lx.toFixed(1)},${padT + plotH + 13}) rotate(-40)" text-anchor="end" font-size="${font}" fill="#6b7687" pointer-events="none">${esc(item.label)}</text>`);
+        const tx = Math.max(lx, padL - 2);
+        parts.push(`<text transform="translate(${tx.toFixed(1)},${padT + plotH + 13}) rotate(-40)" text-anchor="end" font-size="${font}" fill="#6b7687" pointer-events="none">${esc(item.label)}</text>`);
       } else {
         parts.push(`<text x="${lx.toFixed(1)}" y="${padT + plotH + 19}" text-anchor="middle" font-size="${font}" fill="#6b7687" pointer-events="none">${esc(item.label)}</text>`);
       }
@@ -174,18 +175,35 @@ function renderTable(el, columns, rows, cells, rowFilter) {
   el.innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
 }
 
+function fitValues(root) {
+  // Число и единица не переносятся, поэтому длинное значение ужимаем по ширине карточки.
+  root.querySelectorAll('.k-value').forEach((el) => {
+    el.style.fontSize = '';
+    const base = parseFloat(getComputedStyle(el).fontSize);
+    let size = base;
+    while (el.scrollWidth > el.clientWidth + 1 && size > base * 0.6) {
+      size -= 1;
+      el.style.fontSize = size + 'px';
+    }
+  });
+}
+
 function renderKpis(k) {
   const cards = [
-    ['Операций', num(k.operations), k.open_operations ? `из них открыто: ${num(k.open_operations)}` : 'за период'],
-    ['Выпуск (шт)', num(k.quantity), 'всего'],
-    ['Средняя длит.', `${num(k.avg_duration)} мин`, 'на операцию'],
-    ['Производительность', `${dec(k.avg_rate)} шт/ч`, 'средняя'],
-    ['Простои', num(k.pauses), `суммарно ${hm(k.stop_minutes)}`],
-    ['Коэф. использования', `${dec(k.utilization)}%`, 'работа / (работа + простои)'],
+    ['Операций', num(k.operations), '', k.open_operations ? `из них открыто: ${num(k.open_operations)}` : 'за период'],
+    ['Выпуск', num(k.quantity), 'шт', 'всего'],
+    ['Средняя длит.', num(k.avg_duration), 'мин', 'на операцию'],
+    ['Производительность', dec(k.avg_rate), 'шт/ч', 'средняя'],
+    ['Простои', num(k.pauses), '', `суммарно ${hm(k.stop_minutes)}`],
+    ['Коэф. использования', dec(k.utilization), '%', 'работа / (работа + простои)'],
   ];
-  $('kpis').innerHTML = cards.map(([label, value, note]) =>
-    `<div class="kpi"><div class="k-label">${esc(label)}</div><div class="k-value">${esc(value)}</div><div class="k-note">${esc(note)}</div></div>`
+  $('kpis').innerHTML = cards.map(([label, value, unit, note]) =>
+    `<div class="kpi"><div class="k-label">${esc(label)}</div>` +
+    `<div class="k-value"><span class="k-num">${esc(value)}</span>` +
+    (unit ? `<span class="k-unit">${esc(unit)}</span>` : '') + '</div>' +
+    `<div class="k-note">${esc(note)}</div></div>`
   ).join('');
+  fitValues($('kpis'));
 }
 
 /* ─── план / факт ─────────────────────────────────────────────────────────── */
@@ -210,15 +228,20 @@ function renderPlan(p) {
   const short = Number(p.shortfall || 0);
   const missing = p.positions - p.positions_done;
   tiles.innerHTML = [
-    ['План', num(p.total_plan) + ' шт', `позиций: ${num(p.positions)}`, ''],
-    ['Факт', num(p.total_fact) + ' шт', p.diff >= 0 ? `+${num(p.diff)} шт к плану` : `${num(p.diff)} шт`, ''],
-    ['Выполнение', p.done === null ? '—' : dec(p.done) + '%', `закрыто позиций: ${num(p.positions_done)} из ${num(p.positions)}`, planClass(p.done)],
-    ['Недобор по позициям', short ? num(short) + ' шт' : 'нет',
+    ['План', num(p.total_plan), 'шт', `позиций: ${num(p.positions)}`, ''],
+    ['Факт', num(p.total_fact), 'шт', p.diff >= 0 ? `+${num(p.diff)} шт к плану` : `${num(p.diff)} шт`, ''],
+    ['Выполнение', p.done === null ? '—' : dec(p.done), p.done === null ? '' : '%',
+     `закрыто позиций: ${num(p.positions_done)} из ${num(p.positions)}`, planClass(p.done)],
+    ['Недобор по позициям', short ? num(short) : 'нет', short ? 'шт' : '',
      short ? `не закрыто позиций: ${num(missing)}` : 'все позиции закрыты',
      short ? (missing > p.positions / 4 ? ' bad' : ' warn') : ' ok'],
-  ].map(([label, value, note, cls]) =>
-    `<div class="plan-tile${cls}"><div class="k-label">${esc(label)}</div><div class="k-value">${esc(value)}</div><div class="k-note">${esc(note)}</div></div>`
+  ].map(([label, value, unit, note, cls]) =>
+    `<div class="plan-tile${cls}"><div class="k-label">${esc(label)}</div>` +
+    `<div class="k-value"><span class="k-num">${esc(value)}</span>` +
+    (unit ? `<span class="k-unit">${esc(unit)}</span>` : '') + '</div>' +
+    `<div class="k-note">${esc(note)}</div></div>`
   ).join('');
+  fitValues(tiles);
   const periodDays = (lastData && lastData.daily ? lastData.daily.length : 0) || p.plan_days.length;
   const gap = periodDays > p.plan_days.length
     ? ` ⚠ в периоде ${periodDays} дн. — факт больше плана просто из-за разницы дней`
@@ -236,17 +259,117 @@ function renderPlan(p) {
     (r) => ({ key: 'product', value: r.product }));
 }
 
+/* ─── вкладки ─────────────────────────────────────────────────────────────── */
+
+const TABS = ['dashboard', 'plan', 'history'];
+let activeTab = 'dashboard';
+
+function showTab(name, push = true) {
+  if (!TABS.includes(name)) name = 'dashboard';
+  activeTab = name;
+  document.querySelectorAll('.tab').forEach((t) => {
+    const on = t.dataset.tab === name;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('.tab-page').forEach((p) => { p.hidden = p.dataset.page !== name; });
+  // Фильтры не относятся к журналу загрузок — там они только путают.
+  $('filterPanel').hidden = name === 'history';
+  $('chips').hidden = name === 'history' || !activeFilters().length;
+  if (push && location.hash.slice(1) !== name) history.replaceState(null, '', '#' + name);
+  store.set('fk_tab', name);
+  if (name === 'history') loadHistory();
+  if (name !== 'history' && lastData) { mountExportButtons(); fitValues(document); }
+}
+
+function initTabs() {
+  document.querySelectorAll('.tab').forEach((t) =>
+    t.addEventListener('click', () => showTab(t.dataset.tab)));
+  window.addEventListener('hashchange', () => showTab(location.hash.slice(1), false));
+  showTab(location.hash.slice(1) || store.get('fk_tab') || 'dashboard');
+}
+
+/* ─── история загрузок ────────────────────────────────────────────────────── */
+
+async function loadHistory() {
+  const table = $('historyTable');
+  try {
+    const r = await fetch('/api/plan/history', { cache: 'no-store' });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'сервис недоступен');
+    const rows = d.entries || [];
+    $('historyNote').textContent = rows.length ? `записей: ${rows.length}` : 'пока пусто';
+    renderTable(table,
+      [{ title: 'Когда' }, { title: 'Действие' }, { title: 'Файл' }, { title: 'Даты плана' },
+       { title: 'Позиций', num: true }, { title: 'План, шт', num: true }, { title: 'Результат' }],
+      rows,
+      (r2) => [
+        esc(formatMoment(r2.at)),
+        r2.action === 'delete' ? 'удаление' : 'загрузка',
+        esc(r2.file || '—'),
+        esc((r2.dates || []).join(', ') || '—'),
+        num(r2.positions),
+        r2.quantity ? num(r2.quantity) : '—',
+        r2.ok
+          ? `<span class="delta ok">успешно${(r2.replaced || []).length ? ' · перезаписано: ' + esc(r2.replaced.join(', ')) : ''}</span>`
+          : `<span class="delta bad">${esc(r2.error || 'ошибка')}</span>`,
+      ]);
+  } catch (e) {
+    $('historyNote').textContent = '';
+    table.innerHTML = `<tbody><tr><td class="empty">Не удалось загрузить историю: ${esc(e.message)}</td></tr></tbody>`;
+  }
+}
+
+/* ─── загрузка файла ──────────────────────────────────────────────────────── */
+
+function initDropzone() {
+  const zone = $('dropzone');
+  const input = $('planFile');
+  const open = () => input.click();
+  zone.addEventListener('click', open);
+  zone.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+  });
+  input.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) uploadPlan(file);
+    e.target.value = '';
+  });
+
+  ['dragenter', 'dragover'].forEach((type) =>
+    zone.addEventListener(type, (e) => { e.preventDefault(); zone.classList.add('over'); }));
+  ['dragleave', 'dragend'].forEach((type) =>
+    zone.addEventListener(type, () => zone.classList.remove('over')));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('over');
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) uploadPlan(file);
+  });
+  // Файл, брошенный мимо зоны, не должен открываться браузером поверх дашборда.
+  ['dragover', 'drop'].forEach((type) =>
+    window.addEventListener(type, (e) => { if (!zone.contains(e.target)) e.preventDefault(); }));
+}
+
+function showUploadResult(kind, text) {
+  const el = $('uploadResult');
+  el.hidden = false;
+  el.className = 'upload-result ' + kind;
+  el.textContent = text;
+}
+
 async function refreshPlanState() {
   try {
     const r = await fetch('/api/plan', { cache: 'no-store' });
     const d = await r.json();
     const note = $('planNote');
+    const zone = $('dropzone');
     if (!d.upload_enabled) {
-      $('planUploadBtn').disabled = true;
+      zone.classList.add('disabled');
       note.textContent = 'загрузка выключена: на сервере не задан PLAN_UPLOAD_TOKEN';
       return;
     }
-    $('planUploadBtn').disabled = false;
+    zone.classList.remove('disabled');
     note.textContent = d.dates.length
       ? `загружено дат: ${d.dates.length} (${d.dates.slice(-3).join(', ')}${d.dates.length > 3 ? ' …' : ''}), позиций: ${d.positions}`
       : 'планов пока нет';
@@ -261,8 +384,8 @@ async function uploadPlan(file) {
     token = (window.prompt('Ключ загрузки плана (PLAN_UPLOAD_TOKEN из .env)') || '').trim();
     if (!token) return;
   }
-  const note = $('planNote');
-  note.textContent = 'загружаю…';
+  if ($('dropzone').classList.contains('disabled')) return;
+  showUploadResult('pending', `Загружаю ${file.name}…`);
   const form = new FormData();
   form.append('file', file, file.name);
   // В шаблоне «Дата план» — формула =TODAY(); если Excel не сохранил значение,
@@ -276,11 +399,15 @@ async function uploadPlan(file) {
       throw new Error(d.error || 'ошибка загрузки');
     }
     store.set('fk_plan_token', token);
-    note.textContent = `загружено: ${d.loaded_positions} позиций на ${d.loaded_dates.join(', ')}`;
+    const replaced = (d.replaced_dates || []).length ? `, перезаписаны даты: ${d.replaced_dates.join(', ')}` : '';
+    showUploadResult('ok', `Загружено ${d.loaded_positions} позиций на ${d.loaded_dates.join(', ')}` +
+      ` — ${num(d.loaded_quantity || 0)} шт${replaced}.`);
     await refreshPlanState();
     await loadSummary(false);
+    if (activeTab === 'history') loadHistory();
   } catch (e) {
-    note.textContent = '⚠️ ' + e.message;
+    showUploadResult('bad', 'Не удалось загрузить: ' + e.message);
+    if (activeTab === 'history') loadHistory();
   }
 }
 
@@ -340,7 +467,7 @@ function activeFilters() {
 function renderChips() {
   const list = activeFilters();
   const bar = $('chips');
-  bar.hidden = list.length === 0;
+  bar.hidden = list.length === 0 || activeTab === 'history';
   bar.innerHTML = list.map((f) =>
     `<button class="fchip" data-clear="${esc(f.key)}">${esc(f.text)}<i>×</i></button>`).join('')
     + (list.length ? '<button class="fchip clear-all" data-clear="__all">Сбросить всё</button>' : '');
@@ -632,18 +759,14 @@ function bindEvents() {
 
   $('exportPdf').addEventListener('click', () => download('/api/export/pdf?' + query(false)));
   $('exportAll').addEventListener('click', () => exportWidget('all'));
-  $('planUploadBtn').addEventListener('click', () => $('planFile').click());
-  $('planFile').addEventListener('change', (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (file) uploadPlan(file);
-    e.target.value = '';
-  });
+  initDropzone();
 
   let width = window.innerWidth;
   window.addEventListener('resize', () => {
     // Перерисовываем только при смене режима — иначе лишние ререндеры на скролле мобилки.
     const narrowNow = window.innerWidth < 640;
     if (narrowNow !== (width < 640) && lastData) render(lastData);
+    else fitValues(document);
     width = window.innerWidth;
   });
 }
@@ -670,6 +793,7 @@ async function init() {
   resetFilters();
   syncControls();
   bindEvents();
+  initTabs();
   await refreshPlanState();
   await loadSummary(false);
 

@@ -94,16 +94,30 @@ async def plan_upload(request):
         buffer.write(chunk)
     buffer.seek(0)
 
+    filename = field.filename or ""
     try:
         parsed = await asyncio.to_thread(plan_store.parse_workbook, buffer, plan_date)
     except plan_store.PlanError as exc:
+        # Неудачную попытку тоже пишем в журнал — иначе непонятно, почему плана нет.
+        await asyncio.to_thread(plan_store.log_upload, {
+            "action": "upload", "ok": False, "file": filename, "size": size,
+            "dates": [], "positions": 0, "error": str(exc)})
         return web.json_response({"ok": False, "error": str(exc)}, status=400)
-    stored = await asyncio.to_thread(plan_store.save, parsed, field.filename or "")
-    log.info("plan uploaded: file=%s dates=%s", field.filename, sorted(parsed))
+
+    stored, replaced = await asyncio.to_thread(plan_store.save, parsed, filename)
+    positions = sum(len(v) for v in parsed.values())
+    quantity = sum(sum(v.values()) for v in parsed.values())
+    await asyncio.to_thread(plan_store.log_upload, {
+        "action": "upload", "ok": True, "file": filename, "size": size,
+        "dates": sorted(parsed), "positions": positions, "quantity": quantity,
+        "replaced": sorted(replaced), "error": ""})
+    log.info("plan uploaded: file=%s dates=%s positions=%s", filename, sorted(parsed), positions)
     return no_store(web.json_response({
         "ok": True,
         "loaded_dates": sorted(parsed),
-        "loaded_positions": sum(len(v) for v in parsed.values()),
+        "loaded_positions": positions,
+        "loaded_quantity": quantity,
+        "replaced_dates": sorted(replaced),
         "stored_dates": sorted(stored),
     }))
 
@@ -116,6 +130,11 @@ async def plan_state(request):
         "dates": sorted(stored),
         "positions": sum(len(v) for v in stored.values()),
     }))
+
+
+async def plan_history(request):
+    entries = await asyncio.to_thread(plan_store.history)
+    return no_store(web.json_response({"ok": True, "entries": entries}))
 
 
 async def plan_delete(request):
@@ -239,6 +258,7 @@ def build_app():
     app.router.add_get("/api/export/xlsx", export_xlsx)
     app.router.add_get("/api/export/pdf", export_pdf)
     app.router.add_get("/api/plan", plan_state)
+    app.router.add_get("/api/plan/history", plan_history)
     app.router.add_post("/api/plan/upload", plan_upload)
     app.router.add_delete("/api/plan", plan_delete)
     app.router.add_static("/static", STATIC, show_index=False)
