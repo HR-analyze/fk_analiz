@@ -394,6 +394,97 @@ def build_summary(production, pauses, detail_limit=300, plans=None, plan_filters
     }
 
 
+def build_analysis(summary, filters=None):
+    """Плоская выжимка фактов для PDF: суммы, доли, кто и сколько.
+
+    Без причин и рекомендаций — названия причин простоя берём ровно так,
+    как их записал бот, ничего не додумывая.
+    """
+    k = summary["kpi"]
+    daily = summary["daily"]
+    blocks = []
+
+    total = k["quantity"]
+
+    def n(value):
+        return f"{value:,.0f}".replace(",", " ")
+
+    def share(v):
+        return f" ({round(v / total * 100, 1)}%)" if total else ""
+
+    period = [
+        f"Операций за период: {k['operations']}, из них открытых: {k['open_operations']}.",
+        f"Выпуск: {n(k['quantity'])} шт.",
+        f"Средняя длительность операции: {k['avg_duration']} мин, средняя производительность: {k['avg_rate']} шт/ч.",
+        f"Простоев зафиксировано: {k['pauses']}, суммарно {n(k['stop_minutes'])} мин.",
+        f"Коэффициент использования: {k['utilization']}% (работа {n(k['work_minutes'])} мин, простои {n(k['stop_minutes'])} мин).",
+    ]
+    blocks.append(("Итоги периода", period))
+
+    if daily:
+        best = max(daily, key=lambda d: d["qty"])
+        worst = min(daily, key=lambda d: d["qty"])
+        rows = [
+            f"Дней с данными: {len(daily)}.",
+            f"Наибольший выпуск: {best['date']} — {n(best['qty'])} шт ({best['ops']} операций).",
+            f"Наименьший выпуск: {worst['date']} — {n(worst['qty'])} шт ({worst['ops']} операций).",
+        ]
+        with_stop = [d for d in daily if d["stop"]]
+        if with_stop:
+            top_stop = max(with_stop, key=lambda d: d["stop"])
+            rows.append(f"Дней с простоями: {len(with_stop)}; наибольший — {top_stop['date']}, {n(top_stop['stop'])} мин.")
+        else:
+            rows.append("Дней с зафиксированными простоями: 0.")
+        blocks.append(("По дням", rows))
+
+    for title, items, unit in (
+        ("Топ продуктов", summary["top_products"][:5], "шт"),
+        ("Выпуск по оборудованию", summary["by_equipment"][:5], "шт"),
+        ("Выпуск по сотрудникам", summary.get("top_employees", [])[:5], "шт"),
+    ):
+        if items:
+            blocks.append((title, [f"{i + 1}. {x['label']} — {n(x['value'])} {unit}{share(x['value'])}"
+                                   for i, x in enumerate(items)]))
+
+    target = summary.get("hourly_target", 0)
+    if target:
+        below = [h["label"] for h in summary["hourly"] if 0 < h["value"] < target]
+        rows = [f"Средняя производительность по часам: {target} шт/ч.",
+                f"Часов с производительностью ниже средней: {len(below)}."]
+        if below:
+            rows.append("Это часы: " + ", ".join(below) + ".")
+        idle = [h["label"] for h in summary["hourly"] if h["value"] == 0]
+        if idle:
+            rows.append(f"Часов без выпуска: {len(idle)} ({', '.join(idle)}).")
+        blocks.append(("Производительность по часам", rows))
+
+    reasons = summary["pause_reasons"]
+    if reasons:
+        total_stop = sum(r["value"] for r in reasons)
+        rows = [f"Причин в справочнике за период: {len(reasons)}, суммарно {n(total_stop)} мин."]
+        rows += [f"{i + 1}. {r['label']} — {n(r['value'])} мин"
+                 f" ({round(r['value'] / total_stop * 100, 1)}%)" for i, r in enumerate(reasons[:5])]
+        blocks.append(("Простои по причинам", rows))
+
+    plan = summary.get("plan") or {}
+    if plan.get("has_plan"):
+        rows = [
+            f"План: {n(plan['total_plan'])} шт на даты {', '.join(plan['plan_days'])}.",
+            f"Факт: {n(plan['total_fact'])} шт, выполнение {plan['done']}%.",
+            f"Закрыто позиций: {plan['positions_done']} из {plan['positions']}.",
+            f"Недобор по отстающим позициям: {n(plan['shortfall'])} шт.",
+        ]
+        rows += [f"{i + 1}. {b['product']} ({b['equipment']}) — план {n(b['plan'])}, факт {n(b['fact'])}, {b['done']}%"
+                 for i, b in enumerate(plan["behind"][:5])]
+        blocks.append(("План и факт", rows))
+
+    if filters:
+        applied = [f"{name}: {value}" for name, value in filters if value]
+        if applied:
+            blocks.append(("Применённые фильтры", applied))
+    return blocks
+
+
 def build_meta(snapshot, exclude_dates=()):
     excluded = set(exclude_dates or ())
     prod = [r for r in snapshot["production"] if r["date"] not in excluded]

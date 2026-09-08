@@ -108,6 +108,23 @@ body.loading .chart,body.loading .table,body.loading .kpis{opacity:.55;transitio
 .page-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;
   color:var(--muted);font-size:13px;padding-top:6px;flex-wrap:wrap}
 
+/* выгрузки */
+.head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.head-actions{display:flex;gap:8px;flex-wrap:wrap}
+.export-btn{margin-left:auto;font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap;
+  background:#fff;color:#3f5074;border:1px solid var(--line);border-radius:8px;padding:6px 11px;
+  min-height:34px;touch-action:manipulation}
+.export-btn:hover{background:#f2f6ff;border-color:#c9d6f5}
+.panel-head{align-items:center}
+.panel-head .unit{margin-left:auto}
+.panel-head .unit + .export-btn{margin-left:10px}
+
+/* сводка фактов */
+.analysis{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px 22px}
+.an-block h3{margin:0 0 6px;font-size:14px;font-weight:700}
+.an-block ul{margin:0;padding-left:18px}
+.an-block li{font-size:13.5px;line-height:1.5;color:#39435a;margin-bottom:2px}
+
 /* панель план/факт */
 .planbar{padding-bottom:14px}
 .plan-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
@@ -185,6 +202,15 @@ body.loading .chart,body.loading .table,body.loading .kpis{opacity:.55;transitio
   .plan-actions{margin-top:12px}
   .plan-actions .btn{width:100%}
   .plan-note{font-size:12px}
+  .head-row{flex-direction:column;gap:10px}
+  .head-actions{width:100%}
+  .head-actions .btn{flex:1}
+  .panel-head{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px}
+  .panel-head h2{flex:1 1 100%}
+  .panel-head .unit{margin-left:0;flex:1}
+  .export-btn{margin-left:auto;font-size:12px;padding:6px 10px}
+  .analysis{grid-template-columns:1fr;gap:12px}
+  .an-block li{font-size:13px}
 
   /* таблицы превращаются в карточки — горизонтальный скролл на телефоне бесполезен */
   .table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
