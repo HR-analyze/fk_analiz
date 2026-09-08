@@ -39,6 +39,21 @@
   </details>
 
   <div id="chips" class="chips-bar" hidden></div>
+
+  <section class="panel planbar" id="planBar">
+    <header class="panel-head">
+      <h2>План / факт</h2>
+      <span class="unit" id="planDates">план не загружен</span>
+    </header>
+    <div class="plan-tiles" id="planTiles"></div>
+    <div class="plan-actions">
+      <label class="field"><span>Дата плана</span><input type="date" id="planDate"></label>
+      <button class="btn" id="planUploadBtn">Загрузить план (.xlsx)</button>
+      <input type="file" id="planFile" accept=".xlsx,.xlsm" hidden>
+      <span class="plan-note" id="planNote"></span>
+    </div>
+  </section>
+
   <div id="alert" class="alert" hidden></div>
 
   <section class="kpis" id="kpis"></section>
@@ -49,7 +64,7 @@
       <div id="chartDaily" class="chart"></div>
     </article>
     <article class="panel">
-      <header class="panel-head"><h2>Производительность по часам</h2><span class="unit">шт/час · нажми на столбец</span></header>
+      <header class="panel-head"><h2>Производительность по часам</h2><span class="unit" id="hourlyNote">шт/час · нажми на столбец</span></header>
       <div id="chartHourly" class="chart"></div>
     </article>
   </section>
@@ -83,7 +98,12 @@
 
   <section class="panel">
     <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">нажми на карточку</span></header>
-    <div id="dailyChips" class="chips"></div>
+    <div id="dailyCards" class="daycards"></div>
+  </section>
+
+  <section class="panel" id="planPanel" hidden>
+    <header class="panel-head"><h2>План / факт по позициям</h2><span class="unit">нажми на строку</span></header>
+    <div class="table-wrap"><table class="table" id="planTable"></table></div>
   </section>
 
   <section class="panel">

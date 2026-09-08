@@ -69,7 +69,8 @@ body{margin:0;background:var(--bg);color:var(--text);
 .chart .empty{padding:56px 0;text-align:center;color:var(--muted)}
 
 /* интерактивные марки */
-.hit.clickable{cursor:pointer}
+.hit.clickable{cursor:pointer;touch-action:manipulation}
+.table tr.row-click,.fchip{touch-action:manipulation;-webkit-tap-highlight-color:rgba(59,110,245,.15)}
 .hit.clickable:hover + .bar{filter:brightness(1.12)}
 .bar.active{stroke:#101828;stroke-width:2}
 .hit.active{cursor:pointer}
@@ -107,6 +108,44 @@ body.loading .chart,body.loading .table,body.loading .kpis{opacity:.55;transitio
 .page-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;
   color:var(--muted);font-size:13px;padding-top:6px;flex-wrap:wrap}
 
+/* панель план/факт */
+.planbar{padding-bottom:14px}
+.plan-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.plan-tile{border:1px solid var(--line);border-radius:14px;padding:13px 15px;background:#fbfcfe}
+.plan-tile.ok{border-color:#bfe4d3;background:#f2fbf7}
+.plan-tile.warn{border-color:#f2ddb4;background:#fffaf0}
+.plan-tile.bad{border-color:#f4cac9;background:#fff5f5}
+.plan-tile .k-value{font-size:24px;font-weight:800;margin:6px 0 3px;letter-spacing:-.02em}
+.plan-empty{grid-column:1/-1;color:var(--muted);font-size:14px;padding:6px 0 2px}
+.plan-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.plan-note{color:var(--muted);font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.delta{font-variant-numeric:tabular-nums;font-weight:600}
+.delta.ok{color:#0f7a4d}
+.delta.warn{color:#a4650a}
+.delta.bad{color:#b3261e}
+
+/* сводка по дням */
+.daycards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.daycard{font:inherit;text-align:left;cursor:pointer;background:#fff;border:1px solid var(--line);
+  border-radius:14px;padding:13px 15px;display:flex;flex-direction:column;gap:7px;
+  touch-action:manipulation;-webkit-tap-highlight-color:rgba(59,110,245,.15)}
+.daycard:hover{border-color:#c9d6f5;background:#fbfcff}
+.daycard.active{border-color:var(--blue);background:#f2f6ff;box-shadow:0 0 0 1px var(--blue) inset}
+.dc-top{display:flex;justify-content:space-between;align-items:baseline}
+.dc-date{font-size:15px;font-weight:700}
+.dc-wd{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.dc-qty{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.dc-qty small{font-size:12.5px;font-weight:600;color:var(--muted);margin-left:5px}
+.dc-meter{height:5px;background:#eef1f6;border-radius:99px;overflow:hidden}
+.dc-meter i{display:block;height:100%;background:var(--blue);border-radius:99px}
+.dc-plan{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 8px;border-radius:8px;background:#f5f7fb;color:#42506a}
+.dc-plan.ok{background:#eefaf4;color:#0f7a4d}
+.dc-plan.warn{background:#fff7e8;color:#a4650a}
+.dc-plan.bad{background:#fdeceb;color:#b3261e}
+.dc-foot{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.dc-stop{color:#b3261e}
+
 @media (max-width:1180px){.kpis{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:900px){.grid-2{grid-template-columns:1fr}}
 
@@ -136,8 +175,16 @@ body.loading .chart,body.loading .table,body.loading .kpis{opacity:.55;transitio
   .filters-toggle{padding:13px 14px}
   .filters-hint{max-width:45%}
 
-  .chips{grid-template-columns:1fr;gap:8px}
-  .chip{font-size:13px;border-radius:12px;padding:10px 14px}
+  .daycards{grid-template-columns:1fr 1fr;gap:10px}
+  .daycard{padding:11px 12px;gap:6px;border-radius:12px}
+  .dc-qty{font-size:21px}
+  .dc-foot{flex-direction:column;gap:2px;font-size:11.5px}
+  .plan-tiles{grid-template-columns:1fr 1fr;gap:10px}
+  .plan-tile{padding:11px 12px;border-radius:12px}
+  .plan-tile .k-value{font-size:19px}
+  .plan-actions{margin-top:12px}
+  .plan-actions .btn{width:100%}
+  .plan-note{font-size:12px}
 
   /* таблицы превращаются в карточки — горизонтальный скролл на телефоне бесполезен */
   .table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
