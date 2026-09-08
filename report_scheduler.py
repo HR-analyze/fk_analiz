@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import os
+import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -63,5 +64,18 @@ async def scheduler_loop():
         await asyncio.sleep(max(5, 60 - now.second))
 
 
+async def main():
+    # One-shot test mode. Set REPORT_NOW=operational or REPORT_NOW=final,
+    # redeploy once, and the PDF is sent immediately without starting a
+    # second Telegram polling loop. Remove the variable after the test.
+    report_now = os.getenv("REPORT_NOW", "").strip().lower()
+    if report_now in {"operational", "final"}:
+        log.info("Manual report test requested: %s", report_now)
+        await send(report_now)
+        log.info("Manual report test completed")
+        return
+    await scheduler_loop()
+
+
 if __name__ == "__main__":
-    asyncio.run(scheduler_loop())
+    asyncio.run(main())
