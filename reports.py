@@ -30,9 +30,10 @@ def report_period(kind: str, now=None):
         start = now.replace(hour=8, minute=0, second=0, microsecond=0)
         end = now.replace(hour=20, minute=0, second=0, microsecond=0)
     elif kind == "final":
-        day = (now - timedelta(days=1)).date()
-        start = datetime(day.year, day.month, day.day, 0, 0, tzinfo=TZ)
-        end = start + timedelta(days=1)
+        # Night shift: 20:00 of the previous day through 08:00 of the current day.
+        current_day = now.date()
+        end = datetime(current_day.year, current_day.month, current_day.day, 8, 0, tzinfo=TZ)
+        start = end - timedelta(hours=12)
     else:
         raise ValueError(f"Unknown report kind: {kind}")
     return start, end
@@ -51,10 +52,11 @@ def _as_dt(value):
 async def fetch_dashboard(start, end):
     if not API_KEY:
         raise RuntimeError("DASHBOARD_API_KEY is required")
-    # Existing dashboard API accepts date ranges, so request the whole calendar day
-    # and apply the exact operational 08:00–20:00 boundary locally.
+    # Request every calendar day touched by the shift, then apply the exact
+    # shift boundaries locally. This is required for the night shift because
+    # it crosses midnight (20:00 previous day -> 08:00 current day).
     day_start = start.replace(hour=0, minute=0, second=0, microsecond=0)
-    params = {"date_from": day_start.isoformat(), "date_to": day_start.date().isoformat()}
+    params = {"date_from": day_start.isoformat(), "date_to": end.date().isoformat()}
     headers = {"X-API-Key": API_KEY}
     timeout = aiohttp.ClientTimeout(total=30)
     async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -110,5 +112,8 @@ def make_pdf(data, start, end, title):
 async def build_report(kind: str):
     start, end = report_period(kind)
     data = await fetch_dashboard(start, end)
-    title = "Оперативная сводка производства" if kind == "operational" else "Итоговая сводка производства"
+    if kind == "operational":
+        title = "Оперативная сводка (дневная смена)"
+    else:
+        title = "Оперативная сводка (ночная смена)"
     return make_pdf(data, start, end, title), start, end
