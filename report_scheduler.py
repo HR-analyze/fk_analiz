@@ -2,7 +2,6 @@
 import asyncio
 import logging
 import os
-import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -23,17 +22,18 @@ async def send(kind: str):
     pdf, start, end = await build_report(kind)
     if kind == "operational":
         caption = (
-            f"📊 Оперативная сводка за {start:%d.%m.%Y}\n"
-            f"Период: {start:%H:%M}–{end:%H:%M}\n"
-            "Краткий отчёт о производстве за текущий день."
+            f"📊 Оперативная сводка (дневная смена)\n"
+            f"Период: {start:%d.%m.%Y %H:%M}–{end:%H:%M}\n"
+            "Краткий отчёт о производстве за дневную смену."
         )
+        filename = f"fk_day_shift_{start:%Y%m%d}.pdf"
     else:
         caption = (
-            f"📊 Итоговая сводка за {start:%d.%m.%Y}\n"
-            "Период: 00:00–24:00\n"
-            "Итоговый отчёт о производстве за полный предыдущий день."
+            f"📊 Оперативная сводка (ночная смена)\n"
+            f"Период: {start:%d.%m.%Y %H:%M}–{end:%d.%m.%Y %H:%M}\n"
+            "Краткий отчёт о производстве за ночную смену."
         )
-    filename = f"fk_{kind}_{start:%Y%m%d}.pdf"
+        filename = f"fk_night_shift_{end:%Y%m%d}.pdf"
     bot = Bot(TOKEN)
     try:
         from aiogram.types import BufferedInputFile
@@ -44,7 +44,7 @@ async def send(kind: str):
 
 
 async def scheduler_loop():
-    log.info("Production report scheduler started: operational 20:00, final 08:00 (%s)", TZ.key)
+    log.info("Production report scheduler started: day shift 20:00 (08:00–20:00), night shift 08:00 (20:00–08:00) (%s)", TZ.key)
     last_operational = None
     last_final = None
     while True:
@@ -54,13 +54,13 @@ async def scheduler_loop():
             try:
                 await send("operational")
             except Exception:
-                log.exception("Operational report failed")
+                log.exception("Day shift report failed")
         if now.hour == 8 and now.minute == 0 and last_final != now.date():
             last_final = now.date()
             try:
                 await send("final")
             except Exception:
-                log.exception("Final report failed")
+                log.exception("Night shift report failed")
         await asyncio.sleep(max(5, 60 - now.second))
 
 
