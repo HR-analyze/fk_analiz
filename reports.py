@@ -27,13 +27,14 @@ else:
 def report_period(kind: str, now=None):
     now = now or datetime.now(TZ)
     if kind == "operational":
+        # Evening report: current day 08:00 -> 20:00.
         start = now.replace(hour=8, minute=0, second=0, microsecond=0)
         end = now.replace(hour=20, minute=0, second=0, microsecond=0)
     elif kind == "final":
-        # Night shift: 20:00 of the previous day through 08:00 of the current day.
-        current_day = now.date()
-        end = datetime(current_day.year, current_day.month, current_day.day, 8, 0, tzinfo=TZ)
-        start = end - timedelta(hours=12)
+        # Morning operational report for the full operational day:
+        # previous day 08:00 -> current day 08:00.
+        end = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        start = end - timedelta(hours=24)
     else:
         raise ValueError(f"Unknown report kind: {kind}")
     return start, end
@@ -52,9 +53,6 @@ def _as_dt(value):
 async def fetch_dashboard(start, end):
     if not API_KEY:
         raise RuntimeError("DASHBOARD_API_KEY is required")
-    # Request every calendar day touched by the shift, then apply the exact
-    # shift boundaries locally. This is required for the night shift because
-    # it crosses midnight (20:00 previous day -> 08:00 current day).
     day_start = start.replace(hour=0, minute=0, second=0, microsecond=0)
     params = {"date_from": day_start.isoformat(), "date_to": end.date().isoformat()}
     headers = {"X-API-Key": API_KEY}
@@ -115,5 +113,5 @@ async def build_report(kind: str):
     if kind == "operational":
         title = "Оперативная сводка (дневная смена)"
     else:
-        title = "Оперативная сводка (ночная смена)"
+        title = "Оперативная сводка за смену"
     return make_pdf(data, start, end, title), start, end
