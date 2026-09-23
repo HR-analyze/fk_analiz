@@ -5,6 +5,7 @@ import io
 import logging
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 
 from aiohttp import web
@@ -171,6 +172,10 @@ async def collect(request):
     }
     stored_plans = await asyncio.to_thread(plan_store.load)
     payload = aggregate.build_summary(production, pauses, plans=stored_plans, plan_filters=plan_filters)
+    payload["lfl"] = aggregate.build_lfl(
+        snapshot, payload, production, pauses, args["date_from"], args["date_to"],
+        filters={k: args[k] for k in ("equipment", "product", "employee", "shift", "hour")},
+        exclude_dates=EXCLUDE_DATES, now=datetime.now(TZ))
     # В файле плана есть только дата, оборудование и продукт. Фильтры по сотруднику,
     # смене и часу сужают факт, но не план, поэтому сравнение перестаёт быть
     # «выполнением» — об этом надо сказать прямо, а не показывать цифру молча.
