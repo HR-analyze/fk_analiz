@@ -104,32 +104,40 @@ function chartLegend(entries) {
 
 function renderDailyLfl(lfl) {
   const el = $('dailyLfl');
-  // Свежая неделя сверху: руководитель смотрит на неё первой.
+  // Свежая неделя сверху: на неё смотрят первой.
   const weeks = lfl && lfl.available ? (lfl.weeks || []).slice().reverse() : [];
   if (!weeks.length) { el.innerHTML = ''; return; }
+  const top = Math.max(1, ...weeks.map((w) => w.qty));
   let uneven = false;
   const rows = weeks.map((w) => {
     const warn = w.base_days > 0 && w.days !== w.base_days;
     uneven = uneven || warn;
     const tip = `${w.label}: ${num(w.qty)} шт, простоев ${num(w.pauses)} · ` +
       (w.base_days
-        ? `сравнение с ${w.base_label}${w.partial ? ' до ' + lfl.cutoff : ''}: ${num(w.base_qty)} шт, простоев ${num(w.base_pauses)}`
+        ? `неделя раньше (${w.base_label}${w.partial ? ' до ' + lfl.cutoff : ''}): ${num(w.base_qty)} шт, простоев ${num(w.base_pauses)}`
         : `за ${w.base_label} данных нет`) +
       (warn ? ` · дней с данными ${w.days} и ${w.base_days}` : '');
-    return `<tr data-tip="${esc(tip)}"${w.partial ? ' class="now"' : ''}>` +
-      `<td><span class="wk">${esc(w.label)}${warn ? '<sup title="Разное число дней с данными">⚠</sup>' : ''}</span>` +
-      (w.partial ? `<small>до ${esc(lfl.cutoff)}</small>` : '') + '</td>' +
-      // Дельта дублируется внутри ячейки значения: на самых узких экранах колонки
-      // «к пред.» прячутся, и она встаёт под число, иначе таблица не влезает.
-      `<td class="num"><b>${esc(num(w.qty))}</b><span class="inl">${trend(w.qty_change, 1)}</span></td>` +
-      `<td class="num dcol">${trend(w.qty_change, 1)}</td>` +
-      `<td class="num">${esc(num(w.pauses))}<span class="inl">${trend(w.pauses_change, -1)}</span></td>` +
-      `<td class="num dcol">${trend(w.pauses_change, -1)}</td></tr>`;
+    return `<div class="wk${w.partial ? ' now' : ''}" data-tip="${esc(tip)}">` +
+      `<div class="wk-range">${esc(w.label)}${warn ? '<sup title="Разное число дней с данными">⚠</sup>' : ''}` +
+      (w.partial ? `<small>до ${esc(lfl.cutoff)}</small>` : '') + '</div>' +
+      `<div class="wk-bar"><i style="width:${(w.qty / top * 100).toFixed(1)}%"></i></div>` +
+      `<div class="wk-val"><b>${esc(num(w.qty))}</b><span>шт</span>${trend(w.qty_change, 1)}</div>` +
+      `<div class="wk-stop">простоев ${esc(num(w.pauses))} ${trend(w.pauses_change, -1)}</div>` +
+      '</div>';
   }).join('');
   el.innerHTML = '<div class="lfl-title">Неделя к неделе</div>' +
-    '<table class="wk-table"><thead><tr><th>Неделя</th><th class="num">Выпуск, шт</th><th class="num dcol">к пред.</th>' +
-    `<th class="num">Простоев</th><th class="num dcol">к пред.</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `<div class="wk-list">${rows}</div>` +
     (uneven ? '<p class="lfl-note">⚠ — в неделях разное число дней с данными, суммы сравниваются неточно</p>' : '');
+}
+
+// Клетка полосы по часам: оттенок — насколько час лучше или хуже прошлого периода.
+function heatTone(change) {
+  if (change === null || change === undefined) return 'none';
+  if (change >= 10) return 'up2';
+  if (change >= 2) return 'up1';
+  if (change <= -10) return 'down2';
+  if (change <= -2) return 'down1';
+  return 'same';
 }
 
 function renderHourlyLfl(lfl, data) {
@@ -140,14 +148,25 @@ function renderHourlyLfl(lfl, data) {
   const stat = (label, value, extra) =>
     `<div class="hstat"><div class="hs-label">${esc(label)}</div><div class="hs-value">${value}</div>` +
     `<div class="hs-extra">${extra}</div></div>`;
-  el.innerHTML = '<div class="hstats">' +
+  const stats = '<div class="hstats">' +
     stat('Средняя, шт/ч', esc(dec(data.hourly_target)),
          ok ? `${trend(h.target_change, 1)}<span>было ${esc(dec(h.prev_target))}</span>` : '<span>за период</span>') +
     stat('Часов ниже средней', esc(num(data.hourly_below)),
          ok ? `${trend(data.hourly_below - h.prev_below, -1, 'h')}<span>было ${esc(num(h.prev_below))}</span>` : '<span>красные столбцы</span>') +
-    (ok ? stat('Часы к прошлому', `${esc(num(h.better))}<span class="hs-sep">/</span>${esc(num(h.worse))}`,
-               '<span>выше / ниже прошлого</span>') : '') +
-    '</div>' + (ok ? `<p class="lfl-note">Сравнение с периодом ${esc(lfl.prev_label)}</p>` : '');
+    '</div>';
+  if (!ok) { el.innerHTML = stats; return; }
+  const cells = data.hourly.map((x, i) => {
+    const c = x.lfl_change;
+    const text = c === null || c === undefined ? '—' : (c > 0 ? '+' : c < 0 ? '−' : '') + Math.round(Math.abs(c));
+    const tip = `${x.label}: ${dec(x.value)} шт/ч · прошлый период: ${dec(x.lfl_value)} шт/ч, ${pctText(c)}`;
+    return `<div class="hc ${heatTone(c)}" data-tip="${esc(tip)}"><span>${String(i).padStart(2, '0')}</span><b>${esc(text)}</b></div>`;
+  }).join('');
+  el.innerHTML = `<div class="lfl-title">К прошлому периоду ${esc(lfl.prev_label)}</div>` + stats +
+    `<div class="heat-head"><span>По часам, % к тому же часу</span><span>лучше в <b>${num(h.better)}</b> ч · хуже в <b>${num(h.worse)}</b> ч</span></div>` +
+    `<div class="heat">${cells}</div>` +
+    '<div class="heat-key"><span><i class="hc up2"></i><i class="hc up1"></i>лучше</span>' +
+    '<span><i class="hc same"></i>±2%</span><span><i class="hc down1"></i><i class="hc down2"></i>хуже</span>' +
+    '<span class="hk-note">ярче — больше 10%</span></div>';
 }
 
 /* ─── графики ─────────────────────────────────────────────────────────────── */
@@ -712,14 +731,12 @@ function render(data) {
     data.hourly.map((h, i) => ({ label: h.label, key: String(i), value: h.value })),
     { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: 'шт/ч',
       target: data.hourly_target, activeValue: FILTERS.hour,
-      compare: lflOk ? data.hourly.map((h) => h.lfl_value) : [],
       compareTip: lflOk ? (i) => {
         const h = data.hourly[i];
         return ` · прошлый период: ${dec(h.lfl_value)} шт/ч, ${pctText(h.lfl_change)}`;
       } : null })
     + (data.hourly_target ? chartLegend([['box', '#7c5cf5', 'выше средней'], ['box', BELOW_COLOR, 'ниже средней'],
-                                         ['dash', '#101828', 'средняя']]
-      .concat(lflOk ? [['box', GHOST_COLOR, 'тот же час прошлого периода']] : [])) : '');
+                                         ['dash', '#101828', 'средняя']]) : '');
   renderHourlyLfl(lfl, data);
   $('hourlyNote').textContent = 'шт/ч · нажми на столбец';
 
