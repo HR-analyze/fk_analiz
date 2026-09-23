@@ -2,6 +2,7 @@
 const PIE_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300',
                     '#4a3aa7', '#e34948', '#0f766e', '#9a3412', '#6d28d9', '#be123c'];
 const BELOW_COLOR = '#e34948';   // статусный: час ниже средней
+const LFL_MARK = '#101828';      // засечка «было в прошлом периоде» поверх столбца
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 const num = (v) => Number(v || 0).toLocaleString('ru-RU');
@@ -53,6 +54,83 @@ function niceMax(value) {
   return step * exp;
 }
 
+/* ─── сравнение с прошлым (LFL) ───────────────────────────────────────────── */
+
+// better: 1 — рост хорошо, -1 — рост плохо (простои), 0 — без оценки (длительность, число операций).
+function trend(change, better = 1, mode = 'pct') {
+  if (change === null || change === undefined) return '<span class="tr flat">—</span>';
+  const unit = mode === 'pp' ? ' п.п.' : '%';
+  const flat = Math.abs(change) < 0.05;
+  const cls = flat || !better ? 'flat' : ((change > 0) === (better > 0) ? 'good' : 'bad');
+  const text = flat ? '= 0' + unit : `${change > 0 ? '▲ +' : '▼ −'}${dec(Math.abs(change))}${unit}`;
+  return `<span class="tr ${cls}">${esc(text)}</span>`;
+}
+
+function pctText(change) {
+  if (change === null || change === undefined) return 'не с чем сравнить';
+  return (change > 0 ? '+' : change < 0 ? '−' : '') + dec(Math.abs(change)) + '%';
+}
+
+function lflVs(lfl) {
+  if (lfl.days === 7) return 'к прошлой неделе';
+  if (lfl.days === 1) return 'к прошлому дню';
+  return `к пред. ${lfl.days} дн.`;
+}
+
+function renderLflCaption(lfl) {
+  const el = $('lflCaption');
+  if (!lfl || !lfl.available) {
+    el.hidden = false;
+    el.textContent = 'Сравнение с прошлым периодом: ' + ((lfl && lfl.reason) || 'недоступно');
+    return;
+  }
+  const cut = lfl.partial ? `, последний день до ${lfl.cutoff} — как сегодня` : '';
+  const days = lfl.prev_days !== lfl.cur_days
+    ? ` · ⚠ дней с данными: сейчас ${lfl.cur_days}, тогда ${lfl.prev_days} — суммы неравные`
+    : '';
+  el.hidden = false;
+  el.textContent = lfl.prev_empty
+    ? `За прошлый период ${lfl.prev_label} с этими фильтрами данных нет — сравнивать не с чем.`
+    : `▲▼ — изменение к прошлому периоду ${lfl.prev_label} (${lfl.days} дн.${cut})${days}`;
+}
+
+function renderDailyLfl(lfl) {
+  const el = $('dailyLfl');
+  if (!lfl || !lfl.available || !(lfl.weeks || []).length) { el.innerHTML = ''; return; }
+  const cut = (w) => (w.partial ? ` <small>до ${esc(lfl.cutoff)}</small>` : '');
+  el.innerHTML =
+    '<div class="lfl-head"><span class="lfl-title">Неделя к неделе</span>' +
+    '<span class="lfl-key"><i></i>тот же день неделей раньше</span></div>' +
+    '<div class="lfl-weeks">' + lfl.weeks.map((w) => {
+      const tip = `${w.label}: ${num(w.qty)} шт, простоев ${num(w.pauses)} · сравнение с ${w.base_label}` +
+        `${w.partial ? ' до ' + lfl.cutoff : ''}: ${num(w.base_qty)} шт, простоев ${num(w.base_pauses)}` +
+        (w.days !== w.base_days ? ` · дней с данными ${w.days} и ${w.base_days}` : '');
+      return `<div class="lw" data-tip="${esc(tip)}">` +
+        `<div class="lw-range">${esc(w.label)}${cut(w)}</div>` +
+        (w.days !== w.base_days ? `<div class="lw-warn" title="Дней с данными в этой неделе и в той, с которой сравниваем">⚠ ${w.days} дн. против ${w.base_days}</div>` : '') +
+        `<div class="lw-qty">${esc(num(w.qty))}<small>шт</small> ${trend(w.qty_change, 1)}</div>` +
+        `<div class="lw-sub"><span>простоев ${esc(num(w.pauses))}</span> ${trend(w.pauses_change, -1)}</div>` +
+        '</div>';
+    }).join('') + '</div>';
+}
+
+function renderHourlyLfl(lfl, data) {
+  const el = $('hourlyLfl');
+  if (!lfl || !lfl.available || lfl.prev_empty || !data.hourly_target) { el.innerHTML = ''; return; }
+  const h = lfl.hourly;
+  const belowChange = data.hourly_below - h.prev_below;
+  el.innerHTML =
+    `<div class="lfl-head"><span class="lfl-title">К прошлому периоду ${esc(lfl.prev_label)}</span>` +
+    '<span class="lfl-key"><i></i>тот же час в прошлом периоде</span></div>' +
+    '<div class="lfl-pills">' +
+    `<span class="pill">средняя ${esc(dec(data.hourly_target))} шт/ч ${trend(h.target_change, 1)}</span>` +
+    `<span class="pill">выше прошлого: <b>${num(h.better)}</b> ч · ниже: <b>${num(h.worse)}</b> ч</span>` +
+    `<span class="pill">часов ниже средней: <b>${num(data.hourly_below)}</b> (было ${num(h.prev_below)}) ` +
+    `<span class="tr ${belowChange < 0 ? 'good' : belowChange > 0 ? 'bad' : 'flat'}">` +
+    `${belowChange ? (belowChange > 0 ? '▲ +' : '▼ −') + Math.abs(belowChange) : 'без изменений'}</span></span>` +
+    '</div>';
+}
+
 /* ─── графики ─────────────────────────────────────────────────────────────── */
 
 function barChart(items, opts = {}) {
@@ -69,7 +147,8 @@ function barChart(items, opts = {}) {
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const target = Number(opts.target) || 0;
-  const max = niceMax(Math.max(...items.map((i) => i.value), target));
+  const compare = opts.compare || [];
+  const max = niceMax(Math.max(...items.map((i) => i.value), ...compare.map((v) => Number(v) || 0), target));
   const slot = plotW / items.length;
   const barW = Math.max(4, Math.min(slot * 0.62, 62));
   const labelEvery = narrow && items.length > 14 ? Math.ceil(items.length / 8) : 1;
@@ -93,10 +172,18 @@ function barChart(items, opts = {}) {
       ? ` data-filter="${esc(opts.filterKey)}" data-value="${esc(item.key ?? item.label)}" role="button" tabindex="0"`
       : '';
     const tip = `${item.label}: ${dec(item.value)}${opts.unit ? ' ' + opts.unit : ''}`
-      + (below ? ` · ниже средней на ${dec(target - item.value)}` : '');
+      + (below ? ` · ниже средней на ${dec(target - item.value)}` : '')
+      + (opts.compareTip ? opts.compareTip(i) : '');
     // Прозрачная зона на всю колонку — палец на мобилке попадает даже мимо самого столбца.
     parts.push(`<rect class="hit${opts.filterKey ? ' clickable' : ''}${active ? ' active' : ''}" x="${(padL + slot * i).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent"${attrs} data-tip="${esc(tip)}"/>`);
     parts.push(`<rect class="bar${active ? ' active' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h, item.value > 0 ? 2 : 0).toFixed(1)}" rx="4" fill="${fill}" pointer-events="none"/>`);
+    const was = Number(compare[i]) || 0;
+    if (was > 0) {
+      // Засечка «сколько было»: столбец выше неё — стало больше, ниже — меньше.
+      const cy = (padT + plotH - (was / max) * plotH).toFixed(1);
+      parts.push(`<line x1="${(x - 3).toFixed(1)}" y1="${cy}" x2="${(x + barW + 3).toFixed(1)}" y2="${cy}" stroke="#fff" stroke-width="5" stroke-linecap="round" pointer-events="none"/>`);
+      parts.push(`<line x1="${(x - 3).toFixed(1)}" y1="${cy}" x2="${(x + barW + 3).toFixed(1)}" y2="${cy}" stroke="${LFL_MARK}" stroke-width="2.5" stroke-linecap="round" pointer-events="none"/>`);
+    }
     if (i % labelEvery === 0) {
       const lx = padL + slot * i + slot / 2;
       if (rotate) {
@@ -188,21 +275,35 @@ function fitValues(root) {
   });
 }
 
-function renderKpis(k) {
+function renderKpis(k, lfl) {
+  // [подпись, значение, единица, пояснение, ключ LFL, направление «лучше», формат прошлого]
   const cards = [
-    ['Операций', num(k.operations), '', k.open_operations ? `из них открыто: ${num(k.open_operations)}` : 'за период'],
-    ['Выпуск', num(k.quantity), 'шт', 'всего'],
-    ['Средняя длит.', num(k.avg_duration), 'мин', 'на операцию'],
-    ['Производительность', dec(k.avg_rate), 'шт/ч', 'средняя'],
-    ['Простои', num(k.pauses), '', `суммарно ${hm(k.stop_minutes)}`],
-    ['Коэф. использования', dec(k.utilization), '%', 'работа / (работа + простои)'],
+    ['Операций', num(k.operations), '', k.open_operations ? `из них открыто: ${num(k.open_operations)}` : 'за период', 'operations', 0, num],
+    ['Выпуск', num(k.quantity), 'шт', 'всего', 'quantity', 1, (v) => num(v) + ' шт'],
+    ['Средняя длит.', num(k.avg_duration), 'мин', 'на операцию', 'avg_duration', 0, (v) => num(v) + ' мин'],
+    ['Производительность', dec(k.avg_rate), 'шт/ч', 'средняя', 'avg_rate', 1, (v) => dec(v) + ' шт/ч'],
+    ['Простои', num(k.pauses), '', `суммарно ${hm(k.stop_minutes)}`, 'pauses', -1, num],
+    ['Коэф. использования', dec(k.utilization), '%', 'работа / (работа + простои)', 'utilization', 1, (v) => dec(v) + '%'],
   ];
-  $('kpis').innerHTML = cards.map(([label, value, unit, note]) =>
-    `<div class="kpi"><div class="k-label">${esc(label)}</div>` +
-    `<div class="k-value"><span class="k-num">${esc(value)}</span>` +
-    (unit ? `<span class="k-unit">${esc(unit)}</span>` : '') + '</div>' +
-    `<div class="k-note">${esc(note)}</div></div>`
-  ).join('');
+  const ok = lfl && lfl.available && !lfl.prev_empty;
+  $('kpis').innerHTML = cards.map(([label, value, unit, note, key, better, fmt]) => {
+    let delta = '';
+    if (ok && lfl.kpi[key]) {
+      const c = lfl.kpi[key];
+      let tip = `${lfl.prev_label}: ${fmt(c.prev)}`;
+      if (key === 'pauses' && lfl.kpi.stop_minutes) {
+        const m = lfl.kpi.stop_minutes;
+        tip += ` · минут простоя: ${num(k.stop_minutes)} против ${num(m.prev)} (${pctText(m.change)})`;
+      }
+      if (c.change === null) tip += ' · в прошлом периоде ноль, процент не считается';
+      delta = `<div class="k-delta" data-tip="${esc(tip)}">${trend(c.change, better, c.mode)}` +
+        `<span class="k-vs">${esc(lflVs(lfl))}</span></div>`;
+    }
+    return `<div class="kpi"><div class="k-label">${esc(label)}</div>` +
+      `<div class="k-value"><span class="k-num">${esc(value)}</span>` +
+      (unit ? `<span class="k-unit">${esc(unit)}</span>` : '') + '</div>' +
+      `<div class="k-note">${esc(note)}</div>${delta}</div>`;
+  }).join('');
   fitValues($('kpis'));
 }
 
@@ -563,18 +664,34 @@ function readControls() {
 
 function render(data) {
   lastData = data;
-  renderKpis(data.kpi);
+  const lfl = data.lfl || {};
+  const lflOk = lfl.available && !lfl.prev_empty;
+  renderKpis(data.kpi, lfl);
+  renderLflCaption(lfl);
   renderPlan(data.plan);   // читает lastData.daily для предупреждения о разнице дней
 
   $('chartDaily').innerHTML = barChart(
     data.daily.map((d) => ({ label: d.date.slice(5), key: d.date, value: d.qty })),
     { color: '#3b6ef5', filterKey: 'date', unit: 'шт',
-      activeValue: FILTERS.dateFrom === FILTERS.dateTo ? FILTERS.dateFrom : undefined });
+      activeValue: FILTERS.dateFrom === FILTERS.dateTo ? FILTERS.dateFrom : undefined,
+      compare: lfl.available ? data.daily.map((d) => d.lfl_qty) : [],
+      compareTip: lfl.available ? (i) => {
+        const d = data.daily[i];
+        if (!d.lfl_date) return '';
+        return ` · ${d.lfl_date.slice(5)} (неделей раньше): ${num(d.lfl_qty)} шт, ${pctText(d.lfl_change)}`;
+      } : null });
+  renderDailyLfl(lfl);
 
   $('chartHourly').innerHTML = barChart(
     data.hourly.map((h, i) => ({ label: h.label, key: String(i), value: h.value })),
     { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: 'шт/ч',
-      target: data.hourly_target, activeValue: FILTERS.hour });
+      target: data.hourly_target, activeValue: FILTERS.hour,
+      compare: lflOk ? data.hourly.map((h) => h.lfl_value) : [],
+      compareTip: lflOk ? (i) => {
+        const h = data.hourly[i];
+        return ` · прошлый период: ${dec(h.lfl_value)} шт/ч, ${pctText(h.lfl_change)}`;
+      } : null });
+  renderHourlyLfl(lfl, data);
   $('hourlyNote').textContent = data.hourly_target
     ? `шт/час · средняя ${dec(data.hourly_target)} · ниже неё часов: ${num(data.hourly_below)} (красные)`
     : 'шт/час · нажми на столбец';

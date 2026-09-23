@@ -5,6 +5,8 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from aggregate import change_text
+
 log = logging.getLogger("fk.exports")
 TZ = ZoneInfo(os.getenv("TIMEZONE", "Europe/Moscow"))
 FONT_PATH = os.getenv("REPORT_FONT", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
@@ -23,31 +25,57 @@ def _done_column(summary):
     return ("Доля от полного плана, %" if skew else "Выполнение, %"), skew
 
 
+def _blank(value):
+    return "" if value is None else value
+
+
 def widget_rows(summary, widget):
     """(заголовок, колонки, строки) для одного виджета дашборда."""
     k = summary["kpi"]
     done_column, _ = _done_column(summary)
+    lfl = summary.get("lfl") or {}
+    cmp_kpi = lfl.get("kpi") or {}
     if widget == "kpi":
-        return "KPI", ["Показатель", "Значение"], [
-            ["Операций", k["operations"]],
-            ["Из них открытых", k["open_operations"]],
-            ["Выпуск, шт", k["quantity"]],
-            ["Средняя длительность, мин", k["avg_duration"]],
-            ["Средняя производительность, шт/ч", k["avg_rate"]],
-            ["Простоев, шт", k["pauses"]],
-            ["Простои, мин", k["stop_minutes"]],
-            ["Работа, мин", k["work_minutes"]],
-            ["Коэффициент использования, %", k["utilization"]],
+        prev_col = f"Прошлый период {lfl['prev_label']}" if lfl.get("available") else "Прошлый период"
+
+        def row(title, key):
+            c = cmp_kpi.get(key)
+            if not c:
+                return [title, k[key], "", ""]
+            return [title, k[key], c["prev"],
+                    _blank(c["change"]) if c["mode"] == "pct" else
+                    ("" if c["change"] is None else f"{c['change']} п.п.")]
+        return "KPI", ["Показатель", "Значение", prev_col, "Изменение, %"], [
+            row("Операций", "operations"),
+            ["Из них открытых", k["open_operations"], "", ""],
+            row("Выпуск, шт", "quantity"),
+            row("Средняя длительность, мин", "avg_duration"),
+            row("Средняя производительность, шт/ч", "avg_rate"),
+            row("Простоев, шт", "pauses"),
+            row("Простои, мин", "stop_minutes"),
+            ["Работа, мин", k["work_minutes"], "", ""],
+            row("Коэффициент использования, %", "utilization"),
         ]
     if widget == "daily":
         return "Выпуск по дням", ["Дата", "День", "Операций", "Выпуск, шт", "План, шт",
-                                  done_column, "Ср. длительность, мин", "Простои, мин"], [
+                                  done_column, "Ср. длительность, мин", "Простои, мин",
+                                  "Неделей раньше, дата", "Неделей раньше, шт", "К неделе раньше, %"], [
             [d["date"], d["weekday"], d["ops"], d["qty"], d["plan"] or "", d["done"] if d["done"] is not None else "",
-             d["avg_duration"], d["stop"]] for d in summary["daily"]]
+             d["avg_duration"], d["stop"], d.get("lfl_date", ""), _blank(d.get("lfl_qty")),
+             _blank(d.get("lfl_change"))] for d in summary["daily"]]
+    if widget == "weekly":
+        return "Неделя к неделе", ["Неделя", "Дней с данными", "Выпуск, шт", "Сравнение с", "Выпуск там, шт",
+                                   "Выпуск, изменение %", "Простоев", "Простоев там", "Простои, изменение %"], [
+            [w["label"] + (f" (до {lfl['cutoff']})" if w["partial"] else ""), w["days"], w["qty"],
+             w["base_label"] + (f" (до {lfl['cutoff']})" if w["partial"] else ""), w["base_qty"],
+             _blank(w["qty_change"]), w["pauses"], w["base_pauses"], _blank(w["pauses_change"])]
+            for w in lfl.get("weeks", [])]
     if widget == "hourly":
         target = summary.get("hourly_target", 0)
-        return "Производительность по часам", ["Час", "Средняя, шт/ч", "Средняя за период, шт/ч", "Ниже средней"], [
-            [h["label"], h["value"], target, "да" if 0 < h["value"] < target else ""] for h in summary["hourly"]]
+        return "Производительность по часам", ["Час", "Средняя, шт/ч", "Средняя за период, шт/ч", "Ниже средней",
+                                               "Прошлый период, шт/ч", "Изменение, %"], [
+            [h["label"], h["value"], target, "да" if 0 < h["value"] < target else "",
+             _blank(h.get("lfl_value")), _blank(h.get("lfl_change"))] for h in summary["hourly"]]
     if widget in ("equipment", "products", "employees", "reasons"):
         source = {"equipment": ("Выпуск по оборудованию", "Оборудование", "Выпуск, шт", summary["by_equipment"]),
                   "products": ("Топ продуктов", "Продукт", "Выпуск, шт", summary["top_products"]),
@@ -91,7 +119,7 @@ def widget_rows(summary, widget):
     raise KeyError(widget)
 
 
-ALL_WIDGETS = ("kpi", "daily", "hourly", "equipment", "products", "employees", "reasons",
+ALL_WIDGETS = ("kpi", "daily", "weekly", "hourly", "equipment", "products", "employees", "reasons",
                "work_vs_stop", "plan", "employee_timings", "equipment_timings",
                "product_timings", "detail")
 
@@ -293,11 +321,23 @@ def build_pdf(summary, analysis, filters, title="Сводка по произв�
 
     # KPI плиткой 3×2
     k = summary["kpi"]
-    tiles = [("Операций", k["operations"]), ("Выпуск, шт", f"{k['quantity']:,}".replace(",", " ")),
-             ("Средняя длит., мин", k["avg_duration"]), ("Производительность, шт/ч", k["avg_rate"]),
-             ("Простоев", k["pauses"]), ("Коэф. использования, %", k["utilization"])]
-    kpi_rows = [[Paragraph(f"<font size=7 color='#667085'>{n}</font><br/><font size=13 name='{bold}'>{v}</font>",
-                           ParagraphStyle("k", fontName=font, leading=17)) for n, v in tiles[i:i + 3]]
+    lfl = summary.get("lfl") or {}
+    tiles = [("Операций", k["operations"], "operations"),
+             ("Выпуск, шт", f"{k['quantity']:,}".replace(",", " "), "quantity"),
+             ("Средняя длит., мин", k["avg_duration"], "avg_duration"),
+             ("Производительность, шт/ч", k["avg_rate"], "avg_rate"),
+             ("Простоев", k["pauses"], "pauses"), ("Коэф. использования, %", k["utilization"], "utilization")]
+
+    def tile_delta(key):
+        c = (lfl.get("kpi") or {}).get(key)
+        if not lfl.get("available") or not c or c["change"] is None:
+            return ""
+        return (f"<br/><font size=6.5 color='#667085'>{change_text(c['change'], c['mode'])}"
+                f" к {lfl['prev_label']}</font>")
+
+    kpi_rows = [[Paragraph(f"<font size=7 color='#667085'>{n}</font><br/><font size=13 name='{bold}'>{v}</font>"
+                           + tile_delta(key), ParagraphStyle("k", fontName=font, leading=17))
+                 for n, v, key in tiles[i:i + 3]]
                 for i in (0, 3)]
     kpi = Table(kpi_rows, colWidths=[width / 3] * 3)
     kpi.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#E6EAF0")),
@@ -339,7 +379,8 @@ def build_pdf(summary, analysis, filters, title="Сводка по произв�
 
     # Таблицы
     plan = summary.get("plan") or {}
-    tables = [("daily", None), ("employee_timings", None), ("equipment_timings", None), ("product_timings", 25)]
+    tables = [("daily", None), ("weekly", None), ("employee_timings", None),
+              ("equipment_timings", None), ("product_timings", 25)]
     if plan.get("has_plan"):
         tables.insert(0, ("plan", 30))
     for widget, limit in tables:

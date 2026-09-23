@@ -56,15 +56,18 @@
   <!-- ── Дашборд ─────────────────────────────────────────────────────────── -->
   <div class="tab-page" data-page="dashboard">
     <section class="kpis" id="kpis"></section>
+    <p class="lfl-caption" id="lflCaption" hidden></p>
 
     <section class="grid-2">
       <article class="panel" data-widget="daily">
         <header class="panel-head"><h2>Выпуск по дням</h2><span class="unit">шт · нажми на столбец</span></header>
         <div id="chartDaily" class="chart"></div>
+        <div id="dailyLfl" class="lfl"></div>
       </article>
       <article class="panel" data-widget="hourly">
         <header class="panel-head"><h2>Производительность по часам</h2><span class="unit" id="hourlyNote">шт/час · нажми на столбец</span></header>
         <div id="chartHourly" class="chart"></div>
+        <div id="hourlyLfl" class="lfl"></div>
       </article>
     </section>
 

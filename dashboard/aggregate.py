@@ -343,7 +343,7 @@ def plan_vs_fact(production, plans, date_from="", date_to="", equipment="all",
     }
 
 
-def build_summary(production, pauses, detail_limit=300, plans=None, plan_filters=None):
+def kpi_block(production, pauses):
     durations = [duration_min(r["start_time"], r["end_time"]) for r in production]
     work_minutes = sum(durations)
     stop_minutes = sum(duration_min(r["start_time"], r["end_time"]) for r in pauses)
@@ -352,28 +352,35 @@ def build_summary(production, pauses, detail_limit=300, plans=None, plan_filters
         for r in production
         if r["qty"] > 0 and duration_min(r["start_time"], r["end_time"]) > 0
     ]
-    total_qty = sum(r["qty"] for r in production)
     total = work_minutes + stop_minutes
+    return {
+        "operations": len(production),
+        "quantity": sum(r["qty"] for r in production),
+        "avg_duration": round(_avg(durations)),
+        "avg_rate": round(_avg(rates), 1),
+        "pauses": len(pauses),
+        "stop_minutes": stop_minutes,
+        "work_minutes": work_minutes,
+        "utilization": round(work_minutes / total * 100, 1) if total else 0.0,
+        "open_operations": sum(1 for r in production if r["status"] != "closed"),
+    }
 
+
+def hourly_target_of(hourly):
+    """Цель по часам — средняя за период: столбцы ниже неё и есть провалы."""
+    worked = [h["value"] for h in hourly if h["value"] > 0]
+    return round(sum(worked) / len(worked), 1) if worked else 0.0
+
+
+def build_summary(production, pauses, detail_limit=300, plans=None, plan_filters=None):
     detail = sorted(production, key=lambda r: r["created_at"], reverse=True)[:detail_limit]
     hourly = hourly_productivity(production)
-    worked = [h["value"] for h in hourly if h["value"] > 0]
-    # Цель по часам — средняя за период: столбцы ниже неё и есть провалы.
-    hourly_target = round(sum(worked) / len(worked), 1) if worked else 0.0
+    hourly_target = hourly_target_of(hourly)
     pf = plan_vs_fact(production, plans or {}, **(plan_filters or {}))
+    kpi = kpi_block(production, pauses)
 
     return {
-        "kpi": {
-            "operations": len(production),
-            "quantity": total_qty,
-            "avg_duration": round(_avg(durations)),
-            "avg_rate": round(_avg(rates), 1),
-            "pauses": len(pauses),
-            "stop_minutes": stop_minutes,
-            "work_minutes": work_minutes,
-            "utilization": round(work_minutes / total * 100, 1) if total else 0.0,
-            "open_operations": sum(1 for r in production if r["status"] != "closed"),
-        },
+        "kpi": kpi,
         "daily": daily_output(production, pauses, plans, plan_filters),
         "hourly": hourly,
         "hourly_target": hourly_target,
@@ -383,8 +390,8 @@ def build_summary(production, pauses, detail_limit=300, plans=None, plan_filters
         "top_products": _sum_by(production, "product", lambda r: r["qty"], limit=12),
         "pause_reasons": _sum_by(pauses, "reason", lambda r: duration_min(r["start_time"], r["end_time"])),
         "work_vs_stop": [
-            {"label": "Работа (мин)", "value": work_minutes},
-            {"label": "Простои (мин)", "value": stop_minutes},
+            {"label": "Работа (мин)", "value": kpi["work_minutes"]},
+            {"label": "Простои (мин)", "value": kpi["stop_minutes"]},
         ],
         "top_employees": _sum_by(production, "user_name", lambda r: r["qty"], limit=12),
         "product_timings": product_timings(production),
@@ -392,6 +399,226 @@ def build_summary(production, pauses, detail_limit=300, plans=None, plan_filters
         "employee_timings": employee_timings(production, pauses),
         "detail": detail,
     }
+
+
+# ── LFL: сравнение с тем же отрезком в прошлом ────────────────────────────────
+#
+# Сравниваем «как с как»: те же фильтры, та же длина отрезка. Если период
+# заканчивается сегодня, сегодняшний день ещё не закончился — поэтому у дня,
+# с которым он сравнивается, берём только записи до того же времени суток.
+# Иначе утром любой период «проседает» просто потому, что день не доработан.
+
+# Недель в полосе «неделя к неделе»: не меньше MIN_WEEKS, чтобы тренд был виден
+# и при недельном периоде, и не больше MAX_WEEKS, чтобы полоса не разрасталась.
+MIN_WEEKS, MAX_WEEKS = 4, 8
+# Показатель → как считать изменение: "pct" — в процентах, "pp" — в процентных
+# пунктах (коэффициент использования уже в процентах, относительная доля от доли
+# только путает).
+LFL_METRICS = (("operations", "pct"), ("quantity", "pct"), ("avg_duration", "pct"),
+               ("avg_rate", "pct"), ("pauses", "pct"), ("stop_minutes", "pct"),
+               ("utilization", "pp"))
+
+
+def _day_minute(row):
+    """Время записи в минутах от полуночи. Дата строки берётся из created_at — время тоже."""
+    stamp = row.get("created_at") or ""
+    return parse_hhmm(stamp[11:16]) if len(stamp) >= 16 else None
+
+
+def _change(cur, prev, mode="pct"):
+    if mode == "pp":
+        return round(cur - prev, 1)
+    if not prev:
+        return None
+    return round((cur - prev) / prev * 100, 1)
+
+
+def _window(rows, start, end, cut_day=None, cutoff=None):
+    """Строки за [start, end]; у дня cut_day — только записанные не позже cutoff."""
+    s, e = start.isoformat(), end.isoformat()
+    out = []
+    for r in rows:
+        d = r["date"]
+        if not s <= d <= e:
+            continue
+        if cutoff is not None and cut_day is not None and d == cut_day.isoformat():
+            minute = _day_minute(r)
+            if minute is not None and minute > cutoff:
+                continue
+        out.append(r)
+    return out
+
+
+def _days_with_data(*groups):
+    return len({r["date"] for rows in groups for r in rows if r["date"]})
+
+
+def _span(start, end):
+    if start == end:
+        return start.strftime("%d.%m")
+    return f"{start.strftime('%d.%m')}–{end.strftime('%d.%m')}"
+
+
+def build_lfl(snapshot, summary, production, pauses, date_from="", date_to="",
+              filters=None, exclude_dates=(), now=None):
+    """Дополняет summary сравнением с прошлым: KPI к прошлому периоду той же длины,
+    каждый день к тому же дню неделей раньше, недели друг к другу, часы к часам."""
+    try:
+        d_from = date.fromisoformat(date_from)
+        d_to = date.fromisoformat(date_to)
+    except (TypeError, ValueError):
+        return {"available": False, "reason": "для сравнения нужен период с датами от и до"}
+    today = now.date() if now else None
+    if today and d_to > today:
+        d_to = today  # будущие дни пустые — сравнивать их не с чем
+    if d_to < d_from:
+        return {"available": False, "reason": "период ещё не начался"}
+
+    partial = today is not None and d_to == today
+    cutoff = now.hour * 60 + now.minute if partial else None
+    days = (d_to - d_from).days + 1
+    weeks = min(MAX_WEEKS, max(MIN_WEEKS, -(-days // 7)))
+    week = timedelta(days=7)
+
+    # Одна фильтрация на весь нужный отрезок, дальше только нарезка по датам.
+    prev_to = d_from - timedelta(days=1)
+    prev_from = prev_to - timedelta(days=days - 1)
+    oldest = min(prev_from, d_to - week * weeks - timedelta(days=6), d_from - week)
+    rows, stops = apply_filters(snapshot, date_from=oldest.isoformat(), date_to=d_to.isoformat(),
+                                exclude_dates=exclude_dates, **(filters or {}))
+
+    # 1. KPI: прошлый период той же длины, вплотную перед текущим.
+    prev_rows = _window(rows, prev_from, prev_to, prev_to, cutoff)
+    prev_stops = _window(stops, prev_from, prev_to, prev_to, cutoff)
+    cur_k, prev_k = summary["kpi"], kpi_block(prev_rows, prev_stops)
+    prev_empty = not prev_rows and not prev_stops
+    kpi = {}
+    for key, mode in LFL_METRICS:
+        change = None
+        if not prev_empty and not (mode == "pp" and not (prev_k["work_minutes"] + prev_k["stop_minutes"])):
+            change = _change(cur_k[key], prev_k[key], mode)
+        kpi[key] = {"prev": prev_k[key], "change": change, "mode": mode}
+
+    # 2. Каждый день — к тому же дню недели неделей раньше.
+    by_day = {}
+    shifted = _window(rows, d_from - week, d_to - week, d_to - week, cutoff)
+    for r in shifted:
+        by_day[r["date"]] = by_day.get(r["date"], 0) + r["qty"]
+    for d in summary["daily"]:
+        try:
+            ref = (date.fromisoformat(d["date"]) - week).isoformat()
+        except ValueError:
+            continue
+        d["lfl_date"] = ref
+        d["lfl_qty"] = by_day.get(ref, 0)
+        d["lfl_change"] = _change(d["qty"], d["lfl_qty"])
+
+    # 3. Недели, выровненные по концу периода: последняя — «последние 7 дней».
+    def week_stats(end, cut=False):
+        start = end - timedelta(days=6)
+        w_rows = _window(rows, start, end, end, cutoff if cut else None)
+        w_stops = _window(stops, start, end, end, cutoff if cut else None)
+        return {"from": start.isoformat(), "to": end.isoformat(), "label": _span(start, end),
+                "qty": sum(r["qty"] for r in w_rows), "pauses": len(w_stops),
+                "days": _days_with_data(w_rows, w_stops)}
+
+    blocks = [week_stats(d_to - week * k) for k in range(weeks + 1)]
+    out_weeks = []
+    for k in range(weeks):
+        cur, base = blocks[k], blocks[k + 1]
+        # Неполную текущую неделю сравниваем с прошлой, обрезанной до того же часа.
+        if k == 0 and partial:
+            base = week_stats(d_to - week, cut=True)
+        empty = not base["days"]
+        out_weeks.append({**cur,
+                          "partial": k == 0 and partial,
+                          "base_label": base["label"], "base_qty": base["qty"],
+                          "base_pauses": base["pauses"], "base_days": base["days"],
+                          "qty_change": None if empty else _change(cur["qty"], base["qty"]),
+                          "pauses_change": None if empty else _change(cur["pauses"], base["pauses"])})
+    out_weeks.reverse()  # по хронологии, как столбцы графика
+
+    # 4. Часы — к тем же часам прошлого периода.
+    prev_hourly = hourly_productivity(prev_rows)
+    prev_target = hourly_target_of(prev_hourly)
+    cur_hourly = summary["hourly"]
+    better = worse = 0
+    for cur_h, prev_h in zip(cur_hourly, prev_hourly):
+        cur_h["lfl_value"] = prev_h["value"]
+        cur_h["lfl_change"] = _change(cur_h["value"], prev_h["value"]) if cur_h["value"] else None
+        if cur_h["value"] and prev_h["value"]:
+            if cur_h["value"] > prev_h["value"]:
+                better += 1
+            elif cur_h["value"] < prev_h["value"]:
+                worse += 1
+
+    return {
+        "available": True,
+        "days": days,
+        "cur_from": d_from.isoformat(), "cur_to": d_to.isoformat(),
+        "prev_from": prev_from.isoformat(), "prev_to": prev_to.isoformat(),
+        "prev_label": _span(prev_from, prev_to),
+        "cur_days": _days_with_data(production, pauses),
+        "prev_days": _days_with_data(prev_rows, prev_stops),
+        "prev_empty": prev_empty,
+        "partial": partial,
+        "cutoff": f"{cutoff // 60:02d}:{cutoff % 60:02d}" if cutoff is not None else "",
+        "kpi": kpi,
+        "weeks": out_weeks,
+        "hourly": {
+            "prev_target": prev_target,
+            "target_change": _change(summary["hourly_target"], prev_target),
+            "prev_below": sum(1 for h in prev_hourly if 0 < h["value"] < prev_target),
+            "better": better,
+            "worse": worse,
+        },
+    }
+
+
+def change_text(change, mode="pct"):
+    if change is None:
+        return "—"
+    unit = " п.п." if mode == "pp" else "%"
+    value = f"{abs(change):.1f}".replace(".", ",")
+    if change > 0:
+        return f"▲ +{value}{unit}"
+    if change < 0:
+        return f"▼ −{value}{unit}"
+    return f"= 0{unit}"
+
+
+def lfl_lines(lfl, k):
+    """Строки сравнения для сводки фактов и PDF. Только числа, без оценок."""
+    def n(value):
+        return f"{value:,.0f}".replace(",", " ")
+
+    head = f"Прошлый период: {lfl['prev_label']} ({lfl['days']} дн.)"
+    if lfl.get("partial"):
+        head += f", последний день взят до {lfl['cutoff']} — как и сегодняшний"
+    rows = [head + "."]
+    if lfl.get("prev_empty"):
+        rows.append("За прошлый период с этими фильтрами данных нет — сравнивать не с чем.")
+        return rows
+    if lfl["prev_days"] != lfl["cur_days"]:
+        rows.append(f"Дней с данными: сейчас {lfl['cur_days']}, в прошлом периоде {lfl['prev_days']}"
+                    " — суммы сравниваются неравные.")
+    c = lfl["kpi"]
+    for title, key, unit in (("Выпуск", "quantity", " шт"), ("Операций", "operations", ""),
+                             ("Средняя длительность", "avg_duration", " мин"),
+                             ("Производительность", "avg_rate", " шт/ч"),
+                             ("Простоев", "pauses", ""), ("Простои", "stop_minutes", " мин"),
+                             ("Коэффициент использования", "utilization", "%")):
+        prev = c[key]["prev"]
+        prev_text = n(prev) if isinstance(prev, int) else f"{prev}".replace(".", ",")
+        cur = k[key]
+        cur_text = n(cur) if isinstance(cur, int) else f"{cur}".replace(".", ",")
+        line = (f"{title}: {cur_text}{unit} против {prev_text}{unit}, "
+                f"{change_text(c[key]['change'], c[key]['mode'])}")
+        rows.append(line if line.endswith(".") else line + ".")
+    h = lfl.get("hourly") or {}
+    if h.get("better") or h.get("worse"):
+        rows.append(f"По часам: выше прошлого периода в {h['better']} ч, ниже — в {h['worse']} ч.")
+    return rows
 
 
 def build_analysis(summary, filters=None):
@@ -420,6 +647,16 @@ def build_analysis(summary, filters=None):
         f"Коэффициент использования: {k['utilization']}% (работа {n(k['work_minutes'])} мин, простои {n(k['stop_minutes'])} мин).",
     ]
     blocks.append(("Итоги периода", period))
+
+    lfl = summary.get("lfl") or {}
+    if lfl.get("available"):
+        blocks.append(("Сравнение с прошлым периодом", lfl_lines(lfl, k)))
+        if lfl.get("weeks"):
+            blocks.append(("Неделя к неделе", [
+                f"{w['label']}{' (до ' + lfl['cutoff'] + ')' if w['partial'] else ''}: "
+                f"{n(w['qty'])} шт {change_text(w['qty_change'])}, "
+                f"простоев {w['pauses']} {change_text(w['pauses_change'])}"
+                for w in lfl["weeks"]]))
 
     if daily:
         best = max(daily, key=lambda d: d["qty"])
