@@ -109,7 +109,7 @@ function renderDailyLfl(lfl) {
   if (!weeks.length) { el.innerHTML = ''; return; }
   const top = Math.max(1, ...weeks.map((w) => w.qty));
   let uneven = false;
-  const rows = weeks.map((w) => {
+  const rows = weeks.map((w, i) => {
     const warn = w.base_days > 0 && w.days !== w.base_days;
     uneven = uneven || warn;
     const tip = `${w.label}: ${num(w.qty)} шт, простоев ${num(w.pauses)} · ` +
@@ -117,7 +117,9 @@ function renderDailyLfl(lfl) {
         ? `неделя раньше (${w.base_label}${w.partial ? ' до ' + lfl.cutoff : ''}): ${num(w.base_qty)} шт, простоев ${num(w.base_pauses)}`
         : `за ${w.base_label} данных нет`) +
       (warn ? ` · дней с данными ${w.days} и ${w.base_days}` : '');
-    return `<div class="wk${w.partial ? ' now' : ''}" data-tip="${esc(tip)}">` +
+    // Синим — самая свежая неделя периода, даже если он закончился не сегодня;
+    // partial только про подпись «до ЧЧ:ММ».
+    return `<div class="wk${i === 0 ? ' now' : ''}" data-tip="${esc(tip)}">` +
       `<div class="wk-range">${esc(w.label)}${warn ? '<sup title="Разное число дней с данными">⚠</sup>' : ''}` +
       (w.partial ? `<small>до ${esc(lfl.cutoff)}</small>` : '') + '</div>' +
       `<div class="wk-bar"><i style="width:${(w.qty / top * 100).toFixed(1)}%"></i></div>` +
