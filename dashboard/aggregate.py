@@ -536,6 +536,9 @@ def build_lfl(snapshot, summary, production, pauses, date_from="", date_to="",
                           "base_pauses": base["pauses"], "base_days": base["days"],
                           "qty_change": None if empty else _change(cur["qty"], base["qty"]),
                           "pauses_change": None if empty else _change(cur["pauses"], base["pauses"])})
+    # Неделя без единой записи — не «ноль выпуска», а отсутствие данных (например,
+    # до запуска бота). Показывать её строкой «0 шт» только сбивает с толку.
+    out_weeks = [w for w in out_weeks if w["days"]]
     out_weeks.reverse()  # по хронологии, как столбцы графика
 
     # 4. Часы — к тем же часам прошлого периода.

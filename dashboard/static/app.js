@@ -2,7 +2,7 @@
 const PIE_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300',
                     '#4a3aa7', '#e34948', '#0f766e', '#9a3412', '#6d28d9', '#be123c'];
 const BELOW_COLOR = '#e34948';   // статусный: час ниже средней
-const LFL_MARK = '#101828';      // засечка «было в прошлом периоде» поверх столбца
+const GHOST_COLOR = '#dde3ec';   // прошлый период: светлый столбец за текущим
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 const num = (v) => Number(v || 0).toLocaleString('ru-RU');
@@ -57,12 +57,14 @@ function niceMax(value) {
 /* ─── сравнение с прошлым (LFL) ───────────────────────────────────────────── */
 
 // better: 1 — рост хорошо, -1 — рост плохо (простои), 0 — без оценки (длительность, число операций).
+// mode: pct — проценты, pp — процентные пункты, h — разница в часах.
 function trend(change, better = 1, mode = 'pct') {
   if (change === null || change === undefined) return '<span class="tr flat">—</span>';
-  const unit = mode === 'pp' ? ' п.п.' : '%';
+  const unit = { pct: '%', pp: ' п.п.', h: ' ч' }[mode];
   const flat = Math.abs(change) < 0.05;
   const cls = flat || !better ? 'flat' : ((change > 0) === (better > 0) ? 'good' : 'bad');
-  const text = flat ? '= 0' + unit : `${change > 0 ? '▲ +' : '▼ −'}${dec(Math.abs(change))}${unit}`;
+  const text = flat ? (mode === 'h' ? 'без изм.' : '0' + unit)
+                    : `${change > 0 ? '▲' : '▼'} ${mode === 'h' ? Math.abs(change) : dec(Math.abs(change))}${unit}`;
   return `<span class="tr ${cls}">${esc(text)}</span>`;
 }
 
@@ -94,41 +96,58 @@ function renderLflCaption(lfl) {
     : `▲▼ — изменение к прошлому периоду ${lfl.prev_label} (${lfl.days} дн.${cut})${days}`;
 }
 
+function chartLegend(entries) {
+  return '<div class="legend chart-legend">' + entries.map(([kind, color, text]) =>
+    `<span><i class="lg-${kind}" style="${kind === 'dash' ? 'border-color' : 'background'}:${color}"></i>${esc(text)}</span>`
+  ).join('') + '</div>';
+}
+
 function renderDailyLfl(lfl) {
   const el = $('dailyLfl');
-  if (!lfl || !lfl.available || !(lfl.weeks || []).length) { el.innerHTML = ''; return; }
-  const cut = (w) => (w.partial ? ` <small>до ${esc(lfl.cutoff)}</small>` : '');
-  el.innerHTML =
-    '<div class="lfl-head"><span class="lfl-title">Неделя к неделе</span>' +
-    '<span class="lfl-key"><i></i>тот же день неделей раньше</span></div>' +
-    '<div class="lfl-weeks">' + lfl.weeks.map((w) => {
-      const tip = `${w.label}: ${num(w.qty)} шт, простоев ${num(w.pauses)} · сравнение с ${w.base_label}` +
-        `${w.partial ? ' до ' + lfl.cutoff : ''}: ${num(w.base_qty)} шт, простоев ${num(w.base_pauses)}` +
-        (w.days !== w.base_days ? ` · дней с данными ${w.days} и ${w.base_days}` : '');
-      return `<div class="lw" data-tip="${esc(tip)}">` +
-        `<div class="lw-range">${esc(w.label)}${cut(w)}</div>` +
-        (w.days !== w.base_days ? `<div class="lw-warn" title="Дней с данными в этой неделе и в той, с которой сравниваем">⚠ ${w.days} дн. против ${w.base_days}</div>` : '') +
-        `<div class="lw-qty">${esc(num(w.qty))}<small>шт</small> ${trend(w.qty_change, 1)}</div>` +
-        `<div class="lw-sub"><span>простоев ${esc(num(w.pauses))}</span> ${trend(w.pauses_change, -1)}</div>` +
-        '</div>';
-    }).join('') + '</div>';
+  // Свежая неделя сверху: руководитель смотрит на неё первой.
+  const weeks = lfl && lfl.available ? (lfl.weeks || []).slice().reverse() : [];
+  if (!weeks.length) { el.innerHTML = ''; return; }
+  let uneven = false;
+  const rows = weeks.map((w) => {
+    const warn = w.base_days > 0 && w.days !== w.base_days;
+    uneven = uneven || warn;
+    const tip = `${w.label}: ${num(w.qty)} шт, простоев ${num(w.pauses)} · ` +
+      (w.base_days
+        ? `сравнение с ${w.base_label}${w.partial ? ' до ' + lfl.cutoff : ''}: ${num(w.base_qty)} шт, простоев ${num(w.base_pauses)}`
+        : `за ${w.base_label} данных нет`) +
+      (warn ? ` · дней с данными ${w.days} и ${w.base_days}` : '');
+    return `<tr data-tip="${esc(tip)}"${w.partial ? ' class="now"' : ''}>` +
+      `<td><span class="wk">${esc(w.label)}${warn ? '<sup title="Разное число дней с данными">⚠</sup>' : ''}</span>` +
+      (w.partial ? `<small>до ${esc(lfl.cutoff)}</small>` : '') + '</td>' +
+      // Дельта дублируется внутри ячейки значения: на самых узких экранах колонки
+      // «к пред.» прячутся, и она встаёт под число, иначе таблица не влезает.
+      `<td class="num"><b>${esc(num(w.qty))}</b><span class="inl">${trend(w.qty_change, 1)}</span></td>` +
+      `<td class="num dcol">${trend(w.qty_change, 1)}</td>` +
+      `<td class="num">${esc(num(w.pauses))}<span class="inl">${trend(w.pauses_change, -1)}</span></td>` +
+      `<td class="num dcol">${trend(w.pauses_change, -1)}</td></tr>`;
+  }).join('');
+  el.innerHTML = '<div class="lfl-title">Неделя к неделе</div>' +
+    '<table class="wk-table"><thead><tr><th>Неделя</th><th class="num">Выпуск, шт</th><th class="num dcol">к пред.</th>' +
+    `<th class="num">Простоев</th><th class="num dcol">к пред.</th></tr></thead><tbody>${rows}</tbody></table>` +
+    (uneven ? '<p class="lfl-note">⚠ — в неделях разное число дней с данными, суммы сравниваются неточно</p>' : '');
 }
 
 function renderHourlyLfl(lfl, data) {
   const el = $('hourlyLfl');
-  if (!lfl || !lfl.available || lfl.prev_empty || !data.hourly_target) { el.innerHTML = ''; return; }
-  const h = lfl.hourly;
-  const belowChange = data.hourly_below - h.prev_below;
-  el.innerHTML =
-    `<div class="lfl-head"><span class="lfl-title">К прошлому периоду ${esc(lfl.prev_label)}</span>` +
-    '<span class="lfl-key"><i></i>тот же час в прошлом периоде</span></div>' +
-    '<div class="lfl-pills">' +
-    `<span class="pill">средняя ${esc(dec(data.hourly_target))} шт/ч ${trend(h.target_change, 1)}</span>` +
-    `<span class="pill">выше прошлого: <b>${num(h.better)}</b> ч · ниже: <b>${num(h.worse)}</b> ч</span>` +
-    `<span class="pill">часов ниже средней: <b>${num(data.hourly_below)}</b> (было ${num(h.prev_below)}) ` +
-    `<span class="tr ${belowChange < 0 ? 'good' : belowChange > 0 ? 'bad' : 'flat'}">` +
-    `${belowChange ? (belowChange > 0 ? '▲ +' : '▼ −') + Math.abs(belowChange) : 'без изменений'}</span></span>` +
-    '</div>';
+  if (!data.hourly_target) { el.innerHTML = ''; return; }
+  const ok = lfl && lfl.available && !lfl.prev_empty;
+  const h = ok ? lfl.hourly : null;
+  const stat = (label, value, extra) =>
+    `<div class="hstat"><div class="hs-label">${esc(label)}</div><div class="hs-value">${value}</div>` +
+    `<div class="hs-extra">${extra}</div></div>`;
+  el.innerHTML = '<div class="hstats">' +
+    stat('Средняя, шт/ч', esc(dec(data.hourly_target)),
+         ok ? `${trend(h.target_change, 1)}<span>было ${esc(dec(h.prev_target))}</span>` : '<span>за период</span>') +
+    stat('Часов ниже средней', esc(num(data.hourly_below)),
+         ok ? `${trend(data.hourly_below - h.prev_below, -1, 'h')}<span>было ${esc(num(h.prev_below))}</span>` : '<span>красные столбцы</span>') +
+    (ok ? stat('Часы к прошлому', `${esc(num(h.better))}<span class="hs-sep">/</span>${esc(num(h.worse))}`,
+               '<span>выше / ниже прошлого</span>') : '') +
+    '</div>' + (ok ? `<p class="lfl-note">Сравнение с периодом ${esc(lfl.prev_label)}</p>` : '');
 }
 
 /* ─── графики ─────────────────────────────────────────────────────────────── */
@@ -143,14 +162,20 @@ function barChart(items, opts = {}) {
   const padL = narrow ? 56 : 64;
   const padR = narrow ? 14 : 10;
   const padT = 12;
-  const padB = rotate ? (narrow ? 78 : 92) : 38;
+  // Повёрнутым подписям место по самой длинной: «00:00» не требует запаса под названия линий.
+  const longest = Math.max(...items.map((i) => String(i.label).length));
+  const padB = rotate ? Math.min(narrow ? 78 : 92, Math.round(26 + longest * (narrow ? 12 : 11.5) * 0.45)) : 38;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const target = Number(opts.target) || 0;
   const compare = opts.compare || [];
   const max = niceMax(Math.max(...items.map((i) => i.value), ...compare.map((v) => Number(v) || 0), target));
   const slot = plotW / items.length;
-  const barW = Math.max(4, Math.min(slot * 0.62, 62));
+  // С прошлым периодом рисуем «столбец в столбце»: широкий светлый — было,
+  // узкий цветной поверх — стало. Так видно без засечек, выросли или просели.
+  const paired = compare.length > 0;
+  const barW = Math.max(4, Math.min(slot * (paired ? 0.74 : 0.62), 64));
+  const curW = paired ? Math.max(3, barW * 0.58) : barW;
   const labelEvery = narrow && items.length > 14 ? Math.ceil(items.length / 8) : 1;
   const font = narrow ? 12 : 11.5;
   const parts = [];
@@ -163,7 +188,7 @@ function barChart(items, opts = {}) {
 
   items.forEach((item, i) => {
     const h = max ? (item.value / max) * plotH : 0;
-    const x = padL + slot * i + (slot - barW) / 2;
+    const x = padL + slot * i + (slot - curW) / 2;
     const y = padT + plotH - h;
     const below = target > 0 && item.value > 0 && item.value < target;
     const fill = below ? BELOW_COLOR : color;
@@ -176,14 +201,13 @@ function barChart(items, opts = {}) {
       + (opts.compareTip ? opts.compareTip(i) : '');
     // Прозрачная зона на всю колонку — палец на мобилке попадает даже мимо самого столбца.
     parts.push(`<rect class="hit${opts.filterKey ? ' clickable' : ''}${active ? ' active' : ''}" x="${(padL + slot * i).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent"${attrs} data-tip="${esc(tip)}"/>`);
-    parts.push(`<rect class="bar${active ? ' active' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(h, item.value > 0 ? 2 : 0).toFixed(1)}" rx="4" fill="${fill}" pointer-events="none"/>`);
     const was = Number(compare[i]) || 0;
     if (was > 0) {
-      // Засечка «сколько было»: столбец выше неё — стало больше, ниже — меньше.
-      const cy = (padT + plotH - (was / max) * plotH).toFixed(1);
-      parts.push(`<line x1="${(x - 3).toFixed(1)}" y1="${cy}" x2="${(x + barW + 3).toFixed(1)}" y2="${cy}" stroke="#fff" stroke-width="5" stroke-linecap="round" pointer-events="none"/>`);
-      parts.push(`<line x1="${(x - 3).toFixed(1)}" y1="${cy}" x2="${(x + barW + 3).toFixed(1)}" y2="${cy}" stroke="${LFL_MARK}" stroke-width="2.5" stroke-linecap="round" pointer-events="none"/>`);
+      const gh = (was / max) * plotH;
+      const gx = padL + slot * i + (slot - barW) / 2;
+      parts.push(`<rect x="${gx.toFixed(1)}" y="${(padT + plotH - gh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(gh, 2).toFixed(1)}" rx="4" fill="${GHOST_COLOR}" pointer-events="none"/>`);
     }
+    parts.push(`<rect class="bar${active ? ' active' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${curW.toFixed(1)}" height="${Math.max(h, item.value > 0 ? 2 : 0).toFixed(1)}" rx="${paired ? 3 : 4}" fill="${fill}"${paired ? ' stroke="#fff" stroke-width="1.5"' : ''} pointer-events="none"/>`);
     if (i % labelEvery === 0) {
       const lx = padL + slot * i + slot / 2;
       if (rotate) {
@@ -198,8 +222,8 @@ function barChart(items, opts = {}) {
   if (target > 0) {
     const ty = padT + plotH - (target / max) * plotH;
     parts.push(`<line x1="${padL}" y1="${ty.toFixed(1)}" x2="${W - padR}" y2="${ty.toFixed(1)}" stroke="#101828" stroke-width="1.5" stroke-dasharray="6 4" pointer-events="none"/>`);
-    parts.push(`<rect x="${padL + 4}" y="${(ty - 17).toFixed(1)}" width="${narrow ? 132 : 150}" height="15" rx="4" fill="#101828" pointer-events="none"/>`);
-    parts.push(`<text x="${padL + 10}" y="${(ty - 6).toFixed(1)}" font-size="${font - 0.5}" fill="#fff" pointer-events="none">средняя ${esc(dec(target))}${opts.unit ? ' ' + opts.unit : ''}</text>`);
+    const ly = ty - 7 < padT + 10 ? ty + 15 : ty - 7;
+    parts.push(`<text x="${W - padR - 2}" y="${ly.toFixed(1)}" text-anchor="end" font-size="${font}" font-weight="700" fill="#101828" stroke="#fff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" pointer-events="none">средняя ${esc(dec(target))}</text>`);
   }
 
   parts.push(`<line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#d9dfe8" stroke-width="1" pointer-events="none"/>`);
@@ -679,7 +703,9 @@ function render(data) {
         const d = data.daily[i];
         if (!d.lfl_date) return '';
         return ` · ${d.lfl_date.slice(5)} (неделей раньше): ${num(d.lfl_qty)} шт, ${pctText(d.lfl_change)}`;
-      } : null });
+      } : null })
+    + (data.daily.length ? chartLegend([['box', '#3b6ef5', 'выпуск за день']]
+      .concat(lfl.available ? [['box', GHOST_COLOR, 'тот же день неделей раньше']] : [])) : '');
   renderDailyLfl(lfl);
 
   $('chartHourly').innerHTML = barChart(
@@ -690,11 +716,12 @@ function render(data) {
       compareTip: lflOk ? (i) => {
         const h = data.hourly[i];
         return ` · прошлый период: ${dec(h.lfl_value)} шт/ч, ${pctText(h.lfl_change)}`;
-      } : null });
+      } : null })
+    + (data.hourly_target ? chartLegend([['box', '#7c5cf5', 'выше средней'], ['box', BELOW_COLOR, 'ниже средней'],
+                                         ['dash', '#101828', 'средняя']]
+      .concat(lflOk ? [['box', GHOST_COLOR, 'тот же час прошлого периода']] : [])) : '');
   renderHourlyLfl(lfl, data);
-  $('hourlyNote').textContent = data.hourly_target
-    ? `шт/час · средняя ${dec(data.hourly_target)} · ниже неё часов: ${num(data.hourly_below)} (красные)`
-    : 'шт/час · нажми на столбец';
+  $('hourlyNote').textContent = 'шт/ч · нажми на столбец';
 
   const cap = isNarrow() ? 8 : 12;
   $('chartEquipment').innerHTML = barChart(data.by_equipment.slice(0, cap),
