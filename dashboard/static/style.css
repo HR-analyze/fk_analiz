@@ -69,32 +69,64 @@ body{margin:0;background:var(--bg);color:var(--text);
 .k-vs{color:var(--muted);font-size:12px}
 
 /* сравнение с прошлым: зелёный — стало лучше, красный — хуже, серый — без оценки */
-.tr{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
-.tr.good{color:#0f7a4d}
-.tr.bad{color:#b3261e}
-.tr.flat{color:var(--muted)}
+.tr{display:inline-block;font-size:12px;font-weight:700;line-height:1;padding:4px 8px;border-radius:999px;
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+.tr.good{color:#0f7a4d;background:#e6f5ed}
+.tr.bad{color:#b3261e;background:#fdeceb}
+.tr.flat{color:#5d6679;background:#f0f2f6}
 .lfl-caption{margin:-6px 0 16px;color:var(--muted);font-size:12.5px}
 .lfl:empty{display:none}
-.lfl{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-.lfl-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;margin-bottom:10px}
-.lfl-title{font-size:13.5px;font-weight:700}
-.lfl-key{display:inline-flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px}
-.lfl-key i{display:inline-block;width:16px;height:3px;border-radius:2px;background:#101828}
-.lfl-weeks{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px}
-.lw{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fbfcfe;
-  display:flex;flex-direction:column;gap:4px;cursor:default}
-.lw-range{font-size:12.5px;font-weight:700;color:#42506a}
-.lw-range small{font-weight:600;color:var(--muted);margin-left:4px}
-.lw-warn{font-size:11.5px;color:#a4650a}
-.lw-qty{font-size:18px;font-weight:800;letter-spacing:-.01em;display:flex;flex-wrap:wrap;
-  align-items:baseline;gap:2px 8px}
-.lw-qty small{font-size:12px;font-weight:600;color:var(--muted);margin-left:3px}
-.lw-qty .tr{font-size:13px}
-.lw-sub{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:2px 8px}
-.lfl-pills{display:flex;flex-wrap:wrap;gap:8px}
-.pill{background:#f5f7fb;border:1px solid var(--line);border-radius:999px;padding:7px 12px;
-  font-size:13px;color:#42506a}
-.pill b{color:var(--text)}
+.lfl{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.lfl-title{font-size:14px;font-weight:700;margin-bottom:8px}
+.lfl-note{margin:8px 0 0;color:var(--muted);font-size:12px}
+
+/* легенда под столбчатым графиком */
+.chart-legend{margin-top:6px}
+.legend i.lg-dash{width:16px;height:0;border-radius:0;border-top:2px dashed;background:none}
+
+/* неделя к неделе: полоса длиной в выпуск, свежая неделя синяя */
+.wk-list{display:grid;gap:12px}
+.wk{display:grid;grid-template-columns:96px minmax(0,1fr) auto;grid-template-areas:"range bar val" ". stop stop";
+  gap:4px 12px;align-items:center;cursor:default}
+.wk-range{grid-area:range;font-size:13px;font-weight:700;color:#3f4a5e;line-height:1.2;white-space:nowrap}
+.wk-range small{display:block;font-size:11.5px;font-weight:500;color:var(--muted)}
+.wk-range sup{color:#a4650a;margin-left:3px;font-size:11px}
+.wk-bar{grid-area:bar;height:14px;border-radius:4px;background:#f0f2f6;overflow:hidden}
+.wk-bar i{display:block;height:100%;border-radius:4px;background:#b8c6e6}
+.wk.now .wk-bar i{background:var(--blue)}
+.wk-val{grid-area:val;display:flex;align-items:center;gap:6px;justify-self:end;white-space:nowrap;
+  font-size:13.5px;font-variant-numeric:tabular-nums}
+.wk-val span{color:var(--muted);font-size:12px;margin-right:2px}
+.wk-stop{grid-area:stop;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+
+/* сводка по часам */
+.hstats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.hstat{border:1px solid var(--line);border-radius:12px;padding:11px 13px;background:#fbfcfe}
+.hs-label{font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.05em;text-transform:uppercase}
+.hs-value{font-size:22px;font-weight:800;letter-spacing:-.01em;margin:5px 0 7px;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.hs-extra{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;color:var(--muted)}
+
+/* полоса по часам: каждая клетка подписана своим часом */
+.heat-head{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px;margin:14px 0 8px;
+  font-size:12.5px;color:var(--muted)}
+.heat-head b{color:var(--text)}
+.heat{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:2px}
+.hc{border-radius:5px;padding:5px 0 6px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  cursor:default;font-variant-numeric:tabular-nums;color:#243042}
+.hc span{font-size:9.5px;color:#5d6679;line-height:1}
+.hc b{font-size:10.5px;line-height:1}
+.hc.up2{background:#8fd3b0}
+.hc.up1{background:#cfeedd}
+.hc.same{background:#e9edf3}
+.hc.down1{background:#fad4d1}
+.hc.down2{background:#f19a94}
+.hc.none{background:#f5f6f8;color:var(--muted)}
+.heat-key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 16px;margin-top:10px;font-size:12px;color:#3c4658}
+.heat-key span{display:flex;align-items:center;gap:3px}
+.heat-key i.hc{display:inline-block;width:14px;height:10px;padding:0;border-radius:3px}
+.heat-key i.hc:last-of-type{margin-right:4px}
+.hk-note{color:var(--muted)}
 
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .grid-2 .panel{margin-bottom:16px}
@@ -258,10 +290,16 @@ body.loading .chart,body.loading .table,body.loading .kpis{opacity:.55;transitio
   .k-delta{font-size:12px;margin-top:6px;padding-top:6px}
   .k-vs{font-size:11px}
   .lfl-caption{margin:-2px 0 12px;font-size:12px}
-  .lfl-weeks{grid-template-columns:1fr 1fr;gap:8px}
-  .lw{padding:9px 10px}
-  .lw-qty{font-size:16px}
-  .pill{font-size:12.5px}
+  .wk{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"range val" "bar bar" "stop stop";gap:6px 10px}
+  .tr{font-size:11.5px;padding:4px 6px}
+  /* на телефоне 24 клетки в ряд не читаются — два ряда по 12 */
+  .heat{grid-template-columns:repeat(12,minmax(0,1fr));gap:3px}
+  .hc span{font-size:10px}
+  .hc b{font-size:11px}
+  .hstats{grid-template-columns:1fr;gap:8px}
+  .hstat{display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;padding:10px 12px}
+  .hs-value{margin:0;font-size:19px;text-align:right}
+  .hs-extra{grid-column:1 / -1}
 
   .filters-body{padding:0 14px 14px;gap:10px}
   .field{flex:1 1 calc(50% - 5px);min-width:0}
