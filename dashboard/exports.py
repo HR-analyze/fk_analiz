@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from aggregate import change_text
+from aggregate import change_text, units_of
 
 log = logging.getLogger("fk.exports")
 TZ = ZoneInfo(os.getenv("TIMEZONE", "Europe/Moscow"))
@@ -32,6 +32,7 @@ def _blank(value):
 def widget_rows(summary, widget):
     """(заголовок, колонки, строки) для одного виджета дашборда."""
     k = summary["kpi"]
+    u, rate = units_of(summary)
     done_column, _ = _done_column(summary)
     lfl = summary.get("lfl") or {}
     cmp_kpi = lfl.get("kpi") or {}
@@ -48,23 +49,23 @@ def widget_rows(summary, widget):
         return "KPI", ["Показатель", "Значение", prev_col, "Изменение, %"], [
             row("Операций", "operations"),
             ["Из них открытых", k["open_operations"], "", ""],
-            row("Выпуск, шт", "quantity"),
+            row(f"Выпуск, {u}", "quantity"),
             row("Средняя длительность, мин", "avg_duration"),
-            row("Средняя производительность, шт/ч", "avg_rate"),
+            row(f"Средняя производительность, {rate}", "avg_rate"),
             row("Простоев, шт", "pauses"),
             row("Простои, мин", "stop_minutes"),
             ["Работа, мин", k["work_minutes"], "", ""],
             row("Коэффициент использования, %", "utilization"),
         ]
     if widget == "daily":
-        return "Выпуск по дням", ["Дата", "День", "Операций", "Выпуск, шт", "План, шт",
+        return "Выпуск по дням", ["Дата", "День", "Операций", f"Выпуск, {u}", f"План, {u}",
                                   done_column, "Ср. длительность, мин", "Простои, мин",
-                                  "Неделей раньше, дата", "Неделей раньше, шт", "К неделе раньше, %"], [
+                                  "Неделей раньше, дата", f"Неделей раньше, {u}", "К неделе раньше, %"], [
             [d["date"], d["weekday"], d["ops"], d["qty"], d["plan"] or "", d["done"] if d["done"] is not None else "",
              d["avg_duration"], d["stop"], d.get("lfl_date", ""), _blank(d.get("lfl_qty")),
              _blank(d.get("lfl_change"))] for d in summary["daily"]]
     if widget == "weekly":
-        return "Неделя к неделе", ["Неделя", "Дней с данными", "Выпуск, шт", "Сравнение с", "Выпуск там, шт",
+        return "Неделя к неделе", ["Неделя", "Дней с данными", f"Выпуск, {u}", "Сравнение с", f"Выпуск там, {u}",
                                    "Выпуск, изменение %", "Простоев", "Простоев там", "Простои, изменение %"], [
             [w["label"] + (f" (до {lfl['cutoff']})" if w["partial"] else ""), w["days"], w["qty"],
              w["base_label"] + (f" (до {lfl['cutoff']})" if w["partial"] else ""), w["base_qty"],
@@ -72,14 +73,14 @@ def widget_rows(summary, widget):
             for w in lfl.get("weeks", [])]
     if widget == "hourly":
         target = summary.get("hourly_target", 0)
-        return "Производительность по часам", ["Час", "Средняя, шт/ч", "Средняя за период, шт/ч", "Ниже средней",
-                                               "Прошлый период, шт/ч", "Изменение, %"], [
+        return "Производительность по часам", ["Час", f"Средняя, {rate}", f"Средняя за период, {rate}", "Ниже средней",
+                                               f"Прошлый период, {rate}", "Изменение, %"], [
             [h["label"], h["value"], target, "да" if 0 < h["value"] < target else "",
              _blank(h.get("lfl_value")), _blank(h.get("lfl_change"))] for h in summary["hourly"]]
     if widget in ("equipment", "products", "employees", "reasons"):
-        source = {"equipment": ("Выпуск по оборудованию", "Оборудование", "Выпуск, шт", summary["by_equipment"]),
-                  "products": ("Топ продуктов", "Продукт", "Выпуск, шт", summary["top_products"]),
-                  "employees": ("Выпуск по сотрудникам", "Сотрудник", "Выпуск, шт", summary.get("top_employees", [])),
+        source = {"equipment": ("Выпуск по оборудованию", "Оборудование", f"Выпуск, {u}", summary["by_equipment"]),
+                  "products": ("Топ продуктов", "Продукт", f"Выпуск, {u}", summary["top_products"]),
+                  "employees": ("Выпуск по сотрудникам", "Сотрудник", f"Выпуск, {u}", summary.get("top_employees", [])),
                   "reasons": ("Простои по причинам", "Причина", "Минуты", summary["pause_reasons"])}[widget]
         title, name_col, value_col, items = source
         total = sum(i["value"] for i in items)
@@ -91,19 +92,19 @@ def widget_rows(summary, widget):
         return "Работа и простои", ["Показатель", "Минуты", "Доля, %"], [
             [i["label"], i["value"], _pct(i["value"], total)] for i in items]
     if widget == "employee_timings":
-        return "Сводка по сотрудникам", ["Сотрудник", "Операций", "Выпуск, шт", "Доля, %", "Ср. длительность, мин",
-                                         "Ср. производительность, шт/ч", "Простоев", "Простои, мин",
+        return "Сводка по сотрудникам", ["Сотрудник", "Операций", f"Выпуск, {u}", "Доля, %", "Ср. длительность, мин",
+                                         f"Ср. производительность, {rate}", "Простоев", "Простои, мин",
                                          "Загрузка, %", "Дней"], [
             [r["employee"], r["ops"], r["qty"], r["share"], r["avg_duration"], r["avg_rate"],
              r["pauses"], r["stop"], r["utilization"], r["days"]] for r in summary.get("employee_timings", [])]
     if widget == "equipment_timings":
-        return "Сводка по оборудованию", ["Оборудование", "Операций", "Выпуск, шт", "Работа, мин", "Простои, мин",
-                                          "Ср. производительность, шт/ч", "Загрузка, %"], [
+        return "Сводка по оборудованию", ["Оборудование", "Операций", f"Выпуск, {u}", "Работа, мин", "Простои, мин",
+                                          f"Ср. производительность, {rate}", "Загрузка, %"], [
             [r["equipment"], r["ops"], r["qty"], r["work"], r["stop"], r["avg_rate"], r["utilization"]]
             for r in summary["equipment_timings"]]
     if widget == "product_timings":
-        return "Тайминги по продуктам", ["Продукт", "Операций", "Выпуск, шт", "Ср. длительность, мин",
-                                         "Ср. производительность, шт/ч", "Диапазон старта"], [
+        return "Тайминги по продуктам", ["Продукт", "Операций", f"Выпуск, {u}", "Ср. длительность, мин",
+                                         f"Ср. производительность, {rate}", "Диапазон старта"], [
             [r["product"], r["ops"], r["qty"], r["avg_duration"], r["avg_rate"], r["start_range"]]
             for r in summary["product_timings"]]
     if widget == "plan":
@@ -112,8 +113,14 @@ def widget_rows(summary, widget):
             [r["product"], r["equipment"], r["plan"], r["fact"], r["diff"],
              r["done"] if r["done"] is not None else ""] for r in plan.get("rows", [])]
     if widget == "detail":
+        # У БХМ строка — шаг партии (сборка, замес, отлежка…): без названия шага её не понять.
+        if any(r.get("operation") for r in summary["detail"]):
+            return "Детализация операций", ["Дата", "Операция", "Оборудование", "Продукт", "Старт", "Финиш",
+                                            f"Количество, {u}", "Статус", "Оператор"], [
+                [r["date"], r.get("operation", ""), r["equipment"], r["product"], r["start_time"],
+                 r["end_time"] or "", r["qty"], r["status"], r["user_name"]] for r in summary["detail"]]
         return "Детализация операций", ["Дата", "Оборудование", "Продукт", "Старт", "Финиш",
-                                        "Количество, шт", "Статус", "Оператор"], [
+                                        f"Количество, {u}", "Статус", "Оператор"], [
             [r["date"], r["equipment"], r["product"], r["start_time"], r["end_time"] or "",
              r["qty"], r["status"], r["user_name"]] for r in summary["detail"]]
     raise KeyError(widget)
@@ -135,6 +142,9 @@ def build_xlsx(summary, widget, filters):
     from openpyxl.utils import get_column_letter
 
     widgets = ALL_WIDGETS if widget == "all" else [widget]
+    if not summary.get("plan_enabled", True):
+        # У источника нет загрузки плана (БХМ) — пустой лист «План и факт» только путает.
+        widgets = [w for w in widgets if w != "plan"]
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
     head_fill = PatternFill("solid", fgColor="E8EEFB")
@@ -322,10 +332,11 @@ def build_pdf(summary, analysis, filters, title="Сводка по произв�
     # KPI плиткой 3×2
     k = summary["kpi"]
     lfl = summary.get("lfl") or {}
+    u, rate = units_of(summary)
     tiles = [("Операций", k["operations"], "operations"),
-             ("Выпуск, шт", f"{k['quantity']:,}".replace(",", " "), "quantity"),
+             (f"Выпуск, {u}", f"{k['quantity']:,}".replace(",", " "), "quantity"),
              ("Средняя длит., мин", k["avg_duration"], "avg_duration"),
-             ("Производительность, шт/ч", k["avg_rate"], "avg_rate"),
+             (f"Производительность, {rate}", k["avg_rate"], "avg_rate"),
              ("Простоев", k["pauses"], "pauses"), ("Коэф. использования, %", k["utilization"], "utilization")]
 
     def tile_delta(key):
@@ -365,7 +376,7 @@ def build_pdf(summary, analysis, filters, title="Сводка по произв�
     story.append(Paragraph("Графики", h2))
     for name, items, color_hex, target in charts:
         story.append(KeepTogether([
-            Paragraph(name + (f" · средняя {target} шт/ч" if target else ""), body),
+            Paragraph(name + (f" · средняя {target} {rate}" if target else ""), body),
             _bar_drawing(items, width, 132, font, color_hex, target),
             Spacer(1, 3 * mm)]))
 

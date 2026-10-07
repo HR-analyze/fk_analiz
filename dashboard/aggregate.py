@@ -36,6 +36,18 @@ def shift_of(start):
     return "day" if DAY_SHIFT[0] <= a < DAY_SHIFT[1] else "night"
 
 
+def _q(value):
+    """Килограммы БХМ дробные: суммы float обрезаем от хвостов вида 0.30000000000000004.
+    Штуки ФК — int, их round не трогает."""
+    return round(value, 2) if isinstance(value, float) else value
+
+
+def units_of(summary):
+    """Единица объёма выпуска и производительности: шт у ФК, кг у БХМ."""
+    qty = (summary.get("units") or {}).get("qty") or "шт"
+    return qty, f"{qty}/ч"
+
+
 def _avg(values):
     values = [v for v in values if v]
     return sum(values) / len(values) if values else 0.0
@@ -130,7 +142,7 @@ def daily_output(production, pauses, plans=None, plan_filters=None):
             "date": d["date"],
             "weekday": WEEKDAYS[date.fromisoformat(d["date"]).weekday()] if d["date"] else "",
             "ops": d["ops"],
-            "qty": d["qty"],
+            "qty": _q(d["qty"]),
             "avg_duration": round(_avg(d["durations"])),
             "stop": d["stop"],
             "plan": plan,
@@ -186,7 +198,7 @@ def product_timings(production, limit=25):
         rows.append({
             "product": p["product"],
             "ops": p["ops"],
-            "qty": p["qty"],
+            "qty": _q(p["qty"]),
             "avg_duration": round(_avg(p["durations"]), 1),
             "avg_rate": round(_avg(p["rates"]), 1),
             "start_range": f"{starts[0] // 60:02d}:{starts[0] % 60:02d} – {starts[-1] // 60:02d}:{starts[-1] % 60:02d}" if starts else "—",
@@ -214,7 +226,7 @@ def equipment_timings(production, pauses):
         rows.append({
             "equipment": e["equipment"],
             "ops": e["ops"],
-            "qty": e["qty"],
+            "qty": _q(e["qty"]),
             "work": e["work"],
             "stop": e["stop"],
             "avg_rate": round(_avg(e["rates"]), 1),
@@ -260,7 +272,7 @@ def employee_timings(production, pauses):
         rows.append({
             "employee": e["employee"],
             "ops": e["ops"],
-            "qty": e["qty"],
+            "qty": _q(e["qty"]),
             "share": round(e["qty"] / total_qty * 100, 1) if total_qty else 0.0,
             "avg_duration": round(_avg(e["durations"]), 1),
             "avg_rate": round(_avg(e["rates"]), 1),
@@ -355,7 +367,7 @@ def kpi_block(production, pauses):
     total = work_minutes + stop_minutes
     return {
         "operations": len(production),
-        "quantity": sum(r["qty"] for r in production),
+        "quantity": _q(sum(r["qty"] for r in production)),
         "avg_duration": round(_avg(durations)),
         "avg_rate": round(_avg(rates), 1),
         "pauses": len(pauses),
@@ -510,7 +522,7 @@ def build_lfl(snapshot, summary, production, pauses, date_from="", date_to="",
         except ValueError:
             continue
         d["lfl_date"] = ref
-        d["lfl_qty"] = by_day.get(ref, 0)
+        d["lfl_qty"] = _q(by_day.get(ref, 0))
         d["lfl_change"] = _change(d["qty"], d["lfl_qty"])
 
     # 3. Недели, выровненные по концу периода: последняя — «последние 7 дней».
@@ -519,7 +531,7 @@ def build_lfl(snapshot, summary, production, pauses, date_from="", date_to="",
         w_rows = _window(rows, start, end, end, cutoff if cut else None)
         w_stops = _window(stops, start, end, end, cutoff if cut else None)
         return {"from": start.isoformat(), "to": end.isoformat(), "label": _span(start, end),
-                "qty": sum(r["qty"] for r in w_rows), "pauses": len(w_stops),
+                "qty": _q(sum(r["qty"] for r in w_rows)), "pauses": len(w_stops),
                 "days": _days_with_data(w_rows, w_stops)}
 
     blocks = [week_stats(d_to - week * k) for k in range(weeks + 1)]
@@ -590,7 +602,7 @@ def change_text(change, mode="pct"):
     return f"= 0{unit}"
 
 
-def lfl_lines(lfl, k):
+def lfl_lines(lfl, k, qty_unit="шт"):
     """Строки сравнения для сводки фактов и PDF. Только числа, без оценок."""
     def n(value):
         return f"{value:,.0f}".replace(",", " ")
@@ -606,9 +618,9 @@ def lfl_lines(lfl, k):
         rows.append(f"Дней с данными: сейчас {lfl['cur_days']}, в прошлом периоде {lfl['prev_days']}"
                     " — суммы сравниваются неравные.")
     c = lfl["kpi"]
-    for title, key, unit in (("Выпуск", "quantity", " шт"), ("Операций", "operations", ""),
+    for title, key, unit in (("Выпуск", "quantity", f" {qty_unit}"), ("Операций", "operations", ""),
                              ("Средняя длительность", "avg_duration", " мин"),
-                             ("Производительность", "avg_rate", " шт/ч"),
+                             ("Производительность", "avg_rate", f" {qty_unit}/ч"),
                              ("Простоев", "pauses", ""), ("Простои", "stop_minutes", " мин"),
                              ("Коэффициент использования", "utilization", "%")):
         prev = c[key]["prev"]
@@ -633,6 +645,7 @@ def build_analysis(summary, filters=None):
     k = summary["kpi"]
     daily = summary["daily"]
     blocks = []
+    u, rate = units_of(summary)
 
     total = k["quantity"]
 
@@ -644,8 +657,8 @@ def build_analysis(summary, filters=None):
 
     period = [
         f"Операций за период: {k['operations']}, из них открытых: {k['open_operations']}.",
-        f"Выпуск: {n(k['quantity'])} шт.",
-        f"Средняя длительность операции: {k['avg_duration']} мин, средняя производительность: {k['avg_rate']} шт/ч.",
+        f"Выпуск: {n(k['quantity'])} {u}.",
+        f"Средняя длительность операции: {k['avg_duration']} мин, средняя производительность: {k['avg_rate']} {rate}.",
         f"Простоев зафиксировано: {k['pauses']}, суммарно {n(k['stop_minutes'])} мин.",
         f"Коэффициент использования: {k['utilization']}% (работа {n(k['work_minutes'])} мин, простои {n(k['stop_minutes'])} мин).",
     ]
@@ -653,11 +666,11 @@ def build_analysis(summary, filters=None):
 
     lfl = summary.get("lfl") or {}
     if lfl.get("available"):
-        blocks.append(("Сравнение с прошлым периодом", lfl_lines(lfl, k)))
+        blocks.append(("Сравнение с прошлым периодом", lfl_lines(lfl, k, u)))
         if lfl.get("weeks"):
             blocks.append(("Неделя к неделе", [
                 f"{w['label']}{' (до ' + lfl['cutoff'] + ')' if w['partial'] else ''}: "
-                f"{n(w['qty'])} шт {change_text(w['qty_change'])}, "
+                f"{n(w['qty'])} {u} {change_text(w['qty_change'])}, "
                 f"простоев {w['pauses']} {change_text(w['pauses_change'])}"
                 for w in lfl["weeks"]]))
 
@@ -666,8 +679,8 @@ def build_analysis(summary, filters=None):
         worst = min(daily, key=lambda d: d["qty"])
         rows = [
             f"Дней с данными: {len(daily)}.",
-            f"Наибольший выпуск: {best['date']} — {n(best['qty'])} шт ({best['ops']} операций).",
-            f"Наименьший выпуск: {worst['date']} — {n(worst['qty'])} шт ({worst['ops']} операций).",
+            f"Наибольший выпуск: {best['date']} — {n(best['qty'])} {u} ({best['ops']} операций).",
+            f"Наименьший выпуск: {worst['date']} — {n(worst['qty'])} {u} ({worst['ops']} операций).",
         ]
         with_stop = [d for d in daily if d["stop"]]
         if with_stop:
@@ -678,9 +691,9 @@ def build_analysis(summary, filters=None):
         blocks.append(("По дням", rows))
 
     for title, items, unit in (
-        ("Топ продуктов", summary["top_products"][:5], "шт"),
-        ("Выпуск по оборудованию", summary["by_equipment"][:5], "шт"),
-        ("Выпуск по сотрудникам", summary.get("top_employees", [])[:5], "шт"),
+        ("Топ продуктов", summary["top_products"][:5], u),
+        ("Выпуск по оборудованию", summary["by_equipment"][:5], u),
+        ("Выпуск по сотрудникам", summary.get("top_employees", [])[:5], u),
     ):
         if items:
             blocks.append((title, [f"{i + 1}. {x['label']} — {n(x['value'])} {unit}{share(x['value'])}"
@@ -689,7 +702,7 @@ def build_analysis(summary, filters=None):
     target = summary.get("hourly_target", 0)
     if target:
         below = [h["label"] for h in summary["hourly"] if 0 < h["value"] < target]
-        rows = [f"Средняя производительность по часам: {target} шт/ч.",
+        rows = [f"Средняя производительность по часам: {target} {rate}.",
                 f"Часов с производительностью ниже средней: {len(below)}."]
         if below:
             rows.append("Это часы: " + ", ".join(below) + ".")

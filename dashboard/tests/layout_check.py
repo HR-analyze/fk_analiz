@@ -10,6 +10,7 @@
 
 Запуск (дашборд должен быть уже поднят):
     python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090
+    python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090 --source bhm
 Код возврата 1, если хоть одна проверка провалилась.
 """
 import argparse
@@ -132,14 +133,18 @@ PROBE = """
 """
 
 
-async def run(url, chrome):
+async def run(url, chrome, source="fk"):
     from playwright.async_api import async_playwright
 
     problems = 0
     async with async_playwright() as p:
         browser = await p.chromium.launch(executable_path=chrome or None, args=["--no-sandbox"])
+        # Источник выбирается так же, как у человека: через сохранённый выбор в localStorage.
+        context = await browser.new_context()
+        await context.add_init_script(f"try {{ localStorage.setItem('fk_source', {source!r}); }} catch (e) {{}}")
         for width, label in WIDTHS:
-            page = await browser.new_page(viewport={"width": width, "height": 900})
+            page = await context.new_page()
+            await page.set_viewport_size({"width": width, "height": 900})
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
             page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
@@ -170,7 +175,8 @@ async def run(url, chrome):
         # Сплошной прогон по ширинам: ищем только переносы значений и боковой скролл.
         print("\n  Сплошной прогон по ширинам "
               f"{SWEEP_FROM}–{SWEEP_TO}px с шагом {SWEEP_STEP}px:")
-        page = await browser.new_page(viewport={"width": SWEEP_TO, "height": 900})
+        page = await context.new_page()
+        await page.set_viewport_size({"width": SWEEP_TO, "height": 900})
         await page.goto(url, wait_until="networkidle")
         await page.wait_for_timeout(1200)
         bad_widths = []
@@ -196,9 +202,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://127.0.0.1:8090")
     ap.add_argument("--chrome", default="", help="путь к бинарю Chromium, если Playwright его не находит")
+    ap.add_argument("--source", default="fk", choices=("fk", "bhm"), help="какой источник проверять")
     args = ap.parse_args()
-    print(f"Проверка вёрстки: {args.url}\n")
-    problems = asyncio.run(run(args.url, args.chrome))
+    print(f"Проверка вёрстки: {args.url} (источник {args.source})\n")
+    problems = asyncio.run(run(args.url, args.chrome, args.source))
     print()
     if problems:
         print(f"ИТОГ: найдено проблем — {problems}")
