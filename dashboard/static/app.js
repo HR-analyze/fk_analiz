@@ -23,6 +23,17 @@ let meta = null;
 let timer = null;
 let lastData = null;
 
+// Источник данных: ФК (по умолчанию) или БХМ. У каждого свои справочники и единица
+// выпуска: ФК считает штуки, БХМ — килограммы теста. Выбор помнится в localStorage.
+const SOURCES = { fk: { title: 'ФК', qty: 'шт' }, bhm: { title: 'БХМ', qty: 'кг' } };
+let SOURCE = 'fk';
+let UNIT = 'шт';
+let RATE = 'шт/ч';
+// Фильтры живут отдельно у каждого источника: продукты и сотрудники у ФК и БХМ разные.
+const filtersBySource = {};
+// Ответ, пришедший после переключения источника, рисовать нельзя — он про другой цех.
+let loadSeq = 0;
+
 const store = {
   get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* приватный режим */ } },
@@ -112,9 +123,9 @@ function renderDailyLfl(lfl) {
   const rows = weeks.map((w, i) => {
     const warn = w.base_days > 0 && w.days !== w.base_days;
     uneven = uneven || warn;
-    const tip = `${w.label}: ${num(w.qty)} шт, простоев ${num(w.pauses)} · ` +
+    const tip = `${w.label}: ${num(w.qty)} ${UNIT}, простоев ${num(w.pauses)} · ` +
       (w.base_days
-        ? `неделя раньше (${w.base_label}${w.partial ? ' до ' + lfl.cutoff : ''}): ${num(w.base_qty)} шт, простоев ${num(w.base_pauses)}`
+        ? `неделя раньше (${w.base_label}${w.partial ? ' до ' + lfl.cutoff : ''}): ${num(w.base_qty)} ${UNIT}, простоев ${num(w.base_pauses)}`
         : `за ${w.base_label} данных нет`) +
       (warn ? ` · дней с данными ${w.days} и ${w.base_days}` : '');
     // Синим — самая свежая неделя периода, даже если он закончился не сегодня;
@@ -123,7 +134,7 @@ function renderDailyLfl(lfl) {
       `<div class="wk-range">${esc(w.label)}${warn ? '<sup title="Разное число дней с данными">⚠</sup>' : ''}` +
       (w.partial ? `<small>до ${esc(lfl.cutoff)}</small>` : '') + '</div>' +
       `<div class="wk-bar"><i style="width:${(w.qty / top * 100).toFixed(1)}%"></i></div>` +
-      `<div class="wk-val"><b>${esc(num(w.qty))}</b><span>шт</span>${trend(w.qty_change, 1)}</div>` +
+      `<div class="wk-val"><b>${esc(num(w.qty))}</b><span>${esc(UNIT)}</span>${trend(w.qty_change, 1)}</div>` +
       `<div class="wk-stop">простоев ${esc(num(w.pauses))} ${trend(w.pauses_change, -1)}</div>` +
       '</div>';
   }).join('');
@@ -151,7 +162,7 @@ function renderHourlyLfl(lfl, data) {
     `<div class="hstat"><div class="hs-label">${esc(label)}</div><div class="hs-value">${value}</div>` +
     `<div class="hs-extra">${extra}</div></div>`;
   const stats = '<div class="hstats">' +
-    stat('Средняя, шт/ч', esc(dec(data.hourly_target)),
+    stat(`Средняя, ${RATE}`, esc(dec(data.hourly_target)),
          ok ? `${trend(h.target_change, 1)}<span>было ${esc(dec(h.prev_target))}</span>` : '<span>за период</span>') +
     stat('Часов ниже средней', esc(num(data.hourly_below)),
          ok ? `${trend(data.hourly_below - h.prev_below, -1, 'h')}<span>было ${esc(num(h.prev_below))}</span>` : '<span>красные столбцы</span>') +
@@ -160,7 +171,7 @@ function renderHourlyLfl(lfl, data) {
   const cells = data.hourly.map((x, i) => {
     const c = x.lfl_change;
     const text = c === null || c === undefined ? '—' : (c > 0 ? '+' : c < 0 ? '−' : '') + Math.round(Math.abs(c));
-    const tip = `${x.label}: ${dec(x.value)} шт/ч · прошлый период: ${dec(x.lfl_value)} шт/ч, ${pctText(c)}`;
+    const tip = `${x.label}: ${dec(x.value)} ${RATE} · прошлый период: ${dec(x.lfl_value)} ${RATE}, ${pctText(c)}`;
     return `<div class="hc ${heatTone(c)}" data-tip="${esc(tip)}"><span>${String(i).padStart(2, '0')}</span><b>${esc(text)}</b></div>`;
   }).join('');
   el.innerHTML = `<div class="lfl-title">К прошлому периоду ${esc(lfl.prev_label)}</div>` + stats +
@@ -324,9 +335,9 @@ function renderKpis(k, lfl) {
   // [подпись, значение, единица, пояснение, ключ LFL, направление «лучше», формат прошлого]
   const cards = [
     ['Операций', num(k.operations), '', k.open_operations ? `из них открыто: ${num(k.open_operations)}` : 'за период', 'operations', 0, num],
-    ['Выпуск', num(k.quantity), 'шт', 'всего', 'quantity', 1, (v) => num(v) + ' шт'],
+    ['Выпуск', num(k.quantity), UNIT, 'всего', 'quantity', 1, (v) => num(v) + ' ' + UNIT],
     ['Средняя длит.', num(k.avg_duration), 'мин', 'на операцию', 'avg_duration', 0, (v) => num(v) + ' мин'],
-    ['Производительность', dec(k.avg_rate), 'шт/ч', 'средняя', 'avg_rate', 1, (v) => dec(v) + ' шт/ч'],
+    ['Производительность', dec(k.avg_rate), RATE, 'средняя', 'avg_rate', 1, (v) => dec(v) + ' ' + RATE],
     ['Простои', num(k.pauses), '', `суммарно ${hm(k.stop_minutes)}`, 'pauses', -1, num],
     ['Коэф. использования', dec(k.utilization), '%', 'работа / (работа + простои)', 'utilization', 1, (v) => dec(v) + '%'],
   ];
@@ -422,13 +433,104 @@ function renderPlan(p) {
     (r) => ({ key: 'product', value: r.product }));
 }
 
+/* ─── источник: ФК / БХМ ──────────────────────────────────────────────────── */
+
+function setUnits(units) {
+  UNIT = (units && units.qty) || SOURCES[SOURCE].qty;
+  RATE = (units && units.rate) || UNIT + '/ч';
+  document.querySelectorAll('[data-unit="qty"]').forEach((el) => { el.textContent = UNIT; });
+}
+
+// План и история загрузок есть только у ФК: у БХМ механизма загрузки плана нет.
+function planEnabled() {
+  return !meta || meta.plan_enabled !== false;
+}
+
+function markSourceButtons(available) {
+  document.querySelectorAll('.src-btn').forEach((b) => {
+    const on = b.dataset.source === SOURCE;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+    if (available) {
+      const ok = available[b.dataset.source] !== false;
+      b.disabled = !ok;
+      b.title = ok ? '' : 'Источник не настроен на сервере';
+    }
+  });
+}
+
+function applySourceUi() {
+  const planOk = planEnabled();
+  document.querySelectorAll('.tab[data-tab="plan"], .tab[data-tab="history"]').forEach((t) => { t.hidden = !planOk; });
+  document.title = `${SOURCES[SOURCE].title} — аналитика производства`;
+  markSourceButtons(meta && meta.sources);
+  if (!planOk && activeTab !== 'dashboard') showTab('dashboard');
+}
+
+async function fetchMeta(src) {
+  const r = await fetch('/api/meta?source=' + encodeURIComponent(src), { cache: 'no-store' });
+  const m = await r.json();
+  if (!r.ok || !m.ok) throw new Error(m.error || 'сервис недоступен');
+  return m;
+}
+
+function applyMeta(m) {
+  meta = m;
+  fillSelect($('equipment'), meta.equipment || [], 'Все');
+  fillSelect($('product'), meta.products || [], 'Все');
+  fillSelect($('employee'), meta.employees || [], 'Все');
+  // Границы дат — у каждого источника свои; пустая строка снимает ограничение.
+  $('dateFrom').min = $('dateTo').min = meta.date_min || '';
+  $('dateFrom').max = $('dateTo').max = meta.date_max || '';
+  setUnits(meta.units);
+}
+
+function restoreFilters() {
+  const saved = filtersBySource[SOURCE];
+  if (!saved) { resetFilters(); return; }
+  Object.assign(FILTERS, saved);
+  // Значение, которого больше нет в справочнике источника, — сбрасываем, а не шлём вслепую.
+  [['equipment', 'equipment'], ['product', 'products'], ['employee', 'employees']].forEach(([key, list]) => {
+    if (FILTERS[key] !== 'all' && !(meta[list] || []).includes(FILTERS[key])) FILTERS[key] = 'all';
+  });
+}
+
+let switching = '';
+
+async function switchSource(next) {
+  if (!SOURCES[next] || next === SOURCE || switching) return;
+  switching = next;
+  document.body.classList.add('loading');
+  let m;
+  try {
+    m = await fetchMeta(next);
+  } catch (e) {
+    // Источник недоступен — остаёмся на прежнем, ничего не ломая.
+    switching = '';
+    document.body.classList.remove('loading');
+    showAlert(`Источник ${SOURCES[next].title} недоступен: ${e.message}`);
+    return;
+  }
+  // Переключаемся только с готовыми справочниками: до этого момента и автообновление,
+  // и фильтры работают со старым источником.
+  filtersBySource[SOURCE] = { ...FILTERS };
+  SOURCE = next;
+  switching = '';
+  store.set('fk_source', next);
+  applyMeta(m);
+  restoreFilters();
+  syncControls();
+  applySourceUi();
+  await loadSummary(false);
+}
+
 /* ─── вкладки ─────────────────────────────────────────────────────────────── */
 
 const TABS = ['dashboard', 'plan', 'history'];
 let activeTab = 'dashboard';
 
 function showTab(name, push = true) {
-  if (!TABS.includes(name)) name = 'dashboard';
+  if (!TABS.includes(name) || (name !== 'dashboard' && !planEnabled())) name = 'dashboard';
   activeTab = name;
   document.querySelectorAll('.tab').forEach((t) => {
     const on = t.dataset.tab === name;
@@ -717,13 +819,13 @@ function render(data) {
 
   $('chartDaily').innerHTML = barChart(
     data.daily.map((d) => ({ label: d.date.slice(5), key: d.date, value: d.qty })),
-    { color: '#3b6ef5', filterKey: 'date', unit: 'шт',
+    { color: '#3b6ef5', filterKey: 'date', unit: UNIT,
       activeValue: FILTERS.dateFrom === FILTERS.dateTo ? FILTERS.dateFrom : undefined,
       compare: lfl.available ? data.daily.map((d) => d.lfl_qty) : [],
       compareTip: lfl.available ? (i) => {
         const d = data.daily[i];
         if (!d.lfl_date) return '';
-        return ` · ${d.lfl_date.slice(5)} (неделей раньше): ${num(d.lfl_qty)} шт, ${pctText(d.lfl_change)}`;
+        return ` · ${d.lfl_date.slice(5)} (неделей раньше): ${num(d.lfl_qty)} ${UNIT}, ${pctText(d.lfl_change)}`;
       } : null })
     + (data.daily.length ? chartLegend([['box', '#3b6ef5', 'выпуск за день']]
       .concat(lfl.available ? [['box', GHOST_COLOR, 'тот же день неделей раньше']] : [])) : '');
@@ -731,24 +833,24 @@ function render(data) {
 
   $('chartHourly').innerHTML = barChart(
     data.hourly.map((h, i) => ({ label: h.label, key: String(i), value: h.value })),
-    { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: 'шт/ч',
+    { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: RATE,
       target: data.hourly_target, activeValue: FILTERS.hour,
       compareTip: lflOk ? (i) => {
         const h = data.hourly[i];
-        return ` · прошлый период: ${dec(h.lfl_value)} шт/ч, ${pctText(h.lfl_change)}`;
+        return ` · прошлый период: ${dec(h.lfl_value)} ${RATE}, ${pctText(h.lfl_change)}`;
       } : null })
     + (data.hourly_target ? chartLegend([['box', '#7c5cf5', 'выше средней'], ['box', BELOW_COLOR, 'ниже средней'],
                                          ['dash', '#101828', 'средняя']]) : '');
   renderHourlyLfl(lfl, data);
-  $('hourlyNote').textContent = 'шт/ч · нажми на столбец';
+  $('hourlyNote').textContent = `${RATE} · нажми на столбец`;
 
   const cap = isNarrow() ? 8 : 12;
   $('chartEquipment').innerHTML = barChart(data.by_equipment.slice(0, cap),
-    { color: '#3fbf94', rotate: true, filterKey: 'equipment', unit: 'шт', activeValue: FILTERS.equipment });
+    { color: '#3fbf94', rotate: true, filterKey: 'equipment', unit: UNIT, activeValue: FILTERS.equipment });
   $('chartProducts').innerHTML = barChart(data.top_products.slice(0, cap),
-    { color: '#f0a63c', rotate: true, filterKey: 'product', unit: 'шт', activeValue: FILTERS.product });
+    { color: '#f0a63c', rotate: true, filterKey: 'product', unit: UNIT, activeValue: FILTERS.product });
   $('chartEmployees').innerHTML = barChart((data.top_employees || []).slice(0, cap),
-    { color: '#2a78d6', rotate: true, filterKey: 'employee', unit: 'шт', activeValue: FILTERS.employee });
+    { color: '#2a78d6', rotate: true, filterKey: 'employee', unit: UNIT, activeValue: FILTERS.employee });
 
   $('chartReasons').innerHTML = pieChart(data.pause_reasons);
   $('chartWork').innerHTML = pieChart(data.work_vs_stop, { donut: true, colors: ['#2a78d6', '#e34948'] });
@@ -766,7 +868,7 @@ function render(data) {
           : '';
         return `<button class="daycard${active ? ' active' : ''}" data-filter="date" data-value="${esc(d.date)}" role="button" tabindex="0">
           <div class="dc-top"><span class="dc-date">${esc(d.date.slice(5))}</span><span class="dc-wd">${esc(d.weekday || '')}</span></div>
-          <div class="dc-qty">${num(d.qty)}<small>шт</small></div>
+          <div class="dc-qty">${num(d.qty)}<small>${esc(UNIT)}</small></div>
           <div class="dc-meter"><i style="width:${(d.qty / best * 100).toFixed(1)}%"></i></div>
           ${planRow}
           <div class="dc-foot"><span>${num(d.ops)} оп.</span><span>${num(d.avg_duration)} мин</span><span class="${d.stop ? 'dc-stop' : ''}">${d.stop ? hm(d.stop) : 'без простоев'}</span></div>
@@ -775,8 +877,8 @@ function render(data) {
     : '<div class="empty">Нет данных за выбранный период</div>';
 
   renderTable($('employeeTable'),
-    [{ title: 'Сотрудник' }, { title: 'Операций', num: true }, { title: 'Выпуск (шт)', num: true },
-     { title: 'Доля', num: true }, { title: 'Ср. длит. (мин)', num: true }, { title: 'Ср. произв. (шт/ч)', num: true },
+    [{ title: 'Сотрудник' }, { title: 'Операций', num: true }, { title: `Выпуск (${UNIT})`, num: true },
+     { title: 'Доля', num: true }, { title: 'Ср. длит. (мин)', num: true }, { title: `Ср. произв. (${RATE})`, num: true },
      { title: 'Простои', num: true }, { title: 'Загрузка', num: true }, { title: 'Дней', num: true }],
     data.employee_timings || [],
     (r) => [`<span class="tag">${esc(r.employee)}</span>`, num(r.ops), num(r.qty), dec(r.share) + '%',
@@ -784,37 +886,42 @@ function render(data) {
     (r) => ({ key: 'employee', value: r.employee }));
 
   renderTable($('equipmentTable'),
-    [{ title: 'Оборудование' }, { title: 'Операций', num: true }, { title: 'Выпуск (шт)', num: true },
+    [{ title: 'Оборудование' }, { title: 'Операций', num: true }, { title: `Выпуск (${UNIT})`, num: true },
      { title: 'Работа', num: true }, { title: 'Простои', num: true },
-     { title: 'Ср. произв. (шт/ч)', num: true }, { title: 'Загрузка', num: true }],
+     { title: `Ср. произв. (${RATE})`, num: true }, { title: 'Загрузка', num: true }],
     data.equipment_timings,
     (r) => [`<span class="tag">${esc(r.equipment)}</span>`, num(r.ops), num(r.qty), hm(r.work), hm(r.stop), dec(r.avg_rate), dec(r.utilization) + '%'],
     (r) => ({ key: 'equipment', value: r.equipment }));
 
   renderTable($('productTable'),
-    [{ title: 'Продукт' }, { title: 'Операций', num: true }, { title: 'Выпуск (шт)', num: true },
-     { title: 'Ср. длит. (мин)', num: true }, { title: 'Ср. произв. (шт/ч)', num: true }, { title: 'Диапазон старта' }],
+    [{ title: 'Продукт' }, { title: 'Операций', num: true }, { title: `Выпуск (${UNIT})`, num: true },
+     { title: 'Ср. длит. (мин)', num: true }, { title: `Ср. произв. (${RATE})`, num: true }, { title: 'Диапазон старта' }],
     data.product_timings,
     (r) => [`<span class="tag">${esc(r.product)}</span>`, num(r.ops), num(r.qty), dec(r.avg_duration), dec(r.avg_rate), esc(r.start_range)],
     (r) => ({ key: 'product', value: r.product }));
 
+  // У БХМ строка детализации — шаг партии (сборка, замес, отлежка…): показываем, какой.
+  const withOp = data.detail.some((r) => r.operation);
   renderTable($('detailTable'),
-    [{ title: 'Дата' }, { title: 'Оборудование' }, { title: 'Продукт' }, { title: 'Старт' },
-     { title: 'Финиш' }, { title: 'Кол-во', num: true }, { title: 'Статус' }, { title: 'Оператор' }],
+    [{ title: 'Дата' }].concat(withOp ? [{ title: 'Операция' }] : []).concat(
+     [{ title: 'Оборудование' }, { title: 'Продукт' }, { title: 'Старт' },
+     { title: 'Финиш' }, { title: 'Кол-во', num: true }, { title: 'Статус' }, { title: 'Оператор' }]),
     data.detail,
-    (r) => [esc(r.date || '—'), esc(r.equipment), `<span class="tag">${esc(r.product)}</span>`,
+    (r) => [esc(r.date || '—')].concat(withOp ? [esc(r.operation || '—')] : []).concat(
+           [esc(r.equipment), `<span class="tag">${esc(r.product)}</span>`,
             esc(r.start_time || '—'), esc(r.end_time || '—'), num(r.qty),
-            r.status === 'closed' ? 'завершена' : esc(r.status), esc(r.user_name)]);
+            r.status === 'closed' ? 'завершена' : esc(r.status), esc(r.user_name)]));
 
   renderAnalysis(data.analysis);
   mountExportButtons();
 
   const src = data.source || {};
   const fetched = formatMoment(src.fetched_at);
-  const modes = { db: 'PostgreSQL (только чтение)', api: 'API бота', demo: 'тестовые данные (demo)' };
+  const modes = { db: 'PostgreSQL (только чтение)', api: 'API бота', demo: 'тестовые данные (demo)',
+                  'bhm-api': 'API бота БХМ', 'bhm-demo': 'тестовые данные БХМ (demo)' };
   const skipped = (data.excluded_dates || []).length ? ` · скрыто дат: ${data.excluded_dates.join(', ')}` : '';
   $('sourceLine').textContent = `Источник: ${modes[src.mode] || src.mode || '—'} · снимок от ${fetched} · автообновление ${meta ? meta.refresh_seconds : 60} с${skipped}`;
-  $('periodLine').textContent = `Период ${FILTERS.dateFrom || 'начало'} – ${FILTERS.dateTo || 'сегодня'} · ${SHIFT_NAMES[FILTERS.shift]} · операций: ${num(data.kpi.operations)} · выпуск: ${num(data.kpi.quantity)} шт · обновлено ${fetched}`;
+  $('periodLine').textContent = `Период ${FILTERS.dateFrom || 'начало'} – ${FILTERS.dateTo || 'сегодня'} · ${SHIFT_NAMES[FILTERS.shift]} · операций: ${num(data.kpi.operations)} · выпуск: ${num(data.kpi.quantity)} ${UNIT} · обновлено ${fetched}`;
 }
 
 function showAlert(message) {
@@ -826,6 +933,7 @@ function showAlert(message) {
 
 function query(force) {
   const p = new URLSearchParams({
+    source: SOURCE,
     date_from: FILTERS.dateFrom, date_to: FILTERS.dateTo,
     equipment: FILTERS.equipment, product: FILTERS.product,
     employee: FILTERS.employee, shift: FILTERS.shift,
@@ -836,17 +944,19 @@ function query(force) {
 }
 
 async function loadSummary(force) {
+  const seq = ++loadSeq;
   document.body.classList.add('loading');
   try {
     const r = await fetch('/api/summary?' + query(force), { cache: 'no-store' });
     const data = await r.json();
+    if (seq !== loadSeq) return;
     if (!r.ok || !data.ok) throw new Error(data.error || 'сервис недоступен');
     showAlert(data.source && data.source.error ? 'Данные показаны из кеша: ' + data.source.error : '');
     render(data);
   } catch (e) {
-    showAlert('Не удалось загрузить данные: ' + e.message);
+    if (seq === loadSeq) showAlert('Не удалось загрузить данные: ' + e.message);
   } finally {
-    document.body.classList.remove('loading');
+    if (seq === loadSeq) document.body.classList.remove('loading');
   }
 }
 
@@ -941,6 +1051,8 @@ function bindEvents() {
     $(id).addEventListener('change', () => { readControls(); loadSummary(false); }));
 
   $('exportPdf').addEventListener('click', () => download('/api/export/pdf?' + query(false)));
+  document.querySelectorAll('.src-btn').forEach((b) =>
+    b.addEventListener('click', () => switchSource(b.dataset.source)));
   $('exportAll').addEventListener('click', () => exportWidget('all'));
   initDropzone();
 
@@ -955,30 +1067,38 @@ function bindEvents() {
 }
 
 async function init() {
+  // По умолчанию — ФК; БХМ, только если его выбирали раньше.
+  const saved = store.get('fk_source');
+  SOURCE = SOURCES[saved] ? saved : 'fk';
+  let notice = '';
+  let m = null;
   try {
-    const r = await fetch('/api/meta', { cache: 'no-store' });
-    meta = await r.json();
-    if (!r.ok || !meta.ok) throw new Error(meta.error || 'сервис недоступен');
+    m = await fetchMeta(SOURCE);
   } catch (e) {
-    showAlert('Не удалось получить справочники: ' + e.message);
-    meta = { equipment: [], products: [], employees: [], refresh_seconds: 60 };
+    if (SOURCE !== 'fk') {
+      // Сохранённый БХМ сейчас недоступен — открываем ФК, а не пустую страницу.
+      notice = `Источник ${SOURCES[SOURCE].title} недоступен (${e.message}) — показан ФК.`;
+      SOURCE = 'fk';
+      try { m = await fetchMeta('fk'); } catch (e2) { showAlert('Не удалось получить справочники: ' + e2.message); }
+    } else {
+      showAlert('Не удалось получить справочники: ' + e.message);
+    }
   }
-  fillSelect($('equipment'), meta.equipment || [], 'Все');
-  fillSelect($('product'), meta.products || [], 'Все');
-  fillSelect($('employee'), meta.employees || [], 'Все');
+  applyMeta(m || { equipment: [], products: [], employees: [], refresh_seconds: 60 });
+  markSourceButtons(meta.sources);
   $('hour').innerHTML = '<option value="">Все</option>' +
     Array.from({ length: 24 }, (_, h) => `<option value="${h}">${String(h).padStart(2, '0')}:00</option>`).join('');
-  if (meta.date_min) { $('dateFrom').min = meta.date_min; $('dateTo').min = meta.date_min; }
-  if (meta.date_max) { $('dateFrom').max = meta.date_max; $('dateTo').max = meta.date_max; }
   if (!isNarrow()) $('filterPanel').open = true;
-  $('planDate').value = (meta && meta.date_max) || new Date().toISOString().slice(0, 10);
+  $('planDate').value = (SOURCE === 'fk' && meta.date_max) || new Date().toISOString().slice(0, 10);
 
   resetFilters();
   syncControls();
   bindEvents();
   initTabs();
+  applySourceUi();
   await refreshPlanState();
   await loadSummary(false);
+  if (notice) showAlert(notice);
 
   const every = Math.max(15, Number(meta.refresh_seconds) || 60) * 1000;
   if (timer) clearInterval(timer);

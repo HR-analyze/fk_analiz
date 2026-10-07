@@ -10,6 +10,10 @@
 <body>
 <main class="wrap">
   <header class="page-head">
+    <div class="source-switch" id="sourceSwitch" role="radiogroup" aria-label="Источник данных">
+      <button class="src-btn active" type="button" role="radio" aria-checked="true" data-source="fk">ФК</button>
+      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="bhm">БХМ</button>
+    </div>
     <div class="head-row">
       <h1>Аналитический отчёт по производству</h1>
       <div class="head-actions">
@@ -60,7 +64,7 @@
 
     <section class="grid-2">
       <article class="panel" data-widget="daily">
-        <header class="panel-head"><h2>Выпуск по дням</h2><span class="unit">шт · нажми на столбец</span></header>
+        <header class="panel-head"><h2>Выпуск по дням</h2><span class="unit"><span data-unit="qty">шт</span> · нажми на столбец</span></header>
         <div id="chartDaily" class="chart"></div>
         <div id="dailyLfl" class="lfl"></div>
       </article>
@@ -73,18 +77,18 @@
 
     <section class="grid-2">
       <article class="panel" data-widget="equipment">
-        <header class="panel-head"><h2>Выпуск по оборудованию</h2><span class="unit">шт · нажми на столбец</span></header>
+        <header class="panel-head"><h2>Выпуск по оборудованию</h2><span class="unit"><span data-unit="qty">шт</span> · нажми на столбец</span></header>
         <div id="chartEquipment" class="chart"></div>
       </article>
       <article class="panel" data-widget="products">
-        <header class="panel-head"><h2>Топ продуктов</h2><span class="unit">шт · нажми на столбец</span></header>
+        <header class="panel-head"><h2>Топ продуктов</h2><span class="unit"><span data-unit="qty">шт</span> · нажми на столбец</span></header>
         <div id="chartProducts" class="chart"></div>
       </article>
     </section>
 
     <section class="grid-2">
       <article class="panel" data-widget="employees">
-        <header class="panel-head"><h2>Выпуск по сотрудникам</h2><span class="unit">шт · нажми на столбец</span></header>
+        <header class="panel-head"><h2>Выпуск по сотрудникам</h2><span class="unit"><span data-unit="qty">шт</span> · нажми на столбец</span></header>
         <div id="chartEmployees" class="chart"></div>
       </article>
       <article class="panel" data-widget="reasons">

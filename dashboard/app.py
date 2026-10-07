@@ -2,6 +2,7 @@
 import asyncio
 import hmac
 import io
+import json
 import logging
 import os
 import re
@@ -13,6 +14,7 @@ from aiohttp import web
 import aggregate
 import exports
 import plans as plan_store
+from bhm_source import BhmSource
 from sources import TZ, DataSource
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -23,7 +25,33 @@ STATIC = Path(__file__).parent / "static"
 REFRESH_SECONDS = int(os.getenv("REFRESH_SECONDS", "60"))
 # Даты, которые дашборд не показывает. База при этом не трогается — фильтр только на чтении.
 EXCLUDE_DATES = tuple(d.strip() for d in os.getenv("EXCLUDE_DATES", "").split(",") if d.strip())
+BHM_EXCLUDE_DATES = tuple(d.strip() for d in os.getenv("BHM_EXCLUDE_DATES", "").split(",") if d.strip())
 source = DataSource()
+bhm_source = BhmSource()
+
+# Источники дашборда. ФК — по умолчанию: старые ссылки без ?source= работают как раньше.
+# У БХМ своя единица (кг) и нет загрузки плана — вкладки плана для него скрыты.
+SOURCES = {
+    "fk": {"title": "ФК", "data": source, "exclude": EXCLUDE_DATES, "plans": True,
+           "units": {"qty": "шт", "rate": "шт/ч"}, "file": "fk"},
+    "bhm": {"title": "БХМ", "data": bhm_source, "exclude": BHM_EXCLUDE_DATES, "plans": False,
+            "units": {"qty": "кг", "rate": "кг/ч"}, "file": "bhm"},
+}
+
+
+def pick_source(request):
+    key = request.query.get("source", "fk").strip().lower() or "fk"
+    if key not in SOURCES:
+        raise web.HTTPBadRequest(content_type="application/json", text=json.dumps(
+            {"ok": False, "error": "неизвестный источник: " + re.sub(r"[^a-z0-9_-]", "", key)[:16]}, ensure_ascii=False))
+    if key == "bhm" and not bhm_source.enabled:
+        raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
+            {"ok": False, "error": "источник БХМ не настроен: задай BHM_API_URL и BHM_API_KEY"}, ensure_ascii=False))
+    return key, SOURCES[key]
+
+
+def sources_state():
+    return {"fk": True, "bhm": bhm_source.enabled}
 
 
 def no_store(response):
@@ -41,18 +69,24 @@ async def health(request):
         await source.get()
     except Exception as exc:
         return web.json_response({"ok": False, "error": f"{type(exc).__name__}: {exc}", **source.describe()}, status=503)
-    return web.json_response({"ok": True, **source.describe()})
+    # БХМ — второй источник: его недоступность не делает контейнер нездоровым.
+    return web.json_response({"ok": True, **source.describe(), "bhm": bhm_source.describe()})
 
 
 async def meta(request):
-    snapshot = await source.get()
+    key, src = pick_source(request)
+    snapshot = await src["data"].get()
     return no_store(web.json_response({
         "ok": True,
         "timezone": str(TZ),
         "refresh_seconds": REFRESH_SECONDS,
-        "source": source.describe(),
-        "plan_upload_enabled": bool(plan_store.PLAN_UPLOAD_TOKEN),
-        **aggregate.build_meta(snapshot, EXCLUDE_DATES),
+        "source": src["data"].describe(),
+        "source_key": key,
+        "sources": sources_state(),
+        "units": src["units"],
+        "plan_enabled": src["plans"],
+        "plan_upload_enabled": bool(plan_store.PLAN_UPLOAD_TOKEN) and src["plans"],
+        **aggregate.build_meta(snapshot, src["exclude"]),
     }))
 
 
@@ -154,6 +188,8 @@ SHIFT_LABELS = {"all": "все смены", "day": "дневная (08:00–20:0
 async def collect(request):
     """Одна выборка и один расчёт для страницы, Excel и PDF — цифры всегда совпадают."""
     q = request.query
+    key, src = pick_source(request)
+    exclude_dates = src["exclude"]
     args = {
         "date_from": q.get("date_from", "").strip(),
         "date_to": q.get("date_to", "").strip(),
@@ -163,19 +199,20 @@ async def collect(request):
         "shift": q.get("shift", "all").strip(),
         "hour": q.get("hour", "").strip(),
     }
-    snapshot = await source.get(force=q.get("refresh") == "1")
-    production, pauses = aggregate.apply_filters(snapshot, exclude_dates=EXCLUDE_DATES, **args)
+    snapshot = await src["data"].get(force=q.get("refresh") == "1")
+    production, pauses = aggregate.apply_filters(snapshot, exclude_dates=exclude_dates, **args)
     plan_filters = {
         "date_from": args["date_from"], "date_to": args["date_to"],
         "equipment": args["equipment"], "product": args["product"],
-        "exclude_dates": EXCLUDE_DATES,
+        "exclude_dates": exclude_dates,
     }
-    stored_plans = await asyncio.to_thread(plan_store.load)
+    # Планы загружаются только для ФК: продукты БХМ к ним отношения не имеют.
+    stored_plans = await asyncio.to_thread(plan_store.load) if src["plans"] else {}
     payload = aggregate.build_summary(production, pauses, plans=stored_plans, plan_filters=plan_filters)
     payload["lfl"] = aggregate.build_lfl(
         snapshot, payload, production, pauses, args["date_from"], args["date_to"],
         filters={k: args[k] for k in ("equipment", "product", "employee", "shift", "hour")},
-        exclude_dates=EXCLUDE_DATES, now=datetime.now(TZ))
+        exclude_dates=exclude_dates, now=datetime.now(TZ))
     # В файле плана есть только дата, оборудование и продукт. Фильтры по сотруднику,
     # смене и часу сужают факт, но не план, поэтому сравнение перестаёт быть
     # «выполнением» — об этом надо сказать прямо, а не показывать цифру молча.
@@ -183,8 +220,12 @@ async def collect(request):
         name for name, value in (("сотруднику", args["employee"] not in ("all", "")),
                                  ("смене", args["shift"] not in ("all", "")),
                                  ("часу", bool(args["hour"]))) if value]
-    payload["source"] = source.describe()
-    payload["excluded_dates"] = list(EXCLUDE_DATES)
+    payload["source"] = src["data"].describe()
+    payload["source_key"] = key
+    payload["source_title"] = src["title"]
+    payload["units"] = src["units"]
+    payload["plan_enabled"] = src["plans"]
+    payload["excluded_dates"] = list(exclude_dates)
 
     def named(value, default="все"):
         return default if value in ("all", "") else value
@@ -196,8 +237,12 @@ async def collect(request):
         ("Сотрудник", named(args["employee"])),
         ("Смена", SHIFT_LABELS.get(args["shift"], args["shift"])),
         ("Час", f"{int(args['hour']):02d}:00" if args["hour"].isdigit() else "все"),
-        ("Скрытые даты", ", ".join(EXCLUDE_DATES) or "нет"),
+        ("Скрытые даты", ", ".join(exclude_dates) or "нет"),
     ]
+    if key != "fk":
+        # У ФК список фильтров не меняем: выгрузки ФК остаются ровно такими, как были.
+        filters.insert(0, ("Источник", src["title"]))
+    args["source"] = key
     return payload, filters, args
 
 
@@ -226,11 +271,13 @@ async def export_xlsx(request):
     if widget != "all" and widget not in exports.ALL_WIDGETS:
         return web.json_response({"ok": False, "error": f"неизвестный виджет: {widget}"}, status=400)
     payload, filters, args = await collect(request)
+    if widget == "plan" and not payload["plan_enabled"]:
+        return web.json_response({"ok": False, "error": "у этого источника нет плана"}, status=400)
     try:
         blob = await asyncio.to_thread(exports.build_xlsx, payload, widget, filters)
     except KeyError:
         return web.json_response({"ok": False, "error": f"неизвестный виджет: {widget}"}, status=400)
-    name = f"fk_{widget}_{_stamp(args)}.xlsx"
+    name = f"{SOURCES[args['source']]['file']}_{widget}_{_stamp(args)}.xlsx"
     return web.Response(
         body=blob,
         headers={"Content-Disposition": f'attachment; filename="{name}"',
@@ -241,8 +288,9 @@ async def export_xlsx(request):
 async def export_pdf(request):
     payload, filters, args = await collect(request)
     analysis = aggregate.build_analysis(payload, filters)
-    blob = await asyncio.to_thread(exports.build_pdf, payload, analysis, filters)
-    name = f"fk_svodka_{_stamp(args)}.pdf"
+    title = "Сводка по производству" if args["source"] == "fk" else f"Сводка по производству {payload['source_title']}"
+    blob = await asyncio.to_thread(exports.build_pdf, payload, analysis, filters, title)
+    name = f"{SOURCES[args['source']]['file']}_svodka_{_stamp(args)}.pdf"
     return web.Response(
         body=blob,
         headers={"Content-Disposition": f'attachment; filename="{name}"',
@@ -278,5 +326,6 @@ def build_app():
 
 
 if __name__ == "__main__":
-    log.info("FK dashboard starting on port %s (source=%s)", PORT, source.describe()["mode"])
+    log.info("FK dashboard starting on port %s (source=%s, bhm=%s)",
+             PORT, source.describe()["mode"], bhm_source.describe()["mode"])
     web.run_app(build_app(), host="0.0.0.0", port=PORT, access_log=None)
