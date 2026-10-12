@@ -16,7 +16,7 @@ import pg_plan_store
 log = logging.getLogger("fk.plans")
 
 PLAN_FILE = Path(os.getenv("PLAN_FILE", "/app/data/plans.json"))
-PG_PLANS = bool(pg_plan_store.database_url())
+PG_PLANS = bool(os.getenv("PLAN_DATABASE_URL", "").strip() or (os.getenv("DATABASE_URL", "").strip() if os.getenv("RELAXDEV_DEPLOY") == "1" else ""))
 
 
 def init_storage():
