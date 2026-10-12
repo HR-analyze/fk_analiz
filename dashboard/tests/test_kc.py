@@ -428,7 +428,7 @@ def demo_summary():
     d = json.loads((HERE.parent / "kc_demo_data.json").read_text(encoding="utf-8"))
     s = ka.build_summary(ks.normalize(d["operations"], d["pauses"], d["catalog"]),
                          {"date_from": "2026-10-05", "date_to": "2026-10-11"}, now=NOW)
-    return s, [("Источник", "КЦ — кондитерский цех"), ("Период", "2026-10-05 – 2026-10-11")]
+    return s, [("Источник", "Кондитерский цех"), ("Период", "2026-10-05 – 2026-10-11")]
 
 
 def test_excel_all_widgets_numbers_and_notes():

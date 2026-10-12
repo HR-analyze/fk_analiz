@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ФК — аналитика производства</title>
+<title>Аналитика производства</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📊</text></svg>">
 <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -11,11 +11,11 @@
 <main class="wrap">
   <header class="page-head">
     <div class="source-switch" id="sourceSwitch" role="radiogroup" aria-label="Источник данных">
-      <button class="src-btn active" type="button" role="radio" aria-checked="true" data-source="fk">ФК</button>
-      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="bhm">БХМ</button>
-      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="proofing">Расстойка</button>
-      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="kc" title="Кондитерский цех">КЦ</button>
-      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="gantt" title="Диаграмма Ганта и общий тайминг всех цехов">Гант</button>
+      <button class="src-btn active" type="button" role="radio" aria-checked="true" data-source="fk" title="ФК">Формо&shy;вочный цех</button>
+      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="bhm" title="БХМ">Тесто&shy;заготовочный цех</button>
+      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="proofing" title="Расстойка и отпекание">Печной цех</button>
+      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="kc" title="КЦ">Конди&shy;терский цех</button>
+      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="gantt" title="Диаграмма Ганта, общий тайминг и среднее по продукту всех цехов">Тайминги</button>
     </div>
     <div class="head-row">
       <h1>Аналитический отчёт по производству</h1>
@@ -192,8 +192,8 @@
   <!-- ── Расстойка: сводка ──────────────────────────────────────────────── -->
   <div class="tab-page" data-page="proofing" hidden>
     <div class="proof-error" id="proofError" hidden>
-      <div><b>Раздел «Расстойка» сейчас недоступен.</b> <span id="proofErrorText"></span></div>
-      <p>ФК и БХМ работают независимо — переключись на них кнопками сверху.</p>
+      <div><b>Раздел «Печной цех» сейчас недоступен.</b> <span id="proofErrorText"></span></div>
+      <p>Формовочный и тестозаготовочный цеха работают независимо — переключись на них кнопками сверху.</p>
       <button class="btn" type="button" id="proofRetry">Повторить</button>
     </div>
     <div id="proofBody">
@@ -291,8 +291,8 @@
   <!-- ── КЦ: сводка ───────────────────────────────────────────────────────── -->
   <div class="tab-page" data-page="kc" hidden>
     <div class="proof-error" id="kcError" hidden>
-      <div><b>Раздел «КЦ» сейчас недоступен.</b> <span id="kcErrorText"></span></div>
-      <p>ФК, БХМ и расстойка работают независимо — переключись на них кнопками сверху.</p>
+      <div><b>Раздел «Кондитерский цех» сейчас недоступен.</b> <span id="kcErrorText"></span></div>
+      <p>Формовочный, тестозаготовочный и печной цеха работают независимо — переключись на них кнопками сверху.</p>
       <button class="btn" type="button" id="kcRetry">Повторить</button>
     </div>
     <div id="kcBody">
@@ -452,7 +452,7 @@
   </section>
 
   <div class="tab-page" data-page="gantt" hidden>
-    <div class="proof-error" id="gError" hidden><b>Гант недоступен.</b> <span id="gErrorText"></span></div>
+    <div class="proof-error" id="gError" hidden><b>Тайминги недоступны.</b> <span id="gErrorText"></span></div>
     <div class="plan-skew" id="gWarn" hidden></div>
     <section class="kpis k4" id="gKpis"></section>
     <section class="panel">
@@ -474,7 +474,7 @@
   <div class="tab-page" data-page="timing" hidden>
     <div class="plan-skew" id="tNote"></div>
     <section class="panel">
-      <header class="panel-head"><h2>Путь продукта по цехам</h2><span class="unit">БХМ → формовка → расстойка → отпекание → КЦ → фасовка</span></header>
+      <header class="panel-head"><h2>Путь продукта по цехам</h2><span class="unit">тестозаготовочный → формовочный → печной (расстойка, отпекание) → кондитерский цех → фасовка</span></header>
       <div class="g-legend" id="tLegend"></div>
       <div class="gantt-scroll" id="tChart"></div>
     </section>
@@ -497,8 +497,8 @@
   <div class="tab-page" data-page="gmap" hidden>
     <section class="panel">
       <header class="panel-head"><h2>Справочник продуктов</h2><span class="unit" id="mNote">—</span></header>
-      <p class="plan-hint">У цехов разные названия одного продукта («Батон / ромашка» в БХМ и «Батон классический» на формовке),
-        а в КЦ операции вводят руками («Начинка», «Внесение начинки», «Набивка начинкой»).
+      <p class="plan-hint">У цехов разные названия одного продукта («Батон / ромашка» в тестозаготовочном цехе и «Батон классический» в формовочном),
+        а в кондитерском цехе операции вводят руками («Начинка», «Внесение начинки», «Набивка начинкой»).
         Скачай шаблон: лист «Соответствия» — единый продукт, лист «Операции» — единая операция. Заполни и загрузи файл.
         Регистр, «ё», пробелы и знаки препинания сводятся сами; похожие названия (опечатки, «фреш») только подсказываются.</p>
       <div class="plan-actions">

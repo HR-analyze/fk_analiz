@@ -167,7 +167,7 @@ def build_xlsx(summary, widget, filters):
     return out.getvalue()
 
 
-def build_pdf(summary, analysis, filters, title="Сводка: расстойка и отпекание"):
+def build_pdf(summary, analysis, filters, title="Сводка: печной цех (расстойка и отпекание)"):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle

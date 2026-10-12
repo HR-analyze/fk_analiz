@@ -53,7 +53,7 @@ The proofing section needs **no database of its own**: it reads the proofing bot
 
 The KC section works the same way: API only (no access to the KC bot database, no new dashboard tables), key server-side only, in-memory cache. Empty `KC_API_URL` disables the «КЦ» button; `KC_API_URL` without `KC_API_KEY` fails startup. KC «processed pieces» are a sum over operations (one item passing three operations is counted three times) and are never presented as finished output.
 
-The «Гант» section needs no new variables: it combines the four sources above plus the one-time parsed KC Telegram chat (`kc_chat_history.json`, baked into the image). Its mapping (shop product names → unified product, hand-typed KC operations → unified operation) is uploaded on the site with `PLAN_UPLOAD_TOKEN` and stored in the same dashboard PostgreSQL in a **separate** table `fk_dashboard_product_map`, created automatically on startup; the plans table is not touched. Packing (фасовка) has no source yet — it will be a separate bot. KC data taken from the chat is marked as inaccurate on the page and in the exports.
+Section buttons are now named «Формовочный цех» (FK), «Тестозаготовочный цех» (BHM), «Печной цех» (proofing), «Кондитерский цех» (KC) and «Тайминги» (Gantt); URLs and `?source=` keys are unchanged. The «Тайминги» section needs no new variables: it combines the four sources above plus the one-time parsed KC Telegram chat (`kc_chat_history.json`, baked into the image). Its mapping (shop product names → unified product, hand-typed KC operations → unified operation) is uploaded on the site with `PLAN_UPLOAD_TOKEN` and stored in the same dashboard PostgreSQL in a **separate** table `fk_dashboard_product_map`, created automatically on startup; the plans table is not touched. Packing (фасовка) has no source yet — it will be a separate bot. KC data taken from the chat is marked as inaccurate on the page and in the exports.
 
 Missing mandatory settings make startup fail instead of silently exposing data or writing transient plans. A username/password challenge protects the dashboard endpoints; `/health` remains publicly accessible to platform probes.
 
@@ -61,9 +61,9 @@ Missing mandatory settings make startup fail instead of silently exposing data o
 
 1. Open `/health`; confirm `ok: true` and `mode: api`.
 2. Open `/`; enter dashboard login/password; confirm FK facts, BHM tab and exports.
-3. Click «Расстойка»; confirm KPI, charts, «Партии» tab, a photo gallery, Excel and PDF. `/health` shows `proofing.error` empty.
-4. Click «КЦ»; confirm «Сводка», «Операции», «Нормативы», Excel and PDF. `/health` shows `kc.error` empty.
-5. Click «Гант»; pick a day, check the chart (product rows collapse; columns equipment / people / output per person-hour), «Общий тайминг», «Среднее по продукту» (expand a product), download the template, upload it back.
+3. Click «Печной цех» (proofing); confirm KPI, charts, «Партии» tab, a photo gallery, Excel and PDF. `/health` shows `proofing.error` empty.
+4. Click «Кондитерский цех» (KC); confirm «Сводка», «Операции», «Нормативы», Excel and PDF. `/health` shows `kc.error` empty.
+5. Click «Тайминги» (Gantt); pick a day, check the chart (product rows collapse; columns equipment / people / output per person-hour), «Общий тайминг», «Среднее по продукту» (product output per day and per person-hour; expand a product), download the template, upload it back.
 6. Upload a TEST plan with `PLAN_UPLOAD_TOKEN`. Visit `/api/plan` and `/api/plan/history`.
 7. Deploy the same commit again; confirm uploaded plans and history persist.
 

@@ -183,11 +183,11 @@ def test_rows_grouped_by_product_with_columns():
     assert (glaze["people"], glaze["rate_per_person"], glaze["rate_unit"]) == (2, 50.0, "шт")    # 100 шт / (1 ч × 2)
     assert (sauce["people"], sauce["rate_per_person"]) == (3, 60.0)                              # 90 / (0,5 ч × 3)
     prod = next(x for x in s["products"] if x["product"] == "Булка Много мака")
-    assert prod["ops"] == 2 and prod["section_title"] == "КЦ"
+    assert prod["ops"] == 2 and prod["section_title"] == "Кондитерский цех"
     assert prod["people"] == 5 and prod["people_ops"] == 5          # 09:30–10:00 работают обе операции
     assert prod["rate_per_person"] is None and prod["qty"] == ""    # штуки разных операций не складываем
     bread = next(x for x in s["products"] if x["product"] == "Багет")
-    assert bread["section_title"] == "Формовка" and bread["people"] is None
+    assert bread["section_title"] == "Формовочный цех" and bread["people"] is None
     assert bread["rate_per_person"] is None and bread["rate"] == 900.0 and bread["equipment"] == "Rondo"
 
 
@@ -238,8 +238,23 @@ def test_averages_per_product_relative_to_start():
     assert ops["Сборка"]["rate_per_person"] == round(50 / 5, 1)                        # Σшт / Σчел·ч за дни
     assert ops["Сборка"]["qty_day"] == "25 шт"
     assert p["stages"][0]["key"] == "kc" and p["stages"][0]["span_min"] == 130.0
+    # выработка продукта: самая массовая операция последнего этапа, операции не складываются
+    o = p["output"]
+    assert (o["qty_day"], o["unit"], o["operation"], o["days"]) == (25.0, "шт", "Декор", 2)   # поровну — позже закончилась
+    assert o["rate_per_person"] == round(50 / (2 * 1 + 0.5 * 1 + 3 * 1 + 20 / 60), 1)   # шт / чел·ч всех операций
     s = gantt.build(bars, {}, {}, "2026-10-07", "full", now=NOW, avg_from="2026-10-08", avg_to="2026-10-07")
     assert (s["averages"]["from"], s["averages"]["to"]) == ("2026-10-07", "2026-10-08")
+
+
+def test_product_output_takes_last_stage_and_skips_batches():
+    fk = gantt.fk_bars({"production": [fk_row("Батон", "09:00", "10:00", at(7, 10), qty=1000)]})
+    baking = [gantt._bar("proofing", "baking", "Батон", "Отпекание", at(7, 12), at(7, 13), qty=950, unit="шт")]
+    batter = [gantt._bar("kc", "kc", "Бисквит", "Разлив", at(7, 9), at(7, 10), qty=4, unit="замес", people=2)]
+    bars = {"fk": fk, "proofing": baking, "kc": batter}
+    av = {p["product"]: p for p in gantt.averages(bars, gantt.Namer(bars), "2026-10-07", "2026-10-07", now=NOW)["products"]}
+    o = av["Батон"]["output"]
+    assert (o["qty_day"], o["stage"], o["rate_per_person"]) == (950.0, "baking", None)   # людей нет — на чел·ч не считаем
+    assert av["Бисквит"]["output"] is None                                              # замес — не продукция
 
 
 # ── общий тайминг ─────────────────────────────────────────────────────────────
@@ -317,13 +332,16 @@ def test_map_operations_sheet_hints_and_old_section_name():
     for row in ops.iter_rows(min_row=2):
         if row[1].value == "Начинка":
             row[2].value = "Внесение начинки"
-    wb["Соответствия"].append(["ФК", "Батон", "Батон классический"])    # старое название цеха
+    wb["Соответствия"].append(["ФК", "Батон", "Батон классический"])    # старые названия цехов
+    wb["Соответствия"].append(["Формовка", "Багет", "Багет французский"])
+    wb["Соответствия"].append(["Расстойка", "Хала", "Хала плетёная"])
     out = io.BytesIO()
     wb.save(out)
     out.seek(0)
     parsed = product_map.parse_workbook(out)
     assert parsed["ops"] == {"kc": {"Начинка": "Внесение начинки"}} and parsed["op_pairs"] == 1
-    assert parsed["map"] == {"fk": {"Батон": "Батон классический"}}
+    assert parsed["map"] == {"fk": {"Батон": "Батон классический", "Багет": "Багет французский"},
+                             "proofing": {"Хала": "Хала плетёная"}}
     assert product_map.unify({"kc": {"Начинка": "X"}}, "kc", "  начинка ") == "X"
     assert product_map.norm("Булка «Много-мака»  ё") == "булка много мака е"
 
@@ -371,7 +389,7 @@ def test_api_meta_summary_and_one_section_down():
             assert m["ok"] and m["kind"] == "gantt" and m["days"] and m["history_ops"] >= 170
             d = await (await client.get("/api/summary?source=gantt&date=2026-10-07&window=full")).json()
             assert d["ok"] and d["totals"]["ops"] > 0 and d["totals"]["from_chat"] > 0
-            assert set(d["totals"]["by_section"]) == {"БХМ", "Формовка", "Расстойка", "КЦ"}
+            assert set(d["totals"]["by_section"]) == {"Тестозаготовочный цех", "Формовочный цех", "Печной цех", "Кондитерский цех"}
             assert d["products"] and d["averages"]["products"] and m["avg_from"] <= m["avg_to"]
             av = await (await client.get("/api/summary?source=gantt&date=2026-10-07&avg_from=2026-10-07&avg_to=2026-10-07")).json()
             assert (av["averages"]["from"], av["averages"]["to"], av["averages"]["days"]) == ("2026-10-07", "2026-10-07", 1)
@@ -404,11 +422,11 @@ def test_api_map_upload_needs_token_and_changes_timing():
             wb = openpyxl.load_workbook(io.BytesIO(await r.read()))
             ws = wb.active
             for row in ws.iter_rows(min_row=2):
-                if row[0].value == "БХМ" and row[1].value == "Круассан классический":
+                if row[0].value == "Тестозаготовочный цех" and row[1].value == "Круассан классический":
                     row[2].value = "Круассан французский"
             op_ws = wb["Операции"]
             for row in op_ws.iter_rows(min_row=2):
-                if row[0].value == "КЦ" and row[1].value == "Начинка":
+                if row[0].value == "Кондитерский цех" and row[1].value == "Начинка":
                     row[2].value = "Внесение начинки"
             buf = io.BytesIO()
             wb.save(buf)
@@ -457,7 +475,7 @@ def test_exports_xlsx_and_pdf():
             assert wb["Среднее по продукту"].max_row - 1 == sum(1 + len(x["stages"]) + len(x["ops"]) for x in av)
             notes = [c.value for c in wb["Фильтры"]["B"] if c.value]
             assert any("переписки" in str(v) for v in notes)
-            assert any(r[-1] == "переписка КЦ — неточно" for r in wb["Среднее по продукту"].iter_rows(min_row=2, values_only=True))
+            assert any(r[-1] == "переписка кондитерского цеха — неточно" for r in wb["Среднее по продукту"].iter_rows(min_row=2, values_only=True))
             r = await client.get("/api/export/pdf?source=gantt&date=2026-10-07")
             assert r.status == 200 and (await r.read())[:4] == b"%PDF"
         finally:

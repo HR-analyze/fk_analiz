@@ -77,9 +77,13 @@ AVG_COLUMNS = ["Продукт (единый)", "Дней", "Этап", "Цех"
 def average_rows(summary):
     out = []
     for p in summary["averages"]["products"]:
-        out.append([p["product"], p["days"], "весь путь", ", ".join(p["sections"]), "", "", "",
+        o = p.get("output")
+        out_text = (f"{o['qty_day']:g} {o['unit']} — {o['stage_title']}, «{o['operation']}»"
+                    + (f", по {o['days']} дн. из {p['days']}" if o["days"] < p["days"] else "")) if o else ""
+        out_rate = f"{o['rate_per_person']:g} {o['unit']}/чел·ч (все операции)" if o and o["rate_per_person"] is not None else ""
+        out.append([p["product"], p["days"], "весь путь", ", ".join(p["sections"]), "продукт целиком", "", "",
                     _hm(p["lead_min"]) + (f" (от {_hm(p['lead_min_min'])} до {_hm(p['lead_min_max'])})" if p["days"] > 1 and p["lead_min"] is not None else ""),
-                    "", "", "", "", "", "", "есть переписка КЦ — неточно" if p.get("from_chat") else ""])
+                    "", "", out_text, out_rate, "", "", "есть переписка кондитерского цеха — неточно" if p.get("from_chat") else ""])
         for st in p["stages"]:
             out.append([p["product"], p["days"], st["title"], "", "этап целиком", st["days"], "+" + _hm(st["offset_min"]) if st["offset_min"] is not None else "",
                         _hm(st["span_min"]), _hm(st["busy_min"]), "", "", "", "", "", ""])
@@ -87,7 +91,7 @@ def average_rows(summary):
             out.append([p["product"], p["days"], o["stage_title"], o["section_title"], o["operation"], o["days"],
                         "+" + _hm(o["offset_min"]) if o["offset_min"] is not None else "", _hm(o["span_min"]), _hm(o["busy_min"]),
                         _v(o["people_avg"]), o["qty_day"] if o["qty_day"] != "—" else "", _rate_text(o), o["equipment"], o["no_end"] or "",
-                        "переписка КЦ — неточно" if o["from_chat"] else ""])
+                        "переписка кондитерского цеха — неточно" if o["from_chat"] else ""])
     return out
 
 
@@ -120,13 +124,14 @@ def build_analysis(summary, filters=None):
             "По цехам: " + ", ".join(f"{k} — {v}" for k, v in t["by_section"].items()) + ".",
             f"С известным числом людей: {t['people_known']}; человеко-часов (где известно): {str(t['person_hours']).replace('.', ',')}."]
     if t["from_chat"]:
-        rows.append(f"Из разобранного чата КЦ: {t['from_chat']} (до запуска бота КЦ); "
+        rows.append(f"Из разобранного чата кондитерского цеха: {t['from_chat']} (до запуска бота); "
                     f"время по времени сообщения — {t['check']}. Эти данные неточные.")
     blocks = [("Итоги окна", rows)]
     av = summary.get("averages") or {}
     if av.get("products"):
         blocks.append((f"Среднее по продукту за {av['from']} — {av['to']} (рабочие сутки 08–08)", [
-            f"{x['product']}: дней {x['days']}, путь в среднем {_hm(x['lead_min']) or '—'}; этапы: "
+            f"{x['product']}: дней {x['days']}, путь в среднем {_hm(x['lead_min']) or '—'}"
+            + (f", выработка {x['output']['qty_day']:g} {x['output']['unit']} в день" if x.get("output") else "") + "; этапы: "
             + ", ".join(f"{st['title']} {_hm(st['span_min']) or '—'}" for st in x["stages"]) + "."
             for x in av["products"][:10]]))
     chains = [x for x in summary["timing"] if x["stages_count"] > 1]
@@ -138,7 +143,7 @@ def build_analysis(summary, filters=None):
         blocks.append(("Общий тайминг", ["В этом окне нет продукта, найденного больше чем в одном цехе. "
                                          "Сведи названия в справочнике продуктов, если у цехов они разные."]))
     if summary["handoffs"]:
-        blocks.append(("Передано на фасовку (из чата КЦ)", [f"{h['product']} — {h['qty']} {h['unit']} в {h['time']}"
+        blocks.append(("Передано на фасовку (из чата кондитерского цеха)", [f"{h['product']} — {h['qty']} {h['unit']} в {h['time']}"
                                                            for h in summary["handoffs"]]))
     errors = summary.get("section_errors") or {}
     if errors:
@@ -146,7 +151,7 @@ def build_analysis(summary, filters=None):
     caveats = [summary["chat_note"]] if summary.get("chat_note") else []
     blocks.append(("Оговорки", caveats + ["Цеха связаны по единому продукту, а не по номеру партии — у ботов нет общего номера.",
                                 "Фасовки пока нет ни в одном боте: этап заложен, данных нет.",
-                                "Людей знают только КЦ (бот и чат); у формовки, БХМ и расстойки — только отметивший оператор, "
+                                "Людей знает только кондитерский цех (бот и чат); у тестозаготовочного, формовочного и печного цехов — только отметивший оператор, "
                                 "поэтому выработка у них — в час на всех, не на человека.",
                                 "Людей у продукта — максимум одновременно занятых: имён в чате нет, сумма посчитала бы человека дважды.",
                                 "Штуки разных операций не складываются: выработка на человека — по строке операции."]))
@@ -254,7 +259,7 @@ def _gantt_drawing(summary, rows, width, font, row_h=11):
     return d
 
 
-def build_pdf(summary, analysis, filters, title="Диаграмма Ганта и общий тайминг"):
+def build_pdf(summary, analysis, filters, title="Тайминги: диаграмма Ганта и общий тайминг"):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle
@@ -281,9 +286,7 @@ def build_pdf(summary, analysis, filters, title="Диаграмма Ганта �
         story.append(KeepTogether([Paragraph(heading, h2)] + [Paragraph(x, body) for x in lines]))
     story.append(PageBreak())
     story.append(Paragraph(f"Диаграмма Ганта · {summary['day']} · {summary['window_title']}", h2))
-    legend = " · ".join(f"<font color='{c}'>■</font> {n}" for n, c in (("БХМ", SECTION_COLORS["bhm"]), ("Формовка", SECTION_COLORS["fk"]),
-                                                                        ("Расстойка/отпекание", SECTION_COLORS["proofing"]),
-                                                                        ("КЦ", SECTION_COLORS["kc"])))
+    legend = " · ".join(f"<font color='{SECTION_COLORS[k]}'>■</font> {n}" for k, n in SECTIONS.items())
     story.append(Paragraph(legend + " · бледная полоса — время по сообщению или операция идёт; штрих — конец не отмечен", muted))
     rows, chunk, lanes = summary["rows"], [], 0
     for r in rows:

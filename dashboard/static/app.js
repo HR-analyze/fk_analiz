@@ -28,10 +28,11 @@ let lastData = null;
 // Источник данных: ФК (по умолчанию), БХМ или Расстойка. У каждого свои справочники и
 // единица выпуска: ФК считает штуки, БХМ — килограммы теста, расстойка — штуки после печи.
 // У расстойки своя страница (партии из двух этапов), ФК и БХМ делят общую. Выбор помнится в localStorage.
-const SOURCES = { fk: { title: 'ФК', qty: 'шт' }, bhm: { title: 'БХМ', qty: 'кг' },
-                  proofing: { title: 'Расстойка', qty: 'шт', kind: 'proofing' },
-                  kc: { title: 'КЦ', qty: 'шт', kind: 'kc' },
-                  gantt: { title: 'Гант', qty: 'шт', kind: 'gantt' } };
+// Названия разделов: ФК — формовочный, БХМ — тестозаготовочный, расстойка — печной, КЦ — кондитерский цех, Гант — «Тайминги».
+const SOURCES = { fk: { title: 'Формовочный цех', qty: 'шт' }, bhm: { title: 'Тестозаготовочный цех', qty: 'кг' },
+                  proofing: { title: 'Печной цех', qty: 'шт', kind: 'proofing' },
+                  kc: { title: 'Кондитерский цех', qty: 'шт', kind: 'kc' },
+                  gantt: { title: 'Тайминги', qty: 'шт', kind: 'gantt' } };
 const isProofing = () => SOURCE === 'proofing';
 const isKc = () => SOURCE === 'kc';
 const isGantt = () => SOURCE === 'gantt';
@@ -1014,7 +1015,7 @@ function render(data) {
   const src = data.source || {};
   const fetched = formatMoment(src.fetched_at);
   const modes = { db: 'PostgreSQL (только чтение)', api: 'API бота', demo: 'тестовые данные (demo)',
-                  'bhm-api': 'API бота БХМ', 'bhm-demo': 'тестовые данные БХМ (demo)' };
+                  'bhm-api': 'API бота тестозаготовочного цеха (БХМ)', 'bhm-demo': 'тестовые данные тестозаготовочного цеха (demo)' };
   const skipped = (data.excluded_dates || []).length ? ` · скрыто дат: ${data.excluded_dates.join(', ')}` : '';
   $('sourceLine').textContent = `Источник: ${modes[src.mode] || src.mode || '—'} · снимок от ${fetched} · автообновление ${meta ? meta.refresh_seconds : 60} с${skipped}`;
   $('periodLine').textContent = `Период ${FILTERS.dateFrom || 'начало'} – ${FILTERS.dateTo || 'сегодня'} · ${SHIFT_NAMES[FILTERS.shift]} · операций: ${num(data.kpi.operations)} · выпуск: ${num(data.kpi.quantity)} ${UNIT} · обновлено ${fetched}`;
@@ -1093,9 +1094,9 @@ function showProofError(message) {
   $('proofErrorText').textContent = message;
   // Строки шапки и подвала не должны остаться от ФК/БХМ.
   $('periodLine').textContent = proofData
-    ? 'Расстойка: данные не обновились — показаны последние полученные'
-    : 'Расстойка: данные недоступны';
-  $('sourceLine').textContent = 'Источник: API бота расстойки · ошибка подключения';
+    ? 'Печной цех: данные не обновились — показаны последние полученные'
+    : 'Печной цех: данные недоступны';
+  $('sourceLine').textContent = 'Источник: API бота печного цеха (расстойка) · ошибка подключения';
   // Старые цифры при ошибке не прячем, если они уже были: подписываем, что данные не обновились.
   $('proofBody').hidden = !proofData;
   if (proofData) $('proofErrorText').textContent = message + ' Ниже — последние полученные данные.';
@@ -1472,8 +1473,8 @@ function showKcError(message) {
   box.hidden = false;
   $('kcErrorText').textContent = message + (kcData ? ' Ниже — последние полученные данные.' : '');
   $('kcBody').hidden = !kcData;
-  $('periodLine').textContent = kcData ? 'КЦ: данные не обновились — показаны последние полученные' : 'КЦ: данные недоступны';
-  $('sourceLine').textContent = 'Источник: API бота КЦ · ошибка подключения';
+  $('periodLine').textContent = kcData ? 'Кондитерский цех: данные не обновились — показаны последние полученные' : 'Кондитерский цех: данные недоступны';
+  $('sourceLine').textContent = 'Источник: API бота кондитерского цеха · ошибка подключения';
 }
 
 async function refreshKcMeta() {
@@ -1725,7 +1726,7 @@ function renderKc(data) {
 
   const src = data.source || {};
   const fetched = formatMoment(src.fetched_at);
-  const modes = { 'kc-api': 'API бота КЦ', 'kc-demo': 'тестовые данные КЦ (demo)' };
+  const modes = { 'kc-api': 'API бота кондитерского цеха', 'kc-demo': 'тестовые данные кондитерского цеха (demo)' };
   const skipped = (data.excluded_dates || []).length ? ` · скрыто дат: ${data.excluded_dates.join(', ')}` : '';
   $('sourceLine').textContent = `Источник: ${modes[src.mode] || src.mode || '—'} · снимок от ${fetched} · автообновление ${meta ? meta.refresh_seconds : 60} с${skipped}`;
   $('periodLine').textContent = `Период ${FILTERS.dateFrom || 'начало'} – ${FILTERS.dateTo || 'сегодня'} · ${SHIFT_NAMES[FILTERS.shift]} · ` +
@@ -1756,7 +1757,7 @@ const GANTT = { date: '', window: 'full', sections: ['bhm', 'fk', 'proofing', 'k
   avgFrom: '', avgTo: '', fold: new Map(), searchFold: new Map(), avgOpen: new Set() };
 const G_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', kc: '#7c5cf5' };
 const G_STAGE_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', baking: '#0f766e', kc: '#7c5cf5', pack: '#9ca3af' };
-const G_NAMES = { bhm: 'БХМ', fk: 'Формовка', proofing: 'Расстойка', kc: 'КЦ' };
+const G_NAMES = { bhm: 'Тестозаготовочный цех', fk: 'Формовочный цех', proofing: 'Печной цех', kc: 'Кондитерский цех' };
 let ganttData = null;
 
 function showGanttError(message) {
@@ -1828,7 +1829,7 @@ function gBarTip(b) {
     b.equipment ? `оборудование: ${b.equipment}` : '',
     b.operation_raw && b.operation_raw !== b.operation ? `в источнике: «${b.operation_raw}»` : '',
     b.unified && b.unified !== b.product ? `название в цехе: «${b.product}»` : '',
-    b.source === 'chat' ? 'источник: чат КЦ' : '',
+    b.source === 'chat' ? 'источник: переписка кондитерского цеха (неточно)' : '',
     b.flag === 'check' ? '⚠ время по времени сообщения' : (b.flag === 'invalid' ? '⚠ некорректное время — не в нормах' : ''),
     b.note || ''].filter(Boolean).join(' · ');
 }
@@ -1842,7 +1843,7 @@ function gRateCell(x, several) {
 }
 
 function gPeopleCell(x, product) {
-  if (none(x.people)) return '<span class="muted" title="Людей знают только КЦ (бот и чат)">—</span>';
+  if (none(x.people)) return '<span class="muted" title="Людей знает только кондитерский цех (бот и чат)">—</span>';
   const tip = product ? `Максимум одновременно занятых продуктом${x.people_ops ? `; сумма по операциям ${x.people_ops}` : ''}` : 'Людей на операции (максимум за запуск)';
   return `<span title="${esc(tip)}">${num(x.people)}</span>`;
 }
@@ -1911,7 +1912,7 @@ function renderGantt(data) {
     ['Операций в окне', num(t.ops), '', `закрыто ${num(t.closed)} · без конца/идут ${num(t.open)}`],
     ['Человеко-часы', t.people_known ? dec(t.person_hours) : NO_DATA, t.people_known ? 'чел·ч' : '', `людей известно у ${num(t.people_known)} операций`],
     ['Продуктов', num(t.products), '', `операций-строк: ${num(data.rows.length)}`],
-    ['Из чата КЦ', num(t.from_chat), '', t.check ? `время по сообщению: ${num(t.check)}` : 'до запуска бота КЦ'],
+    ['Из переписки', num(t.from_chat), '', `кондитерский цех, неточно${t.check ? ` · время по сообщению: ${num(t.check)}` : ''}`],
   ];
   $('gKpis').innerHTML = cards.map(([label, value, unit, note]) => `<div class="kpi"><div class="k-label">${esc(label)}</div>` +
     `<div class="k-value${value === NO_DATA ? ' k-none' : ''}"><span class="k-num">${esc(value)}</span>${unit ? `<span class="k-unit">${esc(unit)}</span>` : ''}</div>` +
@@ -1927,7 +1928,7 @@ function renderGantt(data) {
   renderTiming(data);
   renderAverages(data);
   const fetched = formatMoment(data.now);
-  $('sourceLine').textContent = `Гант: формовка, БХМ, расстойка, КЦ (бот${data.history_source ? ' + разобранный чат' : ''}) · расчёт ${fetched}`;
+  $('sourceLine').textContent = `Тайминги: тестозаготовочный, формовочный, печной и кондитерский цеха (бот${data.history_source ? ' + разобранная переписка' : ''}) · расчёт ${fetched}`;
   $('periodLine').textContent = `${data.day.split('-').reverse().join('.')} · ${data.window_title} · операций: ${num(t.ops)} · продуктов: ${num(t.products)}`;
 }
 
@@ -2003,14 +2004,14 @@ function renderGanttTable() {
       `<span class="cellbox">${esc(b.start_time)}–${esc(b.end_time || (b.running ? 'идёт' : '…'))}${b.flag !== 'ok' ? ` <span class="delta warn" title="${esc(gBarTip(b))}">⚠</span>` : ''}</span>`,
       none(b.duration_min) ? '—' : esc(hm(b.duration_min)), none(b.people) ? '—' : num(b.people),
       b.qty ? `${num(b.qty)} ${esc(b.unit)}` : '—', decOr(b.rate), decOr(b.rate_per_person),
-      esc(b.equipment || '—'), b.source === 'chat' ? 'чат КЦ' : 'бот']);
+      esc(b.equipment || '—'), b.source === 'chat' ? 'переписка (неточно)' : 'бот']);
 }
 
 function renderTiming(data) {
   const rows = data.timing || [];
   const chains = rows.filter((r) => r.stages_count > 1).length;
   $('tNote').textContent = `ⓘ Этапы связаны по единому продукту (справочник продуктов), а не по номеру партии — общего номера у ботов нет. ` +
-    `Фасовка — отдельный бот, пока не подключён: показываем только «передано на фасовку» из чата КЦ (время по сообщению, неточно). ` +
+    `Фасовка — отдельный бот, пока не подключён: показываем только «передано на фасовку» из переписки кондитерского цеха (время по сообщению, неточно). ` +
     `Продуктов, прошедших больше одного цеха в этом окне: ${chains}.`;
   $('tLegend').innerHTML = (data.stages || []).map((s) => `<span><i style="background:${G_STAGE_COLORS[s.key]}"></i>${esc(s.title)}</span>`).join('');
   // Строка — продукт, дорожка — этап, полосы — реальные операции этапа (не сплошной интервал).
@@ -2052,9 +2053,9 @@ function renderAverages(data) {
   const all = av.products || [];
   const list = all.filter((p) => !q || `${p.product} ${p.ops.map((o) => o.operation).join(' ')}`.toLowerCase().includes(q));
   $('aNote').textContent = `ⓘ Период ${aDay(av.from)} — ${aDay(av.to)}, дней с данными: ${num(av.days || 0)}. ` +
-    (list.some((p) => p.from_chat) ? 'Среднее по КЦ посчитано по переписке — оно неточное, для норм не годится. ' : '') +
+    (list.some((p) => p.from_chat) ? 'Среднее по кондитерскому цеху посчитано по переписке — оно неточное, для норм не годится. ' : '') +
     'Время операции — от начала работы с продуктом в эти рабочие сутки; «длится» — от первого начала до последнего конца, ' +
-    '«занято» — без пауз между запусками. Чат КЦ без отметки конца в длительность не входит.';
+    '«занято» — без пауз между запусками. Операции из переписки без отметки конца в длительность не входят.';
   $('aCount').textContent = `продуктов: ${num(list.length)}${list.length !== all.length ? ` из ${num(all.length)}` : ''}`;
   if (!list.length) { $('aList').innerHTML = '<div class="empty">Нет операций за этот период</div>'; return; }
   $('aList').innerHTML = list.map((p) => {
@@ -2066,9 +2067,28 @@ function renderAverages(data) {
       `<span class="a-name"><b>${esc(p.product)}</b><small>${esc(p.sections.join(', '))} · дней ${num(p.days)} · операций ${num(p.ops.length)}` +
       `${p.from_chat ? ' · <span class="chat-flag">из переписки, неточно</span>' : ''}</small></span>` +
       `<span class="a-lead"><b>${none(p.lead_min) ? '—' : esc(hm(p.lead_min))}</b><small>${p.days > 1 && !none(p.lead_min_min) ? `от ${esc(hm(p.lead_min_min))} до ${esc(hm(p.lead_min_max))}` : 'весь путь за день'}</small></span>` +
+      `${aOutputCell(p)}` +
       `<span class="a-ph"><b>${none(p.person_hours_day) ? '—' : dec(p.person_hours_day)}</b><small>чел·ч в день</small></span>` +
       `<span class="a-chips">${chips}</span></summary><div class="avg-body">${open ? averageBody(p) : ''}</div></details>`;
   }).join('');
+}
+
+// Выработка продукта: последний этап с количеством, максимум по операциям (не сумма операций).
+function aOutputText(p) {
+  const o = p.output;
+  if (!o) return 'нет количества в закрытых операциях';
+  return `${num(o.qty_day)} ${o.unit} в день — ${o.stage_title}, «${o.operation}»` +
+    `${o.days < p.days ? `, по ${o.days} дн. из ${p.days}` : ''}` +
+    (none(o.rate_per_person) ? '; людей нет — на человека не считаем' : `; ${dec(o.rate_per_person)} ${o.unit} на чел·ч всех операций продукта`);
+}
+
+function aOutputCell(p) {
+  const o = p.output;
+  const tip = `Выработка продукта: ${aOutputText(p)}. Берём последний этап с количеством и самую массовую операцию — ` +
+    'операции не складываем, одни и те же изделия проходят несколько операций.';
+  if (!o) return `<span class="a-out" title="${esc(tip)}"><b>—</b><small>выработка в день</small></span>`;
+  return `<span class="a-out" title="${esc(tip)}"><b>${num(o.qty_day)} ${esc(o.unit)}</b>` +
+    `<small>в день${none(o.rate_per_person) ? '' : ` · ${dec(o.rate_per_person)} ${esc(o.unit)}/чел·ч`}</small></span>`;
 }
 
 function averageBody(p) {
@@ -2087,7 +2107,7 @@ function averageBody(p) {
     ops.forEach((o) => {
       end = Math.max(end, (o.offset_min || 0) + (o.span_min || 0));
       rows.push({ kind: 'op', label: o.operation, lanes: 1,
-        sub: `${o.section_title} · дней ${o.days}${o.no_end ? ` · без конца ${o.no_end}` : ''}${o.from_chat ? ' · из переписки' : ''}`,
+        sub: `дней ${o.days}${o.no_end ? ` · без конца ${o.no_end}` : ''}${o.from_chat ? ' · из переписки' : ''}`,
         cols: [none(o.span_min) ? '—' : esc(hm(o.span_min)), none(o.people_avg) ? '<span class="muted">—</span>' : dec(o.people_avg), gRateCell(o, false)],
         bars: [{ start: rel(o.offset_min), draw_end: none(o.span_min) ? null : rel(o.offset_min + o.span_min), lane: 0, color,
           cls: o.no_end ? 'hatch' : '', text: [none(o.people_avg) ? '' : dec(o.people_avg) + ' чел', o.qty_day !== '—' ? o.qty_day : ''].filter(Boolean).join(' · '),
@@ -2107,7 +2127,8 @@ function averageBody(p) {
       `<td class="num" data-label="Занято">${none(o.busy_min) ? '—' : esc(hm(o.busy_min))}</td><td class="num" data-label="Людей">${none(o.people_avg) ? '—' : dec(o.people_avg)}</td>` +
       `<td class="num" data-label="В день">${esc(o.qty_day)}</td><td class="num" data-label="На чел·ч">${gRateCell(o, false)}</td>` +
       `<td data-label="Оборудование">${esc(o.equipment || '—')}</td></tr>`).join('') + '</tbody></table></div>';
-  return `<div class="gantt-scroll">${chart}</div>${table}`;
+  const output = `<p class="a-output"><b>Выработка продукта:</b> ${esc(aOutputText(p))}.</p>`;
+  return `${output}<div class="gantt-scroll">${chart}</div>${table}`;
 }
 
 async function loadGanttMap() {
@@ -2368,7 +2389,7 @@ async function init() {
         units: { qty: 'шт', rate: isKc() ? 'шт/чел·ч' : 'шт/ч' } }; } catch (e2) { /* ничего */ }
     } else if (SOURCE !== 'fk') {
       // Сохранённый БХМ сейчас недоступен — открываем ФК, а не пустую страницу.
-      notice = `Источник ${SOURCES[SOURCE].title} недоступен (${e.message}) — показан ФК.`;
+      notice = `Источник ${SOURCES[SOURCE].title} недоступен (${e.message}) — показан формовочный цех.`;
       SOURCE = 'fk';
       try { m = await fetchMeta('fk'); } catch (e2) { showAlert('Не удалось получить справочники: ' + e2.message); }
     } else {

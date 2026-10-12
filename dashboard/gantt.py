@@ -32,18 +32,21 @@ from sources import TZ, _as_local
 
 HISTORY_FILE = os.getenv("KC_CHAT_HISTORY_FILE", str(Path(__file__).parent / "kc_chat_history.json"))
 STAGES = [
-    {"key": "bhm", "title": "БХМ · тесто"},
-    {"key": "fk", "title": "Формовка"},
-    {"key": "proofing", "title": "Расстойка"},
-    {"key": "baking", "title": "Отпекание"},
-    {"key": "kc", "title": "КЦ · кондитерка"},
+    {"key": "bhm", "title": "Тестозаготовочный цех"},
+    {"key": "fk", "title": "Формовочный цех"},
+    {"key": "proofing", "title": "Печной цех · расстойка"},
+    {"key": "baking", "title": "Печной цех · отпекание"},
+    {"key": "kc", "title": "Кондитерский цех"},
     {"key": "pack", "title": "Фасовка"},
 ]
 STAGE_INDEX = {s["key"]: i for i, s in enumerate(STAGES)}
 WINDOWS = {"full": ("Сутки 08:00–08:00", 8, 24), "day": ("День 08:00–20:00", 8, 12),
            "night": ("Ночь 20:00–08:00", 20, 12), "calendar": ("Календарные сутки 00–24", 0, 24)}
 RATE_UNITS = {"шт", "кг"}
-CHAT_NOTE = ("Данные КЦ неточные: до запуска бота КЦ они вручную разобраны из переписки в Telegram. "
+# Единицы продукции для «выработки продукта», по приоритету. Замес, форма, кольцо — полуфабрикат
+# или подготовка, а не продукция: в выработку продукта не идут.
+OUTPUT_UNITS = ("шт", "пласт", "лист", "кг")
+CHAT_NOTE = ("Данные кондитерского цеха неточные: до запуска бота они вручную разобраны из переписки в Telegram. "
              "Время — по сообщениям (часто это время отправки, а не начала или конца), людей и количество "
              "писали не всегда. Годятся для общей картины, не для норм.")
 
@@ -430,6 +433,27 @@ def _row_stats(items, now, clip=None):
             "equipment": ", ".join(sorted({b["equipment"] for b in items if b["equipment"]})), **_rate_stats(items)}
 
 
+def _day_output(items):
+    """Выработка продукта за рабочие сутки: последний этап с количеством (ближе всего к готовой
+    продукции; единица — по приоритету OUTPUT_UNITS), внутри этапа — максимум по операциям. Операции НЕ складываются:
+    одни и те же изделия проходят несколько операций. Повторные запуски одной операции —
+    разные партии, они складываются."""
+    done = [b for b in items if _timed(b) and b["qty"] and b["unit"] in OUTPUT_UNITS]
+    if not done:
+        return None
+    unit = min({b["unit"] for b in done}, key=OUTPUT_UNITS.index)
+    done = [b for b in done if b["unit"] == unit]
+    stage = max(done, key=lambda b: STAGE_INDEX[b["stage"]])["stage"]
+    per_op, last_end = defaultdict(float), {}
+    for b in done:
+        if b["stage"] == stage:
+            per_op[b["operation"]] += b["qty"]
+            last_end[b["operation"]] = max(last_end.get(b["operation"], b["end"]), b["end"])
+    # равное количество — берём операцию, закончившуюся позже: она ближе к готовой продукции
+    op, qty = max(per_op.items(), key=lambda kv: (kv[1], last_end[kv[0]]))
+    return {"qty": qty, "unit": unit, "stage": stage, "operation": op}
+
+
 def averages(bars_by_section, namer, day_from, day_to, sections=None, product="all", equipment="all", now=None):
     """Средний день продукта за период: когда от начала работы с продуктом идёт каждая операция
     и этап и сколько длится. Каждые рабочие сутки продукта — один «прогон»."""
@@ -456,8 +480,11 @@ def averages(bars_by_section, namer, day_from, day_to, sections=None, product="a
 
     out = []
     for prod, days in by_product.items():
-        leads, phs, op_runs, stage_runs = [], [], defaultdict(list), defaultdict(list)
+        leads, phs, op_runs, stage_runs, outputs = [], [], defaultdict(list), defaultdict(list), []
         for day, items in days.items():
+            day_out = _day_output(items)
+            if day_out:
+                outputs.append(dict(day_out, person_hours=_person_hours(items)))
             t0 = min(b["start"] for b in items)
             timed = [b for b in items if _timed(b)]
             if timed:
@@ -503,7 +530,18 @@ def averages(bars_by_section, namer, day_from, day_to, sections=None, product="a
                        "span_min": avg(r["span"] for r in stage_runs[st["key"]]),
                        "busy_min": avg(r["busy"] for r in stage_runs[st["key"]])}
                       for st in STAGES if stage_runs.get(st["key"])]
-        out.append({"product": prod, "days": len(days), "day_list": sorted(days),
+        output = None
+        if outputs:  # дни с другой единицей не смешиваем — берём основную
+            unit = Counter(o["unit"] for o in outputs).most_common(1)[0][0]
+            same = [o for o in outputs if o["unit"] == unit]
+            with_ph = [o for o in same if o["person_hours"]]
+            last = Counter((o["stage"], o["operation"]) for o in same).most_common(1)[0][0]
+            output = {"qty_day": round(sum(o["qty"] for o in same) / len(same), 1), "unit": unit, "days": len(same),
+                      "stage": last[0], "stage_title": STAGES[STAGE_INDEX[last[0]]]["title"], "operation": last[1],
+                      "rate_per_person": round(sum(o["qty"] for o in with_ph) / sum(o["person_hours"] for o in with_ph), 1)
+                      if with_ph else None,
+                      "person_days": len(with_ph)}
+        out.append({"product": prod, "days": len(days), "day_list": sorted(days), "output": output,
                     "lead_min": avg(leads), "lead_min_min": round(min(leads)) if leads else None,
                     "lead_min_max": round(max(leads)) if leads else None,
                     "person_hours_day": avg(phs), "stages": stages_out, "ops": ops_out,

@@ -461,7 +461,7 @@ def test_app_proofing_down_does_not_break_fk_and_bhm():
             with patched(ps, PROOFING_API_URL="http://127.0.0.1:9", PROOFING_SOURCE_MODE="api", PROOFING_TIMEOUT=3):
                 r = await client.get("/api/summary?source=proofing")
                 body = await r.json()
-                assert r.status == 503 and body["ok"] is False and "API расстойки недоступно" in body["error"]
+                assert r.status == 503 and body["ok"] is False and "API печного цеха (расстойка) недоступно" in body["error"]
                 assert KEY not in json.dumps(body)
                 r = await client.get("/api/meta?source=proofing")
                 assert r.status == 503

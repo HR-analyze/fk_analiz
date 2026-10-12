@@ -1,4 +1,4 @@
-"""Read-only веб-дашборд: ФК, БХМ, расстойка, КЦ и общий Гант. В базы ботов только чтение, никаких записей."""
+"""Read-only веб-дашборд: формовочный (ФК), тестозаготовочный (БХМ), печной (расстойка), кондитерский (КЦ) цеха и «Тайминги» (Гант). В базы ботов только чтение, никаких записей."""
 import asyncio
 import base64
 import binascii
@@ -51,21 +51,21 @@ kc_source = KcSource()
 # Источники дашборда. ФК — по умолчанию: старые ссылки без ?source= работают как раньше.
 # У БХМ своя единица (кг) и нет загрузки плана — вкладки плана для него скрыты.
 SOURCES = {
-    "fk": {"title": "ФК", "data": source, "exclude": EXCLUDE_DATES, "plans": True,
+    "fk": {"title": "Формовочный цех", "data": source, "exclude": EXCLUDE_DATES, "plans": True,
            "units": {"qty": "шт", "rate": "шт/ч"}, "file": "fk"},
-    "bhm": {"title": "БХМ", "data": bhm_source, "exclude": BHM_EXCLUDE_DATES, "plans": False,
+    "bhm": {"title": "Тестозаготовочный цех", "data": bhm_source, "exclude": BHM_EXCLUDE_DATES, "plans": False,
             "units": {"qty": "кг", "rate": "кг/ч"}, "file": "bhm"},
     # Расстойка — партии из двух этапов (расстойка → отпекание): свои расчёты
     # (proofing_aggregate) и выгрузки (proofing_exports). Плана у неё нет, пока не
     # появится согласованный источник планов расстойки.
-    "proofing": {"title": "Расстойка", "data": proofing_source, "exclude": PROOFING_EXCLUDE_DATES, "plans": False,
+    "proofing": {"title": "Печной цех", "data": proofing_source, "exclude": PROOFING_EXCLUDE_DATES, "plans": False,
                  "units": {"qty": "шт", "rate": "шт/ч"}, "file": "proofing", "kind": "proofing"},
     # КЦ — самостоятельные операции без маршрута: свои расчёты (kc_aggregate) и выгрузки
     # (kc_exports). Штуки операций не складываются в готовый выпуск. Плана нет.
-    "kc": {"title": "КЦ", "data": kc_source, "exclude": KC_EXCLUDE_DATES, "plans": False,
+    "kc": {"title": "Кондитерский цех", "data": kc_source, "exclude": KC_EXCLUDE_DATES, "plans": False,
            "units": {"qty": "шт", "rate": "шт/чел·ч"}, "file": "kc", "kind": "kc"},
     # Гант — не отдельный бот, а сводка всех цехов на одной шкале времени + общий тайминг.
-    "gantt": {"title": "Гант", "data": None, "exclude": (), "plans": False,
+    "gantt": {"title": "Тайминги", "data": None, "exclude": (), "plans": False,
               "units": {"qty": "шт", "rate": "шт/ч"}, "file": "gantt", "kind": "gantt"},
 }
 # Разобранный вручную чат КЦ (до запуска бота) — только для Ганта, читается один раз.
@@ -79,14 +79,14 @@ def pick_source(request):
             {"ok": False, "error": "неизвестный источник: " + re.sub(r"[^a-z0-9_-]", "", key)[:16]}, ensure_ascii=False))
     if key == "bhm" and not bhm_source.enabled:
         raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
-            {"ok": False, "error": "источник БХМ не настроен: задай BHM_API_URL и BHM_API_KEY"}, ensure_ascii=False))
+            {"ok": False, "error": "тестозаготовочный цех (БХМ) не настроен: задай BHM_API_URL и BHM_API_KEY"}, ensure_ascii=False))
     if key == "proofing" and not proofing_source.enabled:
         raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
-            {"ok": False, "error": "раздел «Расстойка» не настроен: задай PROOFING_API_URL и PROOFING_API_KEY"},
+            {"ok": False, "error": "раздел «Печной цех» не настроен: задай PROOFING_API_URL и PROOFING_API_KEY"},
             ensure_ascii=False))
     if key == "kc" and not kc_source.enabled:
         raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
-            {"ok": False, "error": "раздел «КЦ» не настроен: задай KC_API_URL и KC_API_KEY"}, ensure_ascii=False))
+            {"ok": False, "error": "раздел «Кондитерский цех» не настроен: задай KC_API_URL и KC_API_KEY"}, ensure_ascii=False))
     return key, SOURCES[key]
 
 
@@ -129,7 +129,7 @@ async def kc_snapshot(force=False):
     except Exception as exc:
         raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
             {"ok": False, "source_key": "kc",
-             "error": f"API кондитерского цеха недоступно: {exc}. Проверь KC_API_URL, KC_API_KEY и работу бота КЦ."},
+             "error": f"API кондитерского цеха недоступно: {exc}. Проверь KC_API_URL, KC_API_KEY и работу бота кондитерского цеха."},
             ensure_ascii=False))
 
 
@@ -140,7 +140,7 @@ async def proofing_snapshot(force=False):
     except Exception as exc:
         raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
             {"ok": False, "source_key": "proofing",
-             "error": f"API расстойки недоступно: {exc}. Проверь PROOFING_API_URL, PROOFING_API_KEY и работу бота расстойки."},
+             "error": f"API печного цеха (расстойка) недоступно: {exc}. Проверь PROOFING_API_URL, PROOFING_API_KEY и работу бота расстойки."},
             ensure_ascii=False))
 
 
@@ -357,7 +357,7 @@ async def collect_kc(request, key, src):
         return "все" if value in ("all", "") else value
 
     filters = [
-        ("Источник", "КЦ — кондитерский цех"),
+        ("Источник", "Кондитерский цех"),
         ("Период", f"{f['date_from'] or 'начало'} – {f['date_to'] or 'сегодня'}"),
         ("Продукция", named(f["product"])),
         ("Операция", named(f["operation"])),
@@ -408,7 +408,7 @@ async def collect_gantt(request, key, src):
                    map_size=sum(len(v) for v in stored["map"].values()),
                    ops_map_size=sum(len(v) for v in stored["ops"].values()))
     filters = [
-        ("Раздел", "Гант — все цеха"),
+        ("Раздел", "Тайминги — все цеха"),
         ("Дата (рабочие сутки)", day),
         ("Окно", gantt.WINDOWS[mode][0]),
         ("Цеха", ", ".join(GANTT_SECTION_TITLES[s] for s in sections)),
@@ -621,7 +621,7 @@ async def gantt_map_upload(request):
 async def proofing_photo(request):
     """Фото партии по запросу: браузер видит только этот адрес дашборда, ключ бота — нет."""
     if not proofing_source.enabled:
-        return web.json_response({"ok": False, "error": "раздел «Расстойка» не настроен"}, status=503)
+        return web.json_response({"ok": False, "error": "раздел «Печной цех» не настроен"}, status=503)
     try:
         data, content_type = await proofing_source.photo(request.match_info["id"])
     except ValueError:
