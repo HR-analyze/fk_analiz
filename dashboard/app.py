@@ -1,5 +1,7 @@
 """Read-only веб-дашборд по данным бота ФК. В базу только SELECT, никаких записей."""
 import asyncio
+import base64
+import binascii
 import hmac
 import io
 import json
@@ -21,6 +23,9 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(
 log = logging.getLogger("fk.dashboard")
 
 PORT = int(os.getenv("PORT", "8090"))
+RELAXDEV_DEPLOY = os.getenv("RELAXDEV_DEPLOY", "") == "1"
+DASHBOARD_USER = os.getenv("DASHBOARD_USER", "").strip()
+DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
 STATIC = Path(__file__).parent / "static"
 REFRESH_SECONDS = int(os.getenv("REFRESH_SECONDS", "60"))
 # Даты, которые дашборд не показывает. База при этом не трогается — фильтр только на чтении.
@@ -66,6 +71,7 @@ async def index(request):
 async def health(request):
     """200, пока сервис способен отдать данные (пусть и из кеша). 503 — если снимка нет вовсе."""
     try:
+        await asyncio.to_thread(plan_store.health_storage)
         await source.get()
     except Exception as exc:
         return web.json_response({"ok": False, "error": f"{type(exc).__name__}: {exc}", **source.describe()}, status=503)
@@ -298,6 +304,48 @@ async def export_pdf(request):
         content_type="application/pdf")
 
 
+def validate_relax():
+    if not RELAXDEV_DEPLOY:
+        return
+    required = {
+        "SOURCE_MODE=api": os.getenv("SOURCE_MODE") == "api",
+        "BOT_API_URL": bool(os.getenv("BOT_API_URL", "").strip()),
+        "BOT_API_KEY": bool(os.getenv("BOT_API_KEY", "").strip()),
+        "PLAN_DATABASE_URL": plan_store.PG_PLANS,
+        "PLAN_UPLOAD_TOKEN": bool(plan_store.PLAN_UPLOAD_TOKEN),
+        "DASHBOARD_USER": bool(DASHBOARD_USER),
+        "DASHBOARD_PASSWORD": bool(DASHBOARD_PASSWORD),
+    }
+    missing = [key for key, ready in required.items() if not ready]
+    if missing:
+        raise RuntimeError("RelaxDev dashboard: missing " + ", ".join(missing))
+    if os.getenv("BHM_API_URL", "").strip() and not os.getenv("BHM_API_KEY", "").strip():
+        raise RuntimeError("RelaxDev dashboard: BHM_API_KEY required for BHM_API_URL")
+
+
+async def start_storage(app):
+    validate_relax()
+    await asyncio.to_thread(plan_store.init_storage)
+
+
+@web.middleware
+async def basic_auth(request, handler):
+    if not RELAXDEV_DEPLOY or request.path == "/health":
+        return await handler(request)
+    header = request.headers.get("Authorization", "")
+    valid = False
+    if header.startswith("Basic "):
+        try:
+            user, password = base64.b64decode(header[6:], validate=True).decode("utf-8").split(":", 1)
+            valid = (hmac.compare_digest(user, DASHBOARD_USER)
+                     and hmac.compare_digest(password, DASHBOARD_PASSWORD))
+        except (ValueError, binascii.Error, UnicodeError):
+            pass
+    if not valid:
+        raise web.HTTPUnauthorized(headers={"WWW-Authenticate": 'Basic realm="FK Dashboard", charset="UTF-8"'})
+    return await handler(request)
+
+
 @web.middleware
 async def errors(request, handler):
     try:
@@ -310,7 +358,8 @@ async def errors(request, handler):
 
 
 def build_app():
-    app = web.Application(middlewares=[errors])
+    app = web.Application(middlewares=[basic_auth, errors])
+    app.on_startup.append(start_storage)
     app.router.add_get("/", index)
     app.router.add_get("/health", health)
     app.router.add_get("/api/meta", meta)
