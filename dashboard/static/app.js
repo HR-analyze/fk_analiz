@@ -1751,7 +1751,9 @@ function bindKc() {
 /* ─── Гант: все цеха на одной шкале + общий тайминг ───────────────────────── */
 
 const GANTT = { date: '', window: 'full', sections: ['bhm', 'fk', 'proofing', 'kc'], product: 'all', equipment: 'all', search: '',
-  avgFrom: '', avgTo: '', collapsed: new Set(), avgOpen: new Set() };
+  // fold: явный выбор «развёрнут/свёрнут» по продукту; по умолчанию продукты свёрнуты
+  // при поиске — своя карта: найденные операции видны сразу, свернуть можно и в поиске
+  avgFrom: '', avgTo: '', fold: new Map(), searchFold: new Map(), avgOpen: new Set() };
 const G_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', kc: '#7c5cf5' };
 const G_STAGE_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', baking: '#0f766e', kc: '#7c5cf5', pack: '#9ca3af' };
 const G_NAMES = { bhm: 'БХМ', fk: 'Формовка', proofing: 'Расстойка', kc: 'КЦ' };
@@ -1931,6 +1933,8 @@ function renderGantt(data) {
 
 function gProductKey(section, product) { return section + '|' + product; }
 
+function gFoldMap() { return GANTT.search.trim() ? GANTT.searchFold : GANTT.fold; }
+
 // Пометка строк из разобранной переписки КЦ: эти данные неточные.
 function gChatText(fromChat, total) {
   if (!fromChat) return '';
@@ -1954,7 +1958,9 @@ function drawGantt() {
     if (!ops.length) return;
     if (p.section !== section) { section = p.section; rows.push({ group: p.section_title, color: G_COLORS[p.section] }); }
     const key = gProductKey(p.section, p.product);
-    const open = !GANTT.collapsed.has(key);
+    // Свёрнут по умолчанию; развёрнут сам, если выбран один продукт или идёт поиск — иначе найденное не видно.
+    const fold = gFoldMap();
+    const open = fold.has(key) ? fold.get(key) : (GANTT.product !== 'all' || !!GANTT.search.trim());
     const several = p.ops > 1;
     const color = G_COLORS[p.section];
     rows.push({ kind: 'product', key, open, label: p.product, mini: true, lanes: 1,
@@ -1979,7 +1985,7 @@ function drawGantt() {
     : '<div class="empty">Нет операций в этом окне — выбери другие сутки или окно</div>';
   $('gDetail').hidden = true;
   const products = rows.filter((r) => r.kind === 'product').length;
-  $('gNote').textContent = `${ganttData.window_title} · продуктов ${num(products)} · нажми на продукт, чтобы свернуть, на полосу — подробности`;
+  $('gNote').textContent = `${ganttData.window_title} · продуктов ${num(products)} · нажми на продукт, чтобы развернуть операции, на полосу — подробности`;
 }
 
 function renderGanttTable() {
@@ -2177,6 +2183,7 @@ function bindGantt() {
   $('gAvgTo').addEventListener('change', () => { GANTT.avgTo = $('gAvgTo').value; reload(); });
   $('gSearch').addEventListener('input', () => {
     GANTT.search = $('gSearch').value;
+    GANTT.searchFold.clear();
     drawGantt(); renderGanttTable();
     if (ganttData) renderAverages(ganttData);
   });
@@ -2188,11 +2195,12 @@ function bindGantt() {
   };
   $('gPrev').addEventListener('click', () => step(-1));
   $('gNext').addEventListener('click', () => step(1));
-  $('gExpand').addEventListener('click', () => { GANTT.collapsed.clear(); drawGantt(); });
-  $('gCollapse').addEventListener('click', () => {
-    (ganttData && ganttData.products || []).forEach((p) => GANTT.collapsed.add(gProductKey(p.section, p.product)));
+  const foldAll = (open) => {
+    (ganttData && ganttData.products || []).forEach((p) => gFoldMap().set(gProductKey(p.section, p.product), open));
     drawGantt();
-  });
+  };
+  $('gExpand').addEventListener('click', () => foldAll(true));
+  $('gCollapse').addEventListener('click', () => foldAll(false));
   $('aList').addEventListener('toggle', (e) => {
     const item = e.target;
     if (!item.matches || !item.matches('details.avg-item') || !ganttData) return;
@@ -2219,7 +2227,7 @@ function bindGantt() {
     const prod = e.target.closest ? e.target.closest('[data-gprod]') : null;
     if (prod && prod.closest('#gChart')) {
       const k = prod.dataset.gprod;
-      if (GANTT.collapsed.has(k)) GANTT.collapsed.delete(k); else GANTT.collapsed.add(k);
+      gFoldMap().set(k, prod.getAttribute('aria-expanded') !== 'true');
       drawGantt();
       const again = Array.from($('gChart').querySelectorAll('[data-gprod]')).find((x) => x.dataset.gprod === k);
       if (again) again.focus({ preventScroll: true });
