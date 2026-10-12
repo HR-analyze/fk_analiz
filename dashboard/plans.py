@@ -16,12 +16,12 @@ import pg_plan_store
 log = logging.getLogger("fk.plans")
 
 PLAN_FILE = Path(os.getenv("PLAN_FILE", "/app/data/plans.json"))
-PG_PLANS = bool(os.getenv("PLAN_DATABASE_URL", "").strip())
+PG_PLANS = bool(pg_plan_store.database_url())
 
 
 def init_storage():
     if os.getenv("RELAXDEV_DEPLOY") == "1" and not PG_PLANS:
-        raise RuntimeError("RelaxDev: PLAN_DATABASE_URL is required; use a NEW, separate PostgreSQL")
+        raise RuntimeError("RelaxDev: attach a NEW PostgreSQL to this dashboard (DATABASE_URL is automatic)")
     if PG_PLANS:
         pg_plan_store.init_storage()
 
