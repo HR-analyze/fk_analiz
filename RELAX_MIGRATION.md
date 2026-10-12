@@ -24,7 +24,6 @@ BHM_SOURCE_MODE=api
 BHM_API_URL=https://<bhm-bot-host>
 BHM_API_KEY=<same-secret-as-DASHBOARD_API_KEY-on-BHM-bot>
 
-PLAN_DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<dashboard-only-database>
 PLAN_UPLOAD_TOKEN=<long-random-secret>
 DASHBOARD_USER=admin
 DASHBOARD_PASSWORD=<long-unique-password>
@@ -34,7 +33,7 @@ CACHE_TTL=60
 REFRESH_SECONDS=60
 ```
 
-**Create a NEW PostgreSQL instance/database for `PLAN_DATABASE_URL`.** Never point it at the FK bot or the BHM bot database. This new database stores *only* dashboard plan data and the upload history in table `fk_dashboard_plan_state`.
+**Attach a NEW PostgreSQL to the NEW dashboard project in RelaxDev.** RelaxDev automatically sets `DATABASE_URL`; **do not copy or enter this variable manually**. The dashboard reads this automatically only when `RELAXDEV_DEPLOY=1`, which is baked into the Dockerfile. Never attach a bot's PostgreSQL to the dashboard: this database must belong exclusively to the dashboard project. It stores production plans and upload history in `fk_dashboard_plan_state`. You may optionally set `PLAN_DATABASE_URL` as an explicit override for external plan storage, but it is not required for the standard RelaxDev flow.
 
 `BOT_API_URL` and `BHM_API_URL` are the publicly reachable service origins, with no `/api/dashboard/all` suffix. The API keys are server-side only, and must be set in the respective bot project as `DASHBOARD_API_KEY`. The dashboard does not start either bot.
 
@@ -53,7 +52,7 @@ The original dashboard saves plans in a local `/app/data/plans.json` on the old 
 
 ## How to diagnose errors
 
-- Missing `PLAN_DATABASE_URL`: create and attach the separate database to the *new dashboard* project.
+- Missing `DATABASE_URL`: create and attach the separate PostgreSQL to the *new dashboard* project. RelaxDev populates `DATABASE_URL` automatically.
 - `/health` 503: check FK bot URL/key, and PostgreSQL connectivity. Dashboard will not serve facts before those are available.
 - BHM tab unavailable: check BHM URL/key and running BHM bot. FK and BHM bots stay independent.
 - Error on plan upload: check `PLAN_UPLOAD_TOKEN`; uploads are authenticated separately from viewing.
