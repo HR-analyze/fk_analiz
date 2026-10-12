@@ -5,9 +5,9 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 def _connect():
-    url = os.getenv("PLAN_DATABASE_URL", "").strip()
+    url = os.getenv("PLAN_DATABASE_URL", "").strip() or (os.getenv("DATABASE_URL", "").strip() if os.getenv("RELAXDEV_DEPLOY") == "1" else "")
     if not url:
-        raise RuntimeError("PLAN_DATABASE_URL must point to a SEPARATE PostgreSQL database")
+        raise RuntimeError("Attach separate PostgreSQL to dashboard; automatic DATABASE_URL missing")
     return psycopg.connect(url, connect_timeout=15)
 
 def init_storage():
