@@ -13,7 +13,6 @@
     <div class="source-switch" id="sourceSwitch" role="radiogroup" aria-label="Источник данных">
       <button class="src-btn active" type="button" role="radio" aria-checked="true" data-source="fk">ФК</button>
       <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="bhm">БХМ</button>
-      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="proofing">Расстойка</button>
     </div>
     <div class="head-row">
       <h1>Аналитический отчёт по производству</h1>
@@ -29,8 +28,6 @@
     <button class="tab active" role="tab" data-tab="dashboard">Дашборд</button>
     <button class="tab" role="tab" data-tab="plan">План / факт</button>
     <button class="tab" role="tab" data-tab="history">История загрузок</button>
-    <button class="tab" role="tab" data-tab="proofing" hidden>Сводка</button>
-    <button class="tab" role="tab" data-tab="batches" hidden>Партии</button>
   </nav>
 
   <details class="panel filters" id="filterPanel">
@@ -42,8 +39,7 @@
       <label class="field"><span>Дата от</span><input type="date" id="dateFrom"></label>
       <label class="field"><span>до</span><input type="date" id="dateTo"></label>
       <label class="field"><span>Оборудование</span><select id="equipment"><option value="all">Все</option></select></label>
-      <label class="field"><span id="productLabel">Продукт</span><select id="product"><option value="all">Все</option></select></label>
-      <label class="field only-proofing" hidden><span>Тип печи</span><select id="oven"><option value="all">Все</option></select></label>
+      <label class="field"><span>Продукт</span><select id="product"><option value="all">Все</option></select></label>
       <label class="field"><span>Сотрудник</span><select id="employee"><option value="all">Все</option></select></label>
       <label class="field"><span>Смена</span><select id="shift">
         <option value="all">Все</option>
@@ -51,7 +47,6 @@
         <option value="night">Ночь 20–08</option>
       </select></label>
       <label class="field"><span>Час</span><select id="hour"><option value="">Все</option></select></label>
-      <label class="field only-proofing" hidden><span>Статус партии</span><select id="status"><option value="all">Все</option></select></label>
       <div class="field actions">
         <button class="btn primary" id="apply">Применить</button>
         <button class="btn" id="reset">Сброс</button>
@@ -179,125 +174,12 @@
     </section>
   </div>
 
-  <!-- ── Расстойка: сводка ──────────────────────────────────────────────── -->
-  <div class="tab-page" data-page="proofing" hidden>
-    <div class="proof-error" id="proofError" hidden>
-      <div><b>Раздел «Расстойка» сейчас недоступен.</b> <span id="proofErrorText"></span></div>
-      <p>ФК и БХМ работают независимо — переключись на них кнопками сверху.</p>
-      <button class="btn" type="button" id="proofRetry">Повторить</button>
-    </div>
-    <div id="proofBody">
-    <section class="kpis k8" id="pKpis"></section>
-    <p class="lfl-caption" id="pLflCaption" hidden></p>
-
-    <section class="grid-2">
-      <article class="panel" data-widget="daily">
-        <header class="panel-head"><h2>Выпуск готовой продукции по дням</h2><span class="unit">шт · по концу отпекания · нажми на столбец</span></header>
-        <div id="pChartDaily" class="chart"></div>
-      </article>
-      <article class="panel" data-widget="hourly">
-        <header class="panel-head"><h2>Выпуск по часам окончания отпекания</h2><span class="unit">шт за период · нажми на столбец</span></header>
-        <div id="pChartHourly" class="chart"></div>
-      </article>
-    </section>
-
-    <section class="panel" data-widget="ovens">
-      <header class="panel-head"><h2>Производительность печей</h2><span class="unit">шт/ч = выход / часы отпекания · нажми на печь</span></header>
-      <div id="pOvens" class="ovencards"></div>
-    </section>
-
-    <section class="panel" data-widget="load">
-      <header class="panel-head"><h2>Загрузка оборудования по часам</h2><span class="unit" id="pLoadNote">% времени часа</span></header>
-      <div id="pLoad" class="loadwrap"></div>
-      <div class="table-wrap"><table class="table" id="pLoadTable"></table></div>
-    </section>
-
-    <section class="grid-2">
-      <article class="panel" data-widget="products">
-        <header class="panel-head"><h2>Топ изделий по фактическому выпуску</h2><span class="unit">шт · нажми на столбец</span></header>
-        <div id="pChartProducts" class="chart"></div>
-      </article>
-      <article class="panel" data-widget="employees">
-        <header class="panel-head"><h2>Обработано партий по сотрудникам</h2><span class="unit">партий с отметкой · нажми на столбец</span></header>
-        <div id="pChartEmployees" class="chart"></div>
-      </article>
-    </section>
-
-    <section class="panel" data-widget="products">
-      <header class="panel-head"><h2>Длительность расстойки и отпекания по изделиям</h2><span class="unit">среднее по корректно закрытым этапам · нажми на строку</span></header>
-      <div class="table-wrap"><table class="table" id="pProductTable"></table></div>
-    </section>
-
-    <section class="grid-2">
-      <article class="panel" data-widget="reasons">
-        <header class="panel-head"><h2>Критические остановки по причинам</h2><span class="unit">минуты</span></header>
-        <div id="pChartReasons" class="chart"></div>
-      </article>
-      <article class="panel" data-widget="pauses">
-        <header class="panel-head"><h2>Остановки по оборудованию</h2><span class="unit">нажми на строку</span></header>
-        <div class="table-wrap"><table class="table" id="pPauseEquipment"></table></div>
-      </article>
-    </section>
-
-    <section class="panel">
-      <header class="panel-head"><h2>Сводка фактов</h2><span class="unit">попадает в PDF</span></header>
-      <div id="pAnalysis" class="analysis"></div>
-    </section>
-
-    <section class="panel" data-widget="daily">
-      <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">нажми на строку</span></header>
-      <div class="table-wrap"><table class="table" id="pDailyTable"></table></div>
-    </section>
-
-    <section class="panel" data-widget="employees">
-      <header class="panel-head"><h2>Сотрудники по отметкам</h2><span class="unit">начало и конец этапа могут делать разные люди · нажми на строку</span></header>
-      <div class="table-wrap"><table class="table" id="pEmployeeTable"></table></div>
-    </section>
-
-    <section class="panel" data-widget="open_stages">
-      <header class="panel-head"><h2>Незакрытые этапы</h2><span class="unit" id="pOpenNote">сейчас</span></header>
-      <div class="table-wrap"><table class="table" id="pOpenTable"></table></div>
-    </section>
-
-    <section class="panel" data-widget="pauses">
-      <header class="panel-head"><h2>Журнал критических остановок</h2><span class="unit">последние записи</span></header>
-      <div class="table-wrap"><table class="table" id="pPauseTable"></table></div>
-    </section>
-    </div>
-  </div>
-
-  <!-- ── Расстойка: партии ───────────────────────────────────────────────── -->
-  <div class="tab-page" data-page="batches" hidden>
-    <section class="panel" data-widget="batches">
-      <header class="panel-head"><h2>Партии</h2><span class="unit" id="pBatchNote">—</span></header>
-      <div class="batch-tools">
-        <label class="field"><span>Поиск по изделию или сотруднику</span>
-          <input type="search" id="pBatchSearch" placeholder="например, багет" autocomplete="off"></label>
-      </div>
-      <div class="table-wrap"><table class="table batch-table" id="pBatchTable"></table></div>
-    </section>
-  </div>
-
   <footer class="page-foot">
     <span id="sourceLine">—</span>
     <button class="btn" id="refresh">Обновить</button>
   </footer>
 </main>
 <div id="tip" class="tip" hidden></div>
-<div id="gallery" class="gallery" hidden role="dialog" aria-modal="true" aria-labelledby="galleryTitle">
-  <div class="gallery-box">
-    <header class="gallery-head">
-      <h2 id="galleryTitle">Фото партии</h2>
-      <button class="btn" type="button" id="galleryClose" aria-label="Закрыть">✕</button>
-    </header>
-    <div class="gallery-view" id="galleryView" hidden>
-      <button class="btn gv-nav" type="button" id="galleryPrev" aria-label="Предыдущее фото">‹</button>
-      <figure><img id="galleryImg" alt=""><figcaption id="galleryCaption"></figcaption></figure>
-      <button class="btn gv-nav" type="button" id="galleryNext" aria-label="Следующее фото">›</button>
-    </div>
-    <div class="gallery-grid" id="galleryGrid"></div>
-  </div>
-</div>
 <script src="/static/app.js"></script>
 </body>
 </html>

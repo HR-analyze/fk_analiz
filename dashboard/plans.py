@@ -11,24 +11,9 @@ from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
 
-import pg_plan_store
-
 log = logging.getLogger("fk.plans")
 
 PLAN_FILE = Path(os.getenv("PLAN_FILE", "/app/data/plans.json"))
-PG_PLANS = bool(os.getenv("PLAN_DATABASE_URL", "").strip() or (os.getenv("DATABASE_URL", "").strip() if os.getenv("RELAXDEV_DEPLOY") == "1" else ""))
-
-
-def init_storage():
-    if os.getenv("RELAXDEV_DEPLOY") == "1" and not PG_PLANS:
-        raise RuntimeError("RelaxDev: attach a NEW PostgreSQL to this dashboard (DATABASE_URL is automatic)")
-    if PG_PLANS:
-        pg_plan_store.init_storage()
-
-
-def health_storage():
-    if PG_PLANS:
-        pg_plan_store.health()
 PLAN_UPLOAD_TOKEN = os.getenv("PLAN_UPLOAD_TOKEN", "").strip()
 MAX_UPLOAD_BYTES = int(os.getenv("PLAN_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
 MAX_ROWS = int(os.getenv("PLAN_MAX_ROWS", "20000"))
@@ -187,23 +172,17 @@ def _write(payload):
 
 
 def load():
-    if PG_PLANS:
-        return pg_plan_store.load()
     with _lock:
         return _read().get("plans", {})
 
 
 def history():
-    if PG_PLANS:
-        return pg_plan_store.history()
     with _lock:
         entries = _read().get("history", [])
     return list(reversed(entries))          # свежие сверху
 
 
 def log_upload(entry):
-    if PG_PLANS:
-        return pg_plan_store.log_upload(entry,HISTORY_LIMIT)
     """Журнал загрузок: и удачных, и отклонённых — чтобы было видно, что пробовали залить."""
     with _lock:
         stored = _read()
@@ -215,8 +194,6 @@ def log_upload(entry):
 
 
 def save(new_plans, source=""):
-    if PG_PLANS:
-        return pg_plan_store.save(new_plans,source)
     """Планы накапливаются: загрузка перезаписывает только присланные даты."""
     with _lock:
         stored = _read()
@@ -230,8 +207,6 @@ def save(new_plans, source=""):
 
 
 def delete_dates(dates):
-    if PG_PLANS:
-        return pg_plan_store.delete_dates(dates,HISTORY_LIMIT)
     with _lock:
         stored = _read()
         plans = stored.get("plans", {})
