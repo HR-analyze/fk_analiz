@@ -496,19 +496,21 @@ def test_exports_xlsx_and_pdf():
             assert wb["Общий тайминг"].max_row - 1 == len(page["timing"])
             assert wb["Строки диаграммы"].max_row - 1 == len(page["rows"]) + len(page["products"])
             av = page["averages"]["products"]
-            # плоские листы процессов: строка — продукт × операция; время — числом (ч:мм)
+            # плоские листы процессов: строка 1 — период, строка 2 — шапка; строка — цех × продукт × операция; время — ч:мм
             proc = wb["Процессы по цехам"]
-            assert proc.max_row - 1 == sum(len(x["ops"]) for x in av)
-            assert [c.value for c in proc[1]][:4] == ["Цех", "Этап цеха", "Продукт", "Операция"]
-            assert proc.cell(row=2, column=9).number_format == "[h]:mm"
-            shops = {r[0] for r in proc.iter_rows(min_row=2, values_only=True)}
-            assert shops <= {"Тестозаготовочный цех", "Формовочный цех", "Печной цех", "Кондитерский цех"} and len(shops) >= 3
-            assert wb["Продукты (среднее)"].max_row - 1 == len(av)
-            assert wb["Этапы по продуктам"].max_row - 1 == sum(len(x["stages"]) for x in av)
+            assert "Среднее за" in proc.cell(row=1, column=1).value
+            assert proc.max_row - 2 == sum(len(x["ops"]) for x in av)
+            assert [c.value for c in proc[2]][:4] == ["Цех", "Продукт", "Этап цеха", "Операция"]
+            assert proc.cell(row=3, column=9).number_format == "[h]:mm" and proc.auto_filter.ref.startswith("A2:")
+            shops = [r[0] for r in proc.iter_rows(min_row=3, values_only=True)]
+            assert set(shops) <= {"Тестозаготовочный цех", "Формовочный цех", "Печной цех", "Кондитерский цех"}
+            assert shops == sorted(shops, key=["Тестозаготовочный цех", "Формовочный цех", "Печной цех", "Кондитерский цех"].index)
+            assert wb["Продукты (среднее)"].max_row - 2 == len(av)
+            assert wb["Этапы по продуктам"].max_row - 2 == sum(len(x["stages"]) for x in av)
             assert wb["Цеха · операции"].max_row > 1
             notes = [c.value for c in wb["Фильтры"]["B"] if c.value]
             assert any("переписки" in str(v) for v in notes)
-            assert any(r[-1] == "переписка кондитерского цеха — неточно" for r in wb["Процессы по цехам"].iter_rows(min_row=2, values_only=True))
+            assert any(r[-1] == "переписка кондитерского цеха — неточно" for r in wb["Процессы по цехам"].iter_rows(min_row=3, values_only=True))
             r = await client.get("/api/export/pdf?source=gantt&date=2026-10-07")
             blob = await r.read()
             assert r.status == 200 and blob[:4] == b"%PDF"
@@ -520,6 +522,35 @@ def test_exports_xlsx_and_pdf():
         finally:
             await client.close()
     asyncio.run(run())
+
+
+def test_process_pdf_survives_many_operations_and_markup_in_names():
+    """PDF не падает: у продукта 60 операций (рисунок делится на части) и в названиях есть «<b>», «&»."""
+    import pypdf
+    kc = {"operations": [kc_op("Торт <b>Особый</b> & Co", f"Операция {i:02d} <i>", at(7, 8) + timedelta(minutes=5 * i), 5, people=1, pcs=10)
+                         for i in range(60)]}
+    s = gantt.build(gantt.collect_bars({"kc": kc}, {}), {}, {}, "2026-10-07", "full", ["kc"], now=NOW,
+                    avg_from="2026-10-07", avg_to="2026-10-07")
+    blob = gantt_exports.build_pdf(s, gantt_exports.build_analysis(s, []), [("Продукт", "Торт <b>Особый</b> & Co")])
+    text = "\n".join(pg.extract_text() for pg in pypdf.PdfReader(io.BytesIO(blob)).pages)
+    assert "Торт <b>Особый</b> & Co" in text and "Операция 59 <i>" in text
+    rows = gantt_exports.process_rows(s)
+    assert len(rows) == 60 and rows[0][1] == "Торт <b>Особый</b> & Co"
+
+
+def test_process_exports_show_output_days_and_all_units():
+    kc = {"operations": [kc_op("Торт", "Разлив", at(7, 9), 60, people=2, pcs=40),
+                         kc_op("Торт", "Сборка", at(8, 9), 60, people=2, pcs=None)]}
+    bars = gantt.collect_bars({"kc": kc}, {})
+    for b in bars["kc"]:
+        if b["operation"] == "Разлив":
+            b["unit"] = "пласт"
+    s = gantt.build(bars, {}, {}, "2026-10-07", "full", ["kc"], now=NOW, avg_from="2026-10-07", avg_to="2026-10-08")
+    p = s["averages"]["products"][0]
+    assert gantt_exports._output_days(p) == "по 1 дн. из 2"          # выработка посчитана не по всем дням
+    op = next(o for o in p["ops"] if o["operation"] == "Разлив")
+    assert gantt_exports._units_text(op) == "40 пласт" and op["qty_by_unit"] == {"пласт": 40.0}
+    assert gantt_exports._n(1370.0) == "1 370" and gantt_exports._n(114.84) == "114,8"
 
 
 def test_other_sections_unchanged():

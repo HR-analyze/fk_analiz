@@ -97,82 +97,103 @@ def _source(item):
     return "переписка кондитерского цеха — неточно" if item.get("from_chat") else "бот"
 
 
+def _units_text(op):
+    """Выработка операции по всем её единицам: «13,8 лист · 12 пласт · 1 замес» (округление как везде — _n)."""
+    units = op.get("qty_by_unit") or {}
+    return " · ".join(f"{_n(v)} {u}" for u, v in units.items() if v) or ""
+
+
+def _output_days(p):
+    """Выработка продукта часто есть не каждый день — пишем, по скольким дням она посчитана."""
+    o = p.get("output") or {}
+    return f"по {o['days']} дн. из {p['days']}" if o and o["days"] < p["days"] else ""
+
+
+SECTION_ORDER = {k: i for i, k in enumerate(SECTIONS)}
+
+
 PRODUCT_COLUMNS = ["Продукт", "Цеха", "Дней за период", "Весь путь в среднем", "Путь — минимум", "Путь — максимум",
-                   "Выработка в день", "Ед.", "Выработка — с какого этапа и операции", "Выработка в час на человека",
-                   "Чел·ч в день", "Операций", "Источник"]
+                   "Выработка в день", "Ед.", "Дней с выработкой", "Выработка — последний этап, самая массовая операция",
+                   "Выработка в час на человека", "Чел·ч в день", "Операций", "Источник"]
 
 
 def product_rows(summary):
     out = []
-    for p in summary["averages"]["products"]:
+    for p in sorted(summary["averages"]["products"], key=lambda x: x["product"].lower()):
         o = p.get("output") or {}
         out.append([p["product"], ", ".join(p["sections"]), p["days"], _xl_time(p["lead_min"]), _xl_time(p["lead_min_min"]),
-                    _xl_time(p["lead_min_max"]), o.get("qty_day"), o.get("unit", ""),
+                    _xl_time(p["lead_min_max"]), o.get("qty_day"), o.get("unit", ""), o.get("days"),
                     f"{o['stage_title']} · {o['operation']}" if o else "", o.get("rate_per_person"), p["person_hours_day"],
                     len(p["ops"]), "есть переписка кондитерского цеха — неточно" if p.get("from_chat") else "бот"])
     return out
 
 
-STAGE_COLUMNS = ["Продукт", "Цех", "Этап", "Дней с этапом", "Начало от старта продукта", "Длится (от начала до конца)",
-                 "Занято (без пауз)"]
+STAGE_COLUMNS = ["Продукт", "Цех", "Этап цеха", "Дней с этапом", "Дней продукта за период", "Начало от старта продукта",
+                 "Длится (от начала до конца)", "Занято (без пауз)"]
 
 
 def stage_rows(summary):
     out = []
-    for p in summary["averages"]["products"]:
+    for p in sorted(summary["averages"]["products"], key=lambda x: x["product"].lower()):
         for st in p["stages"]:
-            out.append([p["product"], st["title"].split(" · ")[0], _stage_part(st["title"]), st["days"],
+            out.append([p["product"], st["title"].split(" · ")[0], _stage_part(st["title"]), st["days"], p["days"],
                         _xl_time(st["offset_min"]), _xl_time(st["span_min"]), _xl_time(st["busy_min"])])
     return out
 
 
-PROCESS_COLUMNS = ["Цех", "Этап цеха", "Продукт", "Операция", "Шаг в продукте", "Дней с операцией", "Дней продукта за период",
+PROCESS_COLUMNS = ["Цех", "Продукт", "Этап цеха", "Операция", "Шаг в продукте", "Дней с операцией", "Дней продукта за период",
                    "Начало от старта продукта", "Длится (от начала до конца)", "Занято (без пауз)", "Людей в среднем",
-                   "Выработка в день", "Ед.", "Выработка в час", "Выработка в час на человека", "Оборудование",
-                   "Без конца / некорректно", "Источник"]
+                   "Выработка в день", "Ед.", "Выработка (все единицы)", "Выработка в час", "Выработка в час на человека",
+                   "Оборудование", "Без конца / некорректно", "Источник"]
 PROCESS_TIME_COLS = (8, 9, 10)   # 1-based: начало, длится, занято
 
 
 def process_rows(summary):
-    """Одна строка — продукт × цех × операция: по ним собираются все процессы каждого цеха (фильтр «Цех»)."""
-    order = {st["key"]: i for i, st in enumerate(summary.get("stages") or [])}
+    """Одна строка — цех × продукт × операция, по ходу процесса продукта: фильтр «Цех» собирает все процессы цеха."""
     rows = []
     for p in summary["averages"]["products"]:
         for step, o in enumerate(p["ops"], 1):
-            rows.append((order.get(o["stage"], 99), p["product"].lower(), step, [
-                o["section_title"], _stage_part(o["stage_title"]), p["product"], o["operation"], step, o["days"], p["days"],
+            rows.append((SECTION_ORDER.get(o["section"], 99), p["product"].lower(), step, [
+                o["section_title"], p["product"], _stage_part(o["stage_title"]), o["operation"], step, o["days"], p["days"],
                 _xl_time(o["offset_min"]), _xl_time(o["span_min"]), _xl_time(o["busy_min"]), o["people_avg"],
-                o.get("qty_day_value"), o.get("qty_unit", ""), o["rate"], o["rate_per_person"], o["equipment"],
+                o.get("qty_day_value"), o.get("qty_unit", ""), _units_text(o), o["rate"], o["rate_per_person"], o["equipment"],
                 o["no_end"] or None, _source(o)]))
     rows.sort(key=lambda r: r[:3])
     return [r[3] for r in rows]
 
 
-SHOP_OP_COLUMNS = ["Цех", "Этап цеха", "Операция", "Продуктов", "Продукты", "Дней (всего по продуктам)",
-                   "Длится — в среднем по продуктам", "Длится — минимум", "Длится — максимум", "Людей в среднем", "Источник"]
+SHOP_OP_COLUMNS = ["Цех", "Этап цеха", "Операция", "Обычно начинается от старта продукта", "Продуктов", "Продукты",
+                   "Дней (всего по продуктам)", "Длится — в среднем по продуктам", "Длится — минимум", "Длится — максимум",
+                   "Людей в среднем", "Источник"]
 
 
 def shop_operation_rows(summary):
-    """Свод по цеху: какие операции в нём есть, у каких продуктов и сколько длятся."""
-    order = {st["key"]: i for i, st in enumerate(summary.get("stages") or [])}
+    """Свод по цеху: какие операции в нём есть, у каких продуктов и сколько длятся — по ходу процесса цеха
+    (по среднему началу от старта продукта), а не по алфавиту."""
     groups = {}
     for p in summary["averages"]["products"]:
         for o in p["ops"]:
-            g = groups.setdefault((order.get(o["stage"], 99), o["section_title"], _stage_part(o["stage_title"]), o["operation"]),
-                                  {"products": [], "days": 0, "spans": [], "people": [], "chat": False})
-            g["products"].append(p["product"])
+            key = (SECTION_ORDER.get(o["section"], 99), o["section_title"], _stage_part(o["stage_title"]), o["operation"])
+            g = groups.setdefault(key, {"products": set(), "days": 0, "spans": [], "offsets": [], "people": [], "chat": False})
+            g["products"].add(p["product"])
             g["days"] += o["days"]
-            if o["span_min"] is not None:
-                g["spans"].append(o["span_min"])
-            if o["people_avg"] is not None:
-                g["people"].append(o["people_avg"])
+            for name, value in (("spans", o["span_min"]), ("offsets", o["offset_min"]), ("people", o["people_avg"])):
+                if value is not None:
+                    g[name].append(value)
             g["chat"] = g["chat"] or bool(o.get("from_chat"))
+
+    def mean(values):
+        return sum(values) / len(values) if values else None
+
     out = []
-    for (_, shop, stage, op), g in sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][3].lower())):
+    for (order, shop, stage, op), g in sorted(groups.items(), key=lambda kv: (
+            kv[0][0], kv[0][2], mean(kv[1]["offsets"]) if kv[1]["offsets"] else 1e9, kv[0][3].lower())):
         sp = g["spans"]
-        out.append([shop, stage, op, len(set(g["products"])), ", ".join(sorted(set(g["products"]), key=str.lower)), g["days"],
-                    _xl_time(sum(sp) / len(sp)) if sp else None, _xl_time(min(sp)) if sp else None, _xl_time(max(sp)) if sp else None,
-                    round(sum(g["people"]) / len(g["people"]), 1) if g["people"] else None,
+        people = mean(g["people"])
+        out.append([shop, stage, op, _xl_time(mean(g["offsets"])), len(g["products"]),
+                    ", ".join(sorted(g["products"], key=str.lower)), g["days"],
+                    _xl_time(mean(sp)), _xl_time(min(sp)) if sp else None, _xl_time(max(sp)) if sp else None,
+                    round(people, 1) if people is not None else None,
                     "есть переписка — неточно" if g["chat"] else "бот"])
     return out
 
@@ -251,33 +272,42 @@ def build_xlsx(summary, filters, mapping, ops_map=None):
     wb.remove(wb.active)
     head_fill, head_font = PatternFill("solid", fgColor="E8EEFB"), Font(bold=True)
 
-    def sheet(title, columns, rows, widths=None, time_cols=()):
+    def sheet(title, columns, rows, widths=None, time_cols=(), caption=""):
+        """caption — строка над шапкой (период): по скопированному листу видно, за что эти средние."""
         ws = wb.create_sheet(title[:31])
+        top = 1
+        if caption:
+            ws.append([caption])
+            ws.cell(row=1, column=1).font = Font(bold=True)
+            top = 2
         ws.append(columns)
         for row in rows:
             ws.append(row)
         for col in time_cols:   # длительность: число (доля суток), видно как ч:мм — суммы и фильтры работают
-            for r in range(2, len(rows) + 2):
+            for r in range(top + 1, len(rows) + top + 1):
                 ws.cell(row=r, column=col).number_format = "[h]:mm"
         if not rows:
             ws.append(["нет данных"])
         for i, c in enumerate(columns, 1):
-            cell = ws.cell(row=1, column=i)
+            cell = ws.cell(row=top, column=i)
             cell.fill, cell.font = head_fill, head_font
             cell.alignment = Alignment(wrap_text=True, vertical="center")
-            longest = max([len(str(c)) if i in time_cols else len(str(c))]
-                          + [6 if i in time_cols else len(str(r[i - 1] if r[i - 1] is not None else "")) for r in rows[:200] if i - 1 < len(r)])
+            longest = max([len(str(c))] + [6 if i in time_cols else len(str(r[i - 1] if r[i - 1] is not None else ""))
+                                           for r in rows[:200] if i - 1 < len(r)])
             ws.column_dimensions[get_column_letter(i)].width = (widths or {}).get(i, min(max(longest + 2, 9), 60))
-        ws.freeze_panes = "A2"
+        ws.freeze_panes = f"A{top + 1}"
         if rows:
-            ws.auto_filter.ref = f"A1:{get_column_letter(len(columns))}{len(rows) + 1}"
+            ws.auto_filter.ref = f"A{top}:{get_column_letter(len(columns))}{len(rows) + top}"
 
+    av = summary.get("averages") or {}
+    period = (f"Среднее за {av.get('from', '')} — {av.get('to', '')} (рабочие сутки 08–08): время — от старта работы с продуктом, "
+              f"длительности — ч:мм. Данные кондитерского цеха из переписки — неточные.")
     # Сначала — процессы за период «Среднее с … по …»: плоско (строка — продукт × цех × операция),
     # время числом ч:мм — фильтр «Цех» собирает все процессы цеха, работают суммы и сводные таблицы.
-    sheet("Процессы по цехам", PROCESS_COLUMNS, process_rows(summary), {4: 34, 3: 30, 16: 26}, PROCESS_TIME_COLS)
-    sheet("Цеха · операции", SHOP_OP_COLUMNS, shop_operation_rows(summary), {3: 34, 5: 60}, (7, 8, 9))
-    sheet("Продукты (среднее)", PRODUCT_COLUMNS, product_rows(summary), {1: 30, 9: 40}, (4, 5, 6))
-    sheet("Этапы по продуктам", STAGE_COLUMNS, stage_rows(summary), {1: 30}, (5, 6, 7))
+    sheet("Процессы по цехам", PROCESS_COLUMNS, process_rows(summary), {2: 30, 4: 34, 14: 28, 17: 26}, PROCESS_TIME_COLS, period)
+    sheet("Цеха · операции", SHOP_OP_COLUMNS, shop_operation_rows(summary), {3: 34, 4: 16, 6: 60}, (4, 8, 9, 10), period)
+    sheet("Продукты (среднее)", PRODUCT_COLUMNS, product_rows(summary), {1: 30, 10: 40}, (4, 5, 6), period)
+    sheet("Этапы по продуктам", STAGE_COLUMNS, stage_rows(summary), {1: 30}, (6, 7, 8), period)
     # Затем — выбранные рабочие сутки (окно диаграммы)
     sheet("Строки диаграммы", ROW_COLUMNS, grouped_rows(summary))
     sheet("Операции", BAR_COLUMNS, bar_rows(summary))
@@ -352,52 +382,92 @@ def _gantt_drawing(summary, rows, width, font, row_h=11):
     return d
 
 
-def _process_drawing(p, width, font, bold, row_h=10):
-    """Средний день продукта: этапы и операции от старта продукта (+1 ч, +2 ч…), как на сайте."""
+def _esc(value):
+    """Текст данных для Paragraph: «<», «&» в названиях — не разметка (иначе PDF падает)."""
+    from xml.sax.saxutils import escape
+    return escape("" if value is None else str(value))
+
+
+def _process_rows(p):
+    """Строки рисунка/таблицы продукта: этап, под ним его операции."""
+    rows = []
+    for st in p["stages"]:
+        rows.append({"stage": True, "label": st["title"], "off": st["offset_min"], "span": st["span_min"], "key": st["key"],
+                     "days": st["days"], "hatched": False})
+        for o in p["ops"]:
+            if o["stage"] == st["key"]:
+                rows.append({"stage": False, "label": o["operation"], "off": o["offset_min"], "span": o["span_min"],
+                             "key": o["stage"], "days": o["days"], "hatched": bool(o["no_end"])})
+    return rows
+
+
+DRAW_ROWS = 40   # строк на один рисунок: выше — делим, иначе рисунок не влезет на страницу (LayoutError)
+
+
+def _process_drawings(p, width, font, bold, row_h=10):
+    """Средний день продукта: этапы и операции от старта продукта (+1 ч, +2 ч…), как на сайте.
+    Строки, посчитанные по части дней продукта, подписаны «N/M дн.» и бледнее: средние разных дней,
+    порядок на шкале примерный. Много строк — несколько рисунков подряд с одной шкалой."""
     import math
 
     from reportlab.graphics.shapes import Drawing, Line, Polygon, Rect, String
     from reportlab.lib.colors import HexColor
 
-    rows = []
-    for st in p["stages"]:
-        rows.append((True, st["title"], st["offset_min"], st["span_min"], st["key"], False))
-        for o in p["ops"]:
-            if o["stage"] == st["key"]:
-                rows.append((False, o["operation"], o["offset_min"], o["span_min"], o["stage"], bool(o["no_end"])))
-    end = max([60] + [(off or 0) + (span or 0) for _, _, off, span, _, _ in rows])
+    rows = _process_rows(p)
+    end = max([60] + [(r["off"] or 0) + (r["span"] or 0) for r in rows])
     hours = math.ceil(end / 60)
     step = 1 if hours <= 24 else 2
     total = hours * 60
-    label_w = 210
+    label_w = 230
     plot_w = width - label_w
-    height = 14 + len(rows) * row_h + 2
-    d = Drawing(width, height)
-    for h in range(0, hours + 1, step):
-        x = label_w + plot_w * h * 60 / total
-        d.add(Line(x, 0, x, height - 12, strokeColor=HexColor("#E6EAF0"), strokeWidth=0.4))
-        d.add(String(x, height - 9, "0" if h == 0 else f"+{h}ч", fontName=font, fontSize=5.5, textAnchor="middle",
-                     fillColor=HexColor("#8A94A6")))
-    y = height - 14
-    for is_stage, label, off, span, key, hatched in rows:
-        y -= row_h
-        color = HexColor(STAGE_COLORS.get(key, "#667085"))
-        d.add(String(2 if is_stage else 10, y + 2.5, label[:52], fontName=bold if is_stage else font,
-                     fontSize=6 if is_stage else 5.7, fillColor=HexColor("#101828" if is_stage else "#3C4658")))
-        d.add(Line(0, y, width, y, strokeColor=HexColor("#F1F4F8"), strokeWidth=0.3))
-        if off is None:
-            continue
-        x = label_w + plot_w * off / total
-        if span:
-            w = max(plot_w * span / total, 1.5)
-            d.add(Rect(x, y + 1.5, w, row_h - 3, fillColor=color, strokeColor=None,
-                       fillOpacity=1 if is_stage else (0.5 if hatched else 0.85)))
-            if is_stage and w > 30:
-                d.add(String(x + 2, y + 3, _hm(span), fontName=bold, fontSize=5, fillColor=HexColor("#FFFFFF")))
-        else:   # конца нет — только отметка начала
-            cy = y + row_h / 2
-            d.add(Polygon([x, cy + 3, x + 3, cy, x, cy - 3, x - 3, cy], fillColor=color, strokeColor=None))
-    return d
+    drawings = []
+    for chunk_start in range(0, max(len(rows), 1), DRAW_ROWS):
+        chunk = rows[chunk_start:chunk_start + DRAW_ROWS]
+        height = 14 + len(chunk) * row_h + 2
+        d = Drawing(width, height)
+        for h in range(0, hours + 1, step):
+            x = label_w + plot_w * h * 60 / total
+            d.add(Line(x, 0, x, height - 12, strokeColor=HexColor("#E6EAF0"), strokeWidth=0.4))
+            d.add(String(x, height - 9, "0" if h == 0 else f"+{h}ч", fontName=font, fontSize=5.5, textAnchor="middle",
+                         fillColor=HexColor("#8A94A6")))
+        y = height - 14
+        for r in chunk:
+            y -= row_h
+            color = HexColor(STAGE_COLORS.get(r["key"], "#667085"))
+            part = r["days"] < p["days"]
+            label = r["label"][:46] + (f"  ({r['days']}/{p['days']} дн.)" if part else "")
+            d.add(String(2 if r["stage"] else 10, y + 2.5, label, fontName=bold if r["stage"] else font,
+                         fontSize=6 if r["stage"] else 5.7, fillColor=HexColor("#101828" if r["stage"] else "#3C4658")))
+            d.add(Line(0, y, width, y, strokeColor=HexColor("#F1F4F8"), strokeWidth=0.3))
+            if r["off"] is None:
+                continue
+            x = label_w + plot_w * r["off"] / total
+            faint = r["hatched"] or r["days"] * 2 < p["days"]
+            if r["span"]:
+                w = max(plot_w * r["span"] / total, 1.5)
+                d.add(Rect(x, y + 1.5, w, row_h - 3, fillColor=color, strokeColor=None,
+                           fillOpacity=(0.55 if faint else 1) if r["stage"] else (0.4 if faint else 0.85)))
+                if r["stage"] and w > 30:
+                    d.add(String(x + 2, y + 3, _hm(r["span"]), fontName=bold, fontSize=5, fillColor=HexColor("#FFFFFF")))
+            else:   # конца нет — только отметка начала
+                cy = y + row_h / 2
+                d.add(Polygon([x, cy + 3, x + 3, cy, x, cy - 3, x - 3, cy], fillColor=color, strokeColor=None))
+        drawings.append(d)
+    return drawings
+
+
+def _bookmark(title, key, level=0):
+    """Закладка PDF (боковая панель «Закладки»): к каждому продукту — в один клик."""
+    from reportlab.platypus import Flowable
+
+    class Mark(Flowable):
+        width = height = 0
+
+        def draw(self):
+            self.canv.bookmarkPage(key)
+            self.canv.addOutlineEntry(title, key, level=level, closed=level == 0)
+
+    return Mark()
 
 
 def _process_section(summary, width, font, bold, styles):
@@ -411,8 +481,11 @@ def _process_section(summary, width, font, bold, styles):
     h1, h2, body, muted, cell = styles["h1"], styles["h2"], styles["body"], styles["muted"], styles["cell"]
     head = ParagraphStyle("ph", fontName=bold, fontSize=6.4, leading=7.8)
     cell_b = ParagraphStyle("cb", parent=cell, fontName=bold)
-    prod_h = ParagraphStyle("prod", fontName=bold, fontSize=11.5, leading=14, spaceBefore=8, spaceAfter=2)
+    prod_h = ParagraphStyle("prod", fontName=bold, fontSize=11.5, leading=14, spaceBefore=12, spaceAfter=2)
     flag = ParagraphStyle("flag", parent=muted, textColor=colors.HexColor("#A15C00"))
+
+    def P(text, style):
+        return Paragraph(_esc(text), style)
 
     def grid(data, widths, stage_rows=(), right=None):
         t = Table(data, colWidths=widths, repeatRows=1)
@@ -426,64 +499,70 @@ def _process_section(summary, width, font, bold, styles):
         t.setStyle(TableStyle(style))
         return t
 
-    out = [Paragraph(f"Процессы по продуктам · {av['from']} — {av['to']}", h1),
-           Paragraph("Средний день каждого продукта за период: этапы (цеха) и операции, когда начинаются от старта работы "
-                     "с продуктом в рабочие сутки 08–08 и сколько длятся. «Длится» — от первого начала до последнего конца, "
-                     "«занято» — без пауз между запусками. Операции без отметки конца — ромбом, в длительность не входят.", muted),
+    title = f"Процессы по продуктам · {av['from']} — {av['to']}"
+    out = [_bookmark("Процессы по продуктам", "processes"), P(title, h1),
+           P("Средний день каждого продукта за период: этапы (цеха) и операции, когда начинаются от старта работы "
+             "с продуктом в рабочие сутки 08–08 и сколько длятся. «Длится» — от первого начала до последнего конца, "
+             "«занято» — без пауз между запусками. Операции без отметки конца — ромбом, в длительность не входят. "
+             "Этапы и операции усреднены по своим дням («N/M дн.» — посчитано по N дням из M), поэтому порядок на шкале "
+             "примерный. Продукты в разделе — по алфавиту; к каждому есть закладка.", muted),
            Spacer(1, 2 * mm)]
-    products = av.get("products") or []
+    products = sorted(av.get("products") or [], key=lambda x: x["product"].lower())
     if not products:
-        return out + [Paragraph("За период операций нет.", body), PageBreak()]
+        return out + [P("За период операций нет.", body), PageBreak()]
 
     # сводка по всем продуктам — оглавление раздела
-    rows = [[Paragraph(c, head) for c in ("Продукт", "Цеха", "Дней", "Весь путь", "Выработка в день", "На чел·ч", "Операций")]]
+    rows = [[P(c, head) for c in ("Продукт", "Цеха", "Дней", "Весь путь", "Выработка в день", "На чел·ч", "Операций")]]
     for p in products:
         o = p.get("output") or {}
-        rows.append([Paragraph(p["product"], cell), Paragraph(", ".join(p["sections"]), cell), Paragraph(str(p["days"]), cell),
-                     Paragraph(_hm(p["lead_min"]) or "—", cell),
-                     Paragraph(f"{_n(o['qty_day'])} {o['unit']}" if o else "—", cell),
-                     Paragraph(f"{_n(o['rate_per_person'])} {o['unit']}/чел·ч" if o.get("rate_per_person") is not None else "—", cell),
-                     Paragraph(str(len(p["ops"])), cell)])
-    out += [Paragraph("Все продукты", h2), grid(rows, [width * x for x in (.26, .3, .06, .1, .1, .1, .08)]), PageBreak()]
+        made = f"{_n(o['qty_day'])} {o['unit']}" + (f" ({_output_days(p)})" if _output_days(p) else "") if o else "—"
+        rows.append([P(p["product"], cell), P(", ".join(p["sections"]), cell), P(p["days"], cell),
+                     P(_hm(p["lead_min"]) or "—", cell), P(made, cell),
+                     P(f"{_n(o['rate_per_person'])} {o['unit']}/чел·ч" if o.get("rate_per_person") is not None else "—", cell),
+                     P(len(p["ops"]), cell)])
+    out += [P("Все продукты", h2), grid(rows, [width * x for x in (.25, .28, .05, .1, .16, .1, .06)], right=(2, 6)), PageBreak()]
 
-    widths = [width * x for x in (.27, .08, .09, .08, .07, .12, .13, .12, .04)]
-    for p in products:
+    widths = [width * x for x in (.27, .08, .08, .08, .055, .14, .13, .1, .065)]
+    for i, p in enumerate(products):
         o = p.get("output") or {}
         info = [", ".join(p["sections"]), f"дней {p['days']}",
                 f"весь путь {_hm(p['lead_min']) or '—'}" + (f" (от {_hm(p['lead_min_min'])} до {_hm(p['lead_min_max'])})"
                                                             if p["days"] > 1 and p["lead_min"] is not None else "")]
         if o:
-            info.append(f"выработка {_n(o['qty_day'])} {o['unit']} в день — {o['stage_title']}, «{o['operation']}»"
+            info.append(f"выработка {_n(o['qty_day'])} {o['unit']} в день"
+                        + (f" ({_output_days(p)})" if _output_days(p) else "")
+                        + f" — последний этап «{o['stage_title']}», самая массовая операция «{o['operation']}»"
                         + (f"; {_n(o['rate_per_person'])} {o['unit']}/чел·ч" if o.get("rate_per_person") is not None else ""))
         if p["person_hours_day"] is not None:
             info.append(f"чел·ч в день {_n(p['person_hours_day'])}")
-        top = [Paragraph(p["product"], prod_h), Paragraph(" · ".join(info), muted)]
+        top = [_bookmark(p["product"], f"product-{i}", level=1), P(p["product"], prod_h), P(" · ".join(info), muted)]
         if p.get("from_chat"):
-            top.append(Paragraph("Часть данных — из переписки кондитерского цеха, неточно.", flag))
-        top += [Spacer(1, 1.5 * mm), _process_drawing(p, width, font, bold), Spacer(1, 1.5 * mm)]
+            top.append(P("Часть данных — из переписки кондитерского цеха, неточно.", flag))
+        drawings = _process_drawings(p, width, font, bold)
+        top += [Spacer(1, 1.5 * mm), drawings[0], Spacer(1, 1.5 * mm)]
 
-        data = [[Paragraph(c, head) for c in ("Этап · операция", "Начало", "Длится", "Занято", "Людей",
-                                              "Выработка в день", "В час на чел. / в час", "Оборудование", "Дней")]]
+        data = [[P(c, head) for c in ("Этап · операция", "Начало", "Длится", "Занято", "Людей",
+                                      "Выработка в день", "В час на чел. / в час", "Оборудование", "Дней")]]
         stage_idx = []
         for st in p["stages"]:
             stage_idx.append(len(data))
-            data.append([Paragraph(st["title"], cell_b), Paragraph("+" + _hm(st["offset_min"]) if st["offset_min"] is not None else "—", cell_b),
-                         Paragraph(_hm(st["span_min"]) or "—", cell_b), Paragraph(_hm(st["busy_min"]) or "—", cell_b),
-                         "", "", "", "", Paragraph(str(st["days"]), cell_b)])
+            data.append([P(st["title"], cell_b), P("+" + _hm(st["offset_min"]) if st["offset_min"] is not None else "—", cell_b),
+                         P(_hm(st["span_min"]) or "—", cell_b), P(_hm(st["busy_min"]) or "—", cell_b),
+                         "", "", "", "", P(f"{st['days']}/{p['days']}", cell_b)])
             for op in p["ops"]:
                 if op["stage"] != st["key"]:
                     continue
                 name = op["operation"] + (f" · без конца {op['no_end']}" if op["no_end"] else "") + (" · переписка" if op.get("from_chat") else "")
-                data.append([Paragraph("&nbsp;&nbsp;&nbsp;" + name, cell),
-                             Paragraph("+" + _hm(op["offset_min"]) if op["offset_min"] is not None else "—", cell),
-                             Paragraph(_hm(op["span_min"]) or "—", cell), Paragraph(_hm(op["busy_min"]) or "—", cell),
-                             Paragraph(_n(op["people_avg"]), cell),
-                             Paragraph(op["qty_day"] if op["qty_day"] != "—" else "—", cell),
-                             Paragraph(_rate_text(op).replace(" (людей нет)", "") or "—", cell),
-                             Paragraph(op["equipment"] or "—", cell), Paragraph(str(op["days"]), cell)])
-        # шапка и рисунок держатся с таблицей; длинная таблица переносится, её шапка повторяется на новой странице
-        out.append(KeepTogether(top + [grid(data, widths, stage_idx, (1, 6))]))
-        out.append(Spacer(1, 4 * mm))
+                data.append([Paragraph("&nbsp;&nbsp;&nbsp;" + _esc(name), cell),
+                             P("+" + _hm(op["offset_min"]) if op["offset_min"] is not None else "—", cell),
+                             P(_hm(op["span_min"]) or "—", cell), P(_hm(op["busy_min"]) or "—", cell),
+                             P(_n(op["people_avg"]), cell), P(_units_text(op) or "—", cell),
+                             P(_rate_text(op).replace(" (людей нет)", "") or "—", cell),
+                             P(op["equipment"] or "—", cell), P(f"{op['days']}/{p['days']}", cell)])
+        # шапка и первый рисунок держатся вместе; длинная таблица переносится, её шапка повторяется на новой странице
+        out.append(KeepTogether(top))
+        out += [x for d in drawings[1:] for x in (d, Spacer(1, 1.5 * mm))]
+        out.append(grid(data, widths, stage_idx, (1, 6)))
     out.append(PageBreak())
     return out
 
@@ -499,7 +578,7 @@ def build_pdf(summary, analysis, filters, title="Тайминги: диагра�
     out = io.BytesIO()
     doc = SimpleDocTemplate(out, pagesize=landscape(A4), leftMargin=10 * mm, rightMargin=10 * mm,
                             topMargin=10 * mm, bottomMargin=10 * mm, title=title)
-    width = doc.width
+    width = doc.width - 12   # внутренние поля кадра (6 + 6 pt): иначе таблицы и рисунки вылезают за кадр
     h1 = ParagraphStyle("h1", fontName=bold, fontSize=16, leading=20, spaceAfter=4)
     h2 = ParagraphStyle("h2", fontName=bold, fontSize=11, leading=14, spaceBefore=6, spaceAfter=4)
     body = ParagraphStyle("body", fontName=font, fontSize=8.2, leading=11)
@@ -507,12 +586,12 @@ def build_pdf(summary, analysis, filters, title="Тайминги: диагра�
     cell = ParagraphStyle("c", fontName=font, fontSize=6.2, leading=7.6)
     warn = ParagraphStyle("warn", fontName=bold, fontSize=8.6, leading=11.5, textColor=colors.HexColor("#7A4B00"),
                           backColor=colors.HexColor("#FFF7E6"), borderPadding=4, spaceBefore=4, spaceAfter=6)
-    story = [Paragraph(title, h1), Paragraph(", ".join(f"{n}: {v}" for n, v in filters if v), muted),
+    story = [Paragraph(title, h1), Paragraph(_esc(", ".join(f"{n}: {v}" for n, v in filters if v)), muted),
              Paragraph(f"Сформировано {datetime.now(TZ).strftime('%d.%m.%Y %H:%M')}", muted), Spacer(1, 3 * mm)]
     if summary.get("chat_note"):
         story.append(Paragraph("Внимание. " + summary["chat_note"], warn))
     for heading, lines in analysis:
-        story.append(KeepTogether([Paragraph(heading, h2)] + [Paragraph(x, body) for x in lines]))
+        story.append(KeepTogether([Paragraph(_esc(heading), h2)] + [Paragraph(_esc(x), body) for x in lines]))
     story.append(PageBreak())
     story += _process_section(summary, width, font, bold, styles={"h1": h1, "h2": h2, "body": body, "muted": muted,
                                                                   "cell": cell, "warn": warn})
@@ -534,7 +613,7 @@ def build_pdf(summary, analysis, filters, title="Тайминги: диагра�
 
     def table(columns, data, limit=300):
         t = Table([[Paragraph(str(c), ParagraphStyle("h", fontName=bold, fontSize=6.4, leading=7.8)) for c in columns]]
-                  + [[Paragraph(str(c), cell) for c in row] for row in data[:limit]], repeatRows=1)
+                  + [[Paragraph(_esc(c), cell) for c in row] for row in data[:limit]], repeatRows=1)
         t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#E6EAF0")),
                                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#EFF3FB")),
                                ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -547,5 +626,10 @@ def build_pdf(summary, analysis, filters, title="Тайминги: диагра�
     story.append(Paragraph("Операции", h2))
     cols = [0, 1, 3, 4, 5, 6, 7, 9, 10, 12, 13, 17]
     story.append(table([BAR_COLUMNS[i] for i in cols], [[r[i] for i in cols] for r in bar_rows(summary)]))
-    doc.build(story)
+    def page_number(canv, doc_):
+        canv.setFont(font, 7)
+        canv.setFillColor(colors.HexColor("#8A94A6"))
+        canv.drawRightString(doc_.pagesize[0] - 10 * mm, 5 * mm, f"стр. {doc_.page}")
+
+    doc.build(story, onFirstPage=page_number, onLaterPages=page_number)
     return out.getvalue()

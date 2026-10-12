@@ -539,6 +539,8 @@ def averages(bars_by_section, namer, day_from, day_to, sections=None, product="a
             ops_out.append({
                 "qty_unit": unit if unit in qty else "",
                 "qty_day_value": round(qty[unit] / len(rs), 1) if unit in qty else None,
+                # все единицы операции (у разлива бисквита — листы, пласты и замесы): в выгрузке ничего не теряется
+                "qty_by_unit": {u: round(q / len(rs), 1) for u, q in sorted(qty.items(), key=lambda kv: (kv[0] != unit, kv[0]))},
                 "stage": stage, "stage_title": STAGES[STAGE_INDEX[stage]]["title"], "section": sec,
                 "section_title": SECTIONS[sec], "operation": op, "days": len(rs),
                 "offset_min": avg(r["offset"] for r in rs), "span_min": avg(r["span"] for r in rs),
