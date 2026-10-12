@@ -45,6 +45,7 @@ jobs:
             -e DASHBOARD_PASSWORD=local-test \
             fk-dashboard-relax
           sleep 4
+          docker logs fk-dashboard-test
           docker inspect -f '{{.State.Running}}' fk-dashboard-test | grep true
           curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ | grep 401
           docker logs fk-dashboard-test
