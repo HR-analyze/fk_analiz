@@ -1754,7 +1754,7 @@ function bindKc() {
 const GANTT = { date: '', window: 'full', sections: ['bhm', 'fk', 'proofing', 'kc'], product: 'all', equipment: 'all', search: '',
   // fold: явный выбор «развёрнут/свёрнут» по продукту; по умолчанию продукты свёрнуты
   // при поиске — своя карта: найденные операции видны сразу, свернуть можно и в поиске
-  avgFrom: '', avgTo: '', fold: new Map(), searchFold: new Map(), avgOpen: new Set() };
+  avgFrom: '', avgTo: '', days: [], fold: new Map(), searchFold: new Map(), avgOpen: new Set() };
 const G_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', kc: '#7c5cf5' };
 const G_STAGE_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', baking: '#0f766e', kc: '#7c5cf5', pack: '#9ca3af' };
 const G_NAMES = { bhm: 'Тестозаготовочный цех', fk: 'Формовочный цех', proofing: 'Печной цех', kc: 'Кондитерский цех' };
@@ -1774,17 +1774,21 @@ function ganttQuery(force) {
   return p.toString();
 }
 
+// Даты — календарём: выбрать можно любой день в пределах данных (min–max), ‹ › листают дни с данными.
 function fillGanttTools(m) {
-  const days = (m.days || []).slice().reverse();
-  if (!GANTT.date || !days.includes(GANTT.date)) GANTT.date = days[0] || '';
-  const dayOptions = days.map((d) => `<option value="${esc(d)}">${esc(d.split('-').reverse().join('.'))}</option>`).join('')
-    || '<option value="">нет данных</option>';
-  $('gDate').innerHTML = dayOptions;
+  GANTT.days = (m.days || []).slice();
+  const first = GANTT.days[0] || '';
+  const last = GANTT.days[GANTT.days.length - 1] || '';
+  const inRange = (d) => d && (!first || d >= first) && (!last || d <= last);
+  if (!inRange(GANTT.date)) GANTT.date = last;
+  if (!inRange(GANTT.avgFrom)) GANTT.avgFrom = m.avg_from || '';
+  if (!inRange(GANTT.avgTo)) GANTT.avgTo = m.avg_to || '';
+  ['gDate', 'gAvgFrom', 'gAvgTo'].forEach((id) => {
+    $(id).min = first;
+    $(id).max = last;
+    $(id).title = first ? `данные с ${first.split('-').reverse().join('.')} по ${last.split('-').reverse().join('.')}` : 'нет данных';
+  });
   $('gDate').value = GANTT.date;
-  if (!days.includes(GANTT.avgFrom)) GANTT.avgFrom = m.avg_from || '';
-  if (!days.includes(GANTT.avgTo)) GANTT.avgTo = m.avg_to || '';
-  $('gAvgFrom').innerHTML = dayOptions;
-  $('gAvgTo').innerHTML = dayOptions;
   $('gAvgFrom').value = GANTT.avgFrom;
   $('gAvgTo').value = GANTT.avgTo;
   $('gWindow').innerHTML = Object.entries(m.windows || {}).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
@@ -2196,12 +2200,18 @@ function showGanttDetail(idx) {
 
 function bindGantt() {
   const reload = () => { loadSummary(false); };
-  $('gDate').addEventListener('change', () => { GANTT.date = $('gDate').value; reload(); });
+  // Пустое значение (стёрли дату в календаре) не применяем — возвращаем прежнее.
+  const pickDate = (id, key) => $(id).addEventListener('change', () => {
+    if (!$(id).value) { $(id).value = GANTT[key]; return; }
+    GANTT[key] = $(id).value;
+    reload();
+  });
+  pickDate('gDate', 'date');
   $('gWindow').addEventListener('change', () => { GANTT.window = $('gWindow').value; reload(); });
   $('gProduct').addEventListener('change', () => { GANTT.product = $('gProduct').value; reload(); });
   $('gEquipment').addEventListener('change', () => { GANTT.equipment = $('gEquipment').value; reload(); });
-  $('gAvgFrom').addEventListener('change', () => { GANTT.avgFrom = $('gAvgFrom').value; reload(); });
-  $('gAvgTo').addEventListener('change', () => { GANTT.avgTo = $('gAvgTo').value; reload(); });
+  pickDate('gAvgFrom', 'avgFrom');
+  pickDate('gAvgTo', 'avgTo');
   $('gSearch').addEventListener('input', () => {
     GANTT.search = $('gSearch').value;
     GANTT.searchFold.clear();
@@ -2209,10 +2219,10 @@ function bindGantt() {
     if (ganttData) renderAverages(ganttData);
   });
   const step = (dir) => {
-    const opts = Array.from($('gDate').options).map((o) => o.value);
-    const i = opts.indexOf(GANTT.date);
-    const j = i - dir;  // список по убыванию дат
-    if (j >= 0 && j < opts.length) { GANTT.date = opts[j]; $('gDate').value = GANTT.date; reload(); }
+    // ближайший день с данными до/после выбранного (выбранный в календаре мог быть и без данных)
+    const days = GANTT.days || [];
+    const next = dir > 0 ? days.find((d) => d > GANTT.date) : days.slice().reverse().find((d) => d < GANTT.date);
+    if (next) { GANTT.date = next; $('gDate').value = next; reload(); }
   };
   $('gPrev').addEventListener('click', () => step(-1));
   $('gNext').addEventListener('click', () => step(1));

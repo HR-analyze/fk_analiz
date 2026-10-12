@@ -488,7 +488,7 @@ body.modal-open{overflow:hidden}
 .gantt-tools .filters-body{padding:0 20px 10px}
 .g-day{display:flex;gap:6px;align-items:stretch}
 .g-day .btn{padding:8px 12px;font-size:18px;line-height:1}
-.g-day select{min-width:132px}
+.g-day input{min-width:150px}
 .g-sections{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px}
 .g-chat-warn{margin:12px 20px 0;padding:9px 12px;border-radius:10px;background:#fff7e6;border:1px solid #f5d48a;color:#7a4b00;
   font-size:13px;line-height:1.45}
@@ -608,7 +608,7 @@ body.modal-open{overflow:hidden}
   .gantt-tools .filters-body{padding:0 14px 10px}
   .g-sections{padding:0 14px}
   .g-chat-warn{margin:10px 14px 0}
-  .g-day select{min-width:0;flex:1}
+  .g-day input{min-width:0;flex:1}
   .gantt-tools .field:first-child{flex:1 1 100%}
   .g-day .btn{min-height:44px}
   .g-sec{min-height:44px}

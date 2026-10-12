@@ -438,11 +438,11 @@
     <div class="filters-body">
       <label class="field" data-gonly="day"><span>Рабочие сутки</span>
         <span class="g-day"><button class="btn" type="button" id="gPrev" aria-label="Предыдущие сутки">‹</button>
-        <select id="gDate"></select>
+        <input type="date" id="gDate">
         <button class="btn" type="button" id="gNext" aria-label="Следующие сутки">›</button></span></label>
       <label class="field" data-gonly="day"><span>Окно</span><select id="gWindow"></select></label>
-      <label class="field" data-gonly="avg" hidden><span>Среднее с</span><select id="gAvgFrom"></select></label>
-      <label class="field" data-gonly="avg" hidden><span>по</span><select id="gAvgTo"></select></label>
+      <label class="field" data-gonly="avg" hidden><span>Среднее с</span><input type="date" id="gAvgFrom"></label>
+      <label class="field" data-gonly="avg" hidden><span>по</span><input type="date" id="gAvgTo"></label>
       <label class="field"><span>Продукт (единый)</span><select id="gProduct"><option value="all">Все</option></select></label>
       <label class="field"><span>Оборудование</span><select id="gEquipment"><option value="all">Все</option></select></label>
       <label class="field"><span>Поиск</span><input type="search" id="gSearch" placeholder="продукт или операция" autocomplete="off"></label>
