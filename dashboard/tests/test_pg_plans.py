@@ -51,8 +51,9 @@ class PlanDatabaseTests(unittest.TestCase):
         plans.PG_PLANS = True
         product_map.init_storage()
         store.save({"2026-10-20":{"line|bread":5}}, "plan.xlsx")
-        product_map.save({"bhm":{"Батон / ромашка":"Батон классический"}}, "map.xlsx")
+        product_map.save({"bhm":{"Батон / ромашка":"Батон классический"}}, "map.xlsx", {"kc":{"Начинка":"Внесение начинки"}})
         self.assertEqual(product_map.load()["map"], {"bhm":{"Батон / ромашка":"Батон классический"}})
+        self.assertEqual(product_map.load()["ops"], {"kc":{"Начинка":"Внесение начинки"}})
         self.assertEqual(store.load()["2026-10-20"]["line|bread"], 5)  # планы не задеты
         product_map.save({}, "")
 

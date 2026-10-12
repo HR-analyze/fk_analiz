@@ -23,7 +23,7 @@ WIDTHS = [(360, "малый телефон"), (390, "iPhone"), (414, "больш
           (768, "планшет"), (1024, "ноутбук"), (1440, "десктоп"), (1920, "широкий")]
 TABS = ["dashboard", "plan", "history"]
 # У расстойки свои вкладки: сводка и таблица партий.
-SOURCE_TABS = {"bhm": ["dashboard"], "proofing": ["proofing", "batches"], "kc": ["kc", "kcops", "kcnorms"], "gantt": ["gantt", "timing", "gmap"]}
+SOURCE_TABS = {"bhm": ["dashboard"], "proofing": ["proofing", "batches"], "kc": ["kc", "kcops", "kcnorms"], "gantt": ["gantt", "timing", "gavg", "gmap"]}
 
 # Поломка вёрстки часто живёт МЕЖДУ типовыми разрешениями: на 390px шрифт уже
 # ужат медиазапросом, на 1440px места вдоволь, а на 820px значение не влезает.

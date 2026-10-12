@@ -182,7 +182,7 @@ async def meta(request):
             "source": {"mode": "gantt"}, "source_key": key, "sources": sources_state(), "units": src["units"],
             "plan_enabled": False, "plan_upload_enabled": bool(plan_store.PLAN_UPLOAD_TOKEN),
             "equipment": [], "employees": [],
-            **gantt.meta(bars, KC_CHAT_HISTORY, stored["map"], errors),
+            **gantt.meta(bars, KC_CHAT_HISTORY, stored["map"], errors, stored["ops"]),
         }))
     if src.get("kind") == "kc":
         snapshot = await kc_snapshot()
@@ -390,11 +390,23 @@ async def collect_gantt(request, key, src):
     sections = [x for x in (q.get("sections") or "").split(",") if x in product_map.SECTIONS] or list(product_map.SECTIONS)
     product = (q.get("product") or "all").strip() or "all"
     equipment = (q.get("equipment") or "all").strip() or "all"
+    avg = []
+    for name in ("avg_from", "avg_to"):
+        value = (q.get(name) or "").strip()
+        try:
+            datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            value = ""
+        avg.append(value)
+    if not all(avg):
+        avg = list(gantt.default_avg_range(days))
     payload = gantt.build(bars, KC_CHAT_HISTORY, stored["map"], day, mode, sections, product, equipment,
-                          now=datetime.now(TZ), section_errors=errors)
+                          now=datetime.now(TZ), section_errors=errors, ops_map=stored["ops"],
+                          avg_from=avg[0], avg_to=avg[1])
     payload.update(source={"mode": "gantt"}, source_key=key, source_title=src["title"], units=src["units"],
                    plan_enabled=False, excluded_dates=[], map_updated=stored.get("updated_at", ""),
-                   map_size=sum(len(v) for v in stored["map"].values()))
+                   map_size=sum(len(v) for v in stored["map"].values()),
+                   ops_map_size=sum(len(v) for v in stored["ops"].values()))
     filters = [
         ("Раздел", "Гант — все цеха"),
         ("Дата (рабочие сутки)", day),
@@ -402,6 +414,7 @@ async def collect_gantt(request, key, src):
         ("Цеха", ", ".join(GANTT_SECTION_TITLES[s] for s in sections)),
         ("Продукт (единый)", "все" if product == "all" else product),
         ("Оборудование", "все" if equipment == "all" else equipment),
+        ("Среднее по продукту за", f"{payload['averages']['from']} — {payload['averages']['to']}"),
     ]
     stamp = {"date_from": day, "date_to": mode, "equipment": equipment, "product": product, "employee": "all",
              "shift": "all", "hour": "", "source": key}
@@ -544,7 +557,7 @@ async def export_gantt(request, kind):
     name = f"gantt_{args['date_from']}_{args['date_to']}"
     if kind == "xlsx":
         stored = await asyncio.to_thread(product_map.load)
-        blob = await asyncio.to_thread(gantt_exports.build_xlsx, payload, filters, stored["map"])
+        blob = await asyncio.to_thread(gantt_exports.build_xlsx, payload, filters, stored["map"], stored["ops"])
         return _attachment(blob, f"{name}.xlsx", XLSX_TYPE)
     blob = await asyncio.to_thread(gantt_exports.build_pdf, payload, gantt_exports.build_analysis(payload, filters), filters)
     return _attachment(blob, f"{name}.pdf", "application/pdf")
@@ -552,15 +565,24 @@ async def export_gantt(request, kind):
 
 async def gantt_map_state(request):
     bars, stored, _ = await gantt_data()
+    products, operations = gantt.known_products(bars), gantt.known_operations(bars)
+
+    def hints():  # попарное сравнение названий — не в цикле событий
+        return (product_map.similar([n for names in products.values() for n in names]),
+                {sec: product_map.similar(list(ops), product_map.SIMILAR_OPS_RATIO) for sec, ops in operations.items()})
+    similar, similar_ops = await asyncio.to_thread(hints)
     return no_store(web.json_response({
         "ok": True, "upload_enabled": bool(plan_store.PLAN_UPLOAD_TOKEN), "map": stored["map"],
         "updated_at": stored.get("updated_at", ""), "file": stored.get("file", ""),
-        "products": gantt.known_products(bars), "sections": product_map.SECTIONS}))
+        "products": products, "sections": product_map.SECTIONS, "ops": stored["ops"],
+        "operations": {sec: sorted(ops) for sec, ops in operations.items()},
+        "similar": similar, "similar_ops": similar_ops}))
 
 
 async def gantt_map_template(request):
     bars, stored, _ = await gantt_data()
-    blob = await asyncio.to_thread(product_map.template_xlsx, gantt.known_products(bars), stored["map"])
+    blob = await asyncio.to_thread(product_map.template_xlsx, gantt.known_products(bars), stored["map"],
+                                   gantt.known_operations(bars), stored["ops"])
     return _attachment(blob, "spravochnik_produktov.xlsx", XLSX_TYPE)
 
 
@@ -587,12 +609,13 @@ async def gantt_map_upload(request):
         buffer.write(chunk)
     buffer.seek(0)
     try:
-        mapping, count = await asyncio.to_thread(product_map.parse_xlsx, buffer)
+        parsed = await asyncio.to_thread(product_map.parse_workbook, buffer)
     except product_map.MapError as exc:
         return web.json_response({"ok": False, "error": str(exc)}, status=400)
-    stored = await asyncio.to_thread(product_map.save, mapping, field.filename or "")
-    log.info("product map uploaded: file=%s pairs=%s", field.filename, count)
-    return no_store(web.json_response({"ok": True, "pairs": count, "updated_at": stored["updated_at"]}))
+    stored = await asyncio.to_thread(product_map.save, parsed["map"], field.filename or "", parsed["ops"])
+    log.info("product map uploaded: file=%s pairs=%s op_pairs=%s", field.filename, parsed["pairs"], parsed["op_pairs"])
+    return no_store(web.json_response({"ok": True, "pairs": parsed["pairs"], "op_pairs": parsed["op_pairs"],
+                                       "updated_at": stored["updated_at"]}))
 
 
 async def proofing_photo(request):

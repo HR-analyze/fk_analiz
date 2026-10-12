@@ -1,7 +1,8 @@
 """Диаграмма Ганта и общий тайминг по всем цехам. Чистые функции над снимками источников.
 
 Одна полоса = одна операция: продукт · операция · люди · выработка · оборудование.
-Источники: ФК (формовка), БХМ (тесто), расстойка (расстойка и отпекание), КЦ (бот + разобранный
+Строки сгруппированы: цех → продукт (сворачивается) → его операции.
+Источники: формовка (бот ФК), БХМ (тесто), расстойка (расстойка и отпекание), КЦ (бот + разобранный
 чат Telegram до запуска бота). Фасовки пока нет ни в одном боте — этап заложен, данных нет.
 
 Правила:
@@ -12,22 +13,27 @@
   (рисуется только отметка начала, длительность не считается);
 - общий тайминг связывает цеха по ЕДИНОМУ продукту (справочник соответствий), а не по
   номеру партии: у ботов нет общего идентификатора партии;
-- выработку разных единиц (шт, кг, пласты…) не складываем.
+- выработку разных единиц (шт, кг, пласты…) не складываем, штуки разных операций — тоже:
+  выработка на человека считается по строке операции, а у продукта — только если операция одна;
+- «людей» у продукта — максимум одновременно занятых (имён в чате нет, сумма по операциям
+  посчитала бы одного человека несколько раз);
+- среднее по продукту — по рабочим суткам 08–08: каждая операция от начала работы с продуктом
+  в эти сутки, затем усреднение по дням.
 """
 import json
 import os
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, datetime, time as dtime, timedelta
 from pathlib import Path
 
 from aggregate import duration_min, parse_hhmm
-from product_map import SECTIONS, unify
+from product_map import SECTIONS, norm
 from sources import TZ, _as_local
 
 HISTORY_FILE = os.getenv("KC_CHAT_HISTORY_FILE", str(Path(__file__).parent / "kc_chat_history.json"))
 STAGES = [
     {"key": "bhm", "title": "БХМ · тесто"},
-    {"key": "fk", "title": "ФК · формовка"},
+    {"key": "fk", "title": "Формовка"},
     {"key": "proofing", "title": "Расстойка"},
     {"key": "baking", "title": "Отпекание"},
     {"key": "kc", "title": "КЦ · кондитерка"},
@@ -37,6 +43,9 @@ STAGE_INDEX = {s["key"]: i for i, s in enumerate(STAGES)}
 WINDOWS = {"full": ("Сутки 08:00–08:00", 8, 24), "day": ("День 08:00–20:00", 8, 12),
            "night": ("Ночь 20:00–08:00", 20, 12), "calendar": ("Календарные сутки 00–24", 0, 24)}
 RATE_UNITS = {"шт", "кг"}
+CHAT_NOTE = ("Данные КЦ неточные: до запуска бота КЦ они вручную разобраны из переписки в Telegram. "
+             "Время — по сообщениям (часто это время отправки, а не начала или конца), людей и количество "
+             "писали не всегда. Годятся для общей картины, не для норм.")
 
 
 def load_history(path=None):
@@ -227,9 +236,7 @@ def available_days(bars_by_section, handoffs=()):
     days = set()
     for bars in bars_by_section.values():
         for b in bars:
-            local = b["start"].astimezone(TZ)
-            # рабочие сутки 08–08: ночь до 08:00 относится к прошлой дате
-            days.add((local - timedelta(hours=8)).date().isoformat())
+            days.add(_work_day(b["start"]))
     return sorted(days)
 
 
@@ -312,22 +319,226 @@ def timing_block(bars, handoffs, start, end, now):
     return rows
 
 
+class Namer:
+    """Единые названия продуктов и операций: справочник, затем автоматическое сведение
+    написаний (регистр, «ё», пробелы, знаки) к самому частому варианту. Результаты кешируются:
+    на запрос — тысячи операций с повторяющимися названиями."""
+
+    def __init__(self, bars_by_section, history=None, mapping=None, ops_map=None):
+        self._maps = {"p": self._index(mapping), "o": self._index(ops_map)}
+        self._memo = {}
+        products, ops = defaultdict(Counter), defaultdict(Counter)
+        for sec, bars in bars_by_section.items():
+            for b in bars:
+                u = self._unify("p", sec, b["product"])
+                products[norm(u)][u] += 1
+                o = self._unify("o", sec, b["operation"])
+                ops[(sec, norm(o))][o] += 1
+        for h in (history or {}).get("handoffs", []):
+            u = self._unify("p", "kc", h["product"])
+            products[norm(u)][u] += 1
+        pick = lambda c: sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]  # noqa: E731
+        self._products = {k: pick(c) for k, c in products.items()}
+        self._ops = {k: pick(c) for k, c in ops.items()}
+
+    @staticmethod
+    def _index(mapping):
+        """{section: (точные, по norm)} — то же, что product_map.unify, без перебора на каждый вызов."""
+        return {sec: (dict(items), {norm(k): v for k, v in items.items()}) for sec, items in (mapping or {}).items()}
+
+    def _unify(self, kind, section, name):
+        key = (kind, section, name)
+        if key not in self._memo:
+            exact, by_norm = self._maps[kind].get(section, ({}, {}))
+            self._memo[key] = exact.get(name) or by_norm.get(norm(name)) or name
+        return self._memo[key]
+
+    def product(self, section, name):
+        u = self._unify("p", section, name)
+        return self._products.get(norm(u), u)
+
+    def operation(self, section, name):
+        o = self._unify("o", section, name)
+        return self._ops.get((section, norm(o)), o)
+
+    def apply(self, b):
+        return dict(b, unified=self.product(b["section"], b["product"]), operation=self.operation(b["section"], b["operation"]),
+                    operation_raw=b["operation"])
+
+
+def _work_day(dt):
+    """Рабочие сутки 08–08: ночь до 08:00 относится к прошлой дате."""
+    return (dt.astimezone(TZ) - timedelta(hours=8)).date().isoformat()
+
+
+def _timed(b):
+    """Операция с честной длительностью: конец отмечен и время не некорректное."""
+    return b["end"] is not None and b["flag"] != "invalid" and b["end"] > b["start"]
+
+
+def _rate_stats(items):
+    """Выработка группы операций: Σшт/Σчел·ч (где люди известны) и Σшт/Σч. Единицы не смешиваются:
+    берётся основная единица группы."""
+    timed = [b for b in items if _timed(b) and b["qty"] and b["unit"] in RATE_UNITS]
+    if not timed:
+        return {"rate": None, "rate_per_person": None, "rate_unit": ""}
+    unit = Counter(b["unit"] for b in timed).most_common(1)[0][0]
+    timed = [b for b in timed if b["unit"] == unit]
+    hours = sum((b["end"] - b["start"]).total_seconds() / 3600 for b in timed)
+    with_people = [b for b in timed if b["people"]]
+    ph = sum((b["end"] - b["start"]).total_seconds() / 3600 * b["people"] for b in with_people)
+    return {"rate": round(sum(b["qty"] for b in timed) / hours, 1) if hours else None,
+            "rate_per_person": round(sum(b["qty"] for b in with_people) / ph, 1) if ph else None,
+            "rate_unit": unit}
+
+
+def _person_hours(items):
+    v = sum((b["end"] - b["start"]).total_seconds() / 3600 * b["people"] for b in items if _timed(b) and b["people"])
+    return round(v, 2) if v else None
+
+
+def _qty_groups(items):
+    qty = defaultdict(float)
+    for b in items:
+        if b["qty"] and b["end"]:
+            qty[b["unit"] or "ед."] += b["qty"]
+    return qty
+
+
+def _peak_people(items, now):
+    """Максимум людей, одновременно занятых продуктом (по операциям с известным числом людей)."""
+    events = []
+    for b in items:
+        e = bar_end(b, now)
+        if b["people"] and e and e > b["start"]:
+            events += [(b["start"], 1, b["people"]), (e, 0, -b["people"])]
+    cur = best = 0
+    for _, _, d in sorted(events):  # конец раньше начала в ту же минуту — эстафета, не параллель
+        cur += d
+        best = max(best, cur)
+    return best or None
+
+
+def _row_stats(items, now, clip=None):
+    """clip=(start, end): «занято» считается внутри окна, а не за все дни идущей операции."""
+    people = [b["people"] for b in items if b["people"]]
+    intervals = [(b["start"], bar_end(b, now)) for b in items if bar_end(b, now)]
+    if clip:
+        intervals = [(max(s, clip[0]), min(e, clip[1])) for s, e in intervals if min(e, clip[1]) > max(s, clip[0])]
+    return {"people": max(people) if people else None, "person_hours": _person_hours(items),
+            "qty": _qty_text(_qty_groups(items)), "busy_min": round(_union_minutes(intervals)) if intervals else None,
+            "equipment": ", ".join(sorted({b["equipment"] for b in items if b["equipment"]})), **_rate_stats(items)}
+
+
+def averages(bars_by_section, namer, day_from, day_to, sections=None, product="all", equipment="all", now=None):
+    """Средний день продукта за период: когда от начала работы с продуктом идёт каждая операция
+    и этап и сколько длится. Каждые рабочие сутки продукта — один «прогон»."""
+    now = now or datetime.now(TZ)
+    sections = [s for s in (sections or list(SECTIONS)) if s in SECTIONS]
+    runs = defaultdict(list)
+    for sec in sections:
+        for b in bars_by_section.get(sec, []):
+            b = namer.apply(b)
+            if product not in ("all", "") and b["unified"] != product:
+                continue
+            if equipment not in ("all", "") and b["equipment"] != equipment:
+                continue
+            day = _work_day(b["start"])
+            if day_from <= day <= day_to:
+                runs[(b["unified"], day)].append(b)
+    by_product = defaultdict(dict)
+    for (prod, day), items in runs.items():
+        by_product[prod][day] = items
+
+    def avg(values):
+        values = [v for v in values if v is not None]
+        return round(sum(values) / len(values), 1) if values else None
+
+    out = []
+    for prod, days in by_product.items():
+        leads, phs, op_runs, stage_runs = [], [], defaultdict(list), defaultdict(list)
+        for day, items in days.items():
+            t0 = min(b["start"] for b in items)
+            timed = [b for b in items if _timed(b)]
+            if timed:
+                leads.append((max(b["end"] for b in timed) - t0).total_seconds() / 60)
+            phs.append(_person_hours(items))
+            groups = defaultdict(list)
+            for b in items:
+                groups[(b["stage"], b["section"], b["operation"])].append(b)
+            for key, ops in groups.items():
+                t = [b for b in ops if _timed(b)]
+                op_runs[key].append({
+                    "offset": (min(b["start"] for b in ops) - t0).total_seconds() / 60,
+                    "span": (max(b["end"] for b in t) - min(b["start"] for b in t)).total_seconds() / 60 if t else None,
+                    "busy": _union_minutes([(b["start"], b["end"]) for b in t]) if t else None,
+                    "people": max((b["people"] for b in ops if b["people"]), default=None),
+                    "items": ops})
+            stage_items = defaultdict(list)
+            for b in items:
+                stage_items[b["stage"]].append(b)
+            for st, ops in stage_items.items():
+                t = [b for b in ops if _timed(b)]
+                stage_runs[st].append({
+                    "offset": (min(b["start"] for b in ops) - t0).total_seconds() / 60,
+                    "span": (max(b["end"] for b in t) - min(b["start"] for b in t)).total_seconds() / 60 if t else None,
+                    "busy": _union_minutes([(b["start"], b["end"]) for b in t]) if t else None})
+        ops_out = []
+        for (stage, sec, op), rs in op_runs.items():
+            items = [b for r in rs for b in r["items"]]
+            qty = _qty_groups(items)
+            ops_out.append({
+                "stage": stage, "stage_title": STAGES[STAGE_INDEX[stage]]["title"], "section": sec,
+                "section_title": SECTIONS[sec], "operation": op, "days": len(rs),
+                "offset_min": avg(r["offset"] for r in rs), "span_min": avg(r["span"] for r in rs),
+                "busy_min": avg(r["busy"] for r in rs), "people_avg": avg(r["people"] for r in rs),
+                "qty_day": _qty_text({u: q / len(rs) for u, q in qty.items()}),
+                "no_end": sum(1 for b in items if not _timed(b)),
+                "from_chat": sum(1 for b in items if b["source"] == "chat"),
+                "equipment": ", ".join(sorted({b["equipment"] for b in items if b["equipment"]})),
+                **_rate_stats(items)})
+        ops_out.sort(key=lambda o: (STAGE_INDEX[o["stage"]], o["offset_min"] if o["offset_min"] is not None else 0, o["operation"].lower()))
+        stages_out = [{"key": st["key"], "title": st["title"], "days": len(stage_runs[st["key"]]),
+                       "offset_min": avg(r["offset"] for r in stage_runs[st["key"]]),
+                       "span_min": avg(r["span"] for r in stage_runs[st["key"]]),
+                       "busy_min": avg(r["busy"] for r in stage_runs[st["key"]])}
+                      for st in STAGES if stage_runs.get(st["key"])]
+        out.append({"product": prod, "days": len(days), "day_list": sorted(days),
+                    "lead_min": avg(leads), "lead_min_min": round(min(leads)) if leads else None,
+                    "lead_min_max": round(max(leads)) if leads else None,
+                    "person_hours_day": avg(phs), "stages": stages_out, "ops": ops_out,
+                    "from_chat": sum(o["from_chat"] for o in ops_out),
+                    "sections": sorted({SECTIONS[o["section"]] for o in ops_out}, key=list(SECTIONS.values()).index)})
+    out.sort(key=lambda r: (-r["days"], -len(r["stages"]), r["product"].lower()))
+    return {"from": day_from, "to": day_to, "products": out,
+            "days": len({d for days in by_product.values() for d in days})}
+
+
+def default_avg_range(days, span=7):
+    if not days:
+        return "", ""
+    last = date.fromisoformat(days[-1])
+    first = max(date.fromisoformat(days[0]), last - timedelta(days=span - 1))
+    return first.isoformat(), last.isoformat()
+
+
 def build(bars_by_section, history, mapping, day, mode="full", sections=None, product="all", equipment="all",
-          now=None, section_errors=None):
+          now=None, section_errors=None, ops_map=None, avg_from=None, avg_to=None):
     now = now or datetime.now(TZ)
     sections = [s for s in (sections or list(SECTIONS)) if s in SECTIONS]
     start, end = window_bounds(day, mode)
+    namer = Namer(bars_by_section, history, mapping, ops_map)
     bars = []
     for sec in sections:
         for b in bars_by_section.get(sec, []):
-            b = dict(b, unified=unify(mapping, sec, b["product"]))
+            b = namer.apply(b)
             if product not in ("all", "") and b["unified"] != product:
                 continue
             if equipment not in ("all", "") and b["equipment"] != equipment:
                 continue
             if _overlaps(b, start, end, now):
                 bars.append(b)
-    handoffs = [dict(h, unified=unify(mapping, "kc", h["product"])) for h in handoff_events(history)] if "kc" in sections else []
+    handoffs = [dict(h, unified=namer.product("kc", h["product"])) for h in handoff_events(history)] if "kc" in sections else []
     if product not in ("all", ""):
         handoffs = [h for h in handoffs if h["unified"] == product]
 
@@ -341,8 +552,21 @@ def build(bars_by_section, history, mapping, day, mode="full", sections=None, pr
                                                                        min(b["start"] for b in kv[1]), kv[0][2].lower())):
         lanes = _lanes(items, now)
         out_rows.append({"section": sec, "section_title": SECTIONS[sec], "product": prod, "operation": op,
-                         "lanes": lanes, "equipment": ", ".join(sorted({b["equipment"] for b in items if b["equipment"]})),
+                         "lanes": lanes, "runs": len(items), **_row_stats(items, now, (start, end)),
                          "bars": [dict(view(b, now), lane=b["lane"]) for b in sorted(items, key=lambda x: x["start"])]})
+    # Строка продукта (сворачиваемая): итог по его операциям в цехе.
+    products = []
+    for (sec, prod), items in sorted(_group(bars, lambda b: (b["section"], b["unified"])).items(),
+                                     key=lambda kv: (order[kv[0][0]], kv[0][1].lower())):
+        ops = sorted({b["operation"] for b in items})
+        stats = _row_stats(items, now, (start, end))
+        if len(ops) > 1:  # штуки разных операций не складываем в «выработку продукта»
+            stats.update(rate=None, rate_per_person=None, qty="")
+        known = [bar_end(b, now) for b in items if bar_end(b, now)]
+        products.append({"section": sec, "section_title": SECTIONS[sec], "product": prod, "ops": len(ops),
+                         "runs": len(items), **stats, "people": _peak_people(items, now),
+                         "people_ops": sum(r["people"] or 0 for r in out_rows if r["section"] == sec and r["product"] == prod) or None,
+                         "start": _iso(min(b["start"] for b in items)), "end": _iso(max(known)) if known else ""})
     closed = [b for b in bars if b["end"]]
     totals = {
         "ops": len(bars), "closed": len(closed), "open": len(bars) - len(closed),
@@ -352,28 +576,56 @@ def build(bars_by_section, history, mapping, day, mode="full", sections=None, pr
         "by_section": {SECTIONS[s]: sum(1 for b in bars if b["section"] == s) for s in sections},
         "from_chat": sum(1 for b in bars if b["source"] == "chat"),
         "check": sum(1 for b in bars if b["flag"] == "check"),
+        "products": len({b["unified"] for b in bars}),
     }
     in_window = [h for h in handoffs if start <= h["at"] < end]
+    days = available_days(bars_by_section)
+    if not avg_from or not avg_to:
+        avg_from, avg_to = default_avg_range(days)
+    if avg_from > avg_to:
+        avg_from, avg_to = avg_to, avg_from
     return {
         "kind": "gantt",
         "day": day, "window": mode, "window_title": WINDOWS.get(mode, WINDOWS["full"])[0],
         "start": _iso(start), "end": _iso(end), "now": _iso(now),
         "sections": sections, "section_errors": section_errors or {},
-        "rows": out_rows, "totals": totals,
+        "rows": out_rows, "products": products, "totals": totals,
         "timing": timing_block(bars, handoffs, start, end, now),
+        "averages": averages(bars_by_section, namer, avg_from, avg_to, sections, product, equipment, now),
         "handoffs": [{"product": h["unified"], "time": h["at"].astimezone(TZ).strftime("%d.%m %H:%M"), "qty": h["qty"],
                       "unit": h["unit"], "exact": h["exact"]} for h in in_window],
         "stages": STAGES,
         "history_source": (history or {}).get("source", ""),
+        "chat_note": CHAT_NOTE if (history or {}).get("operations") and "kc" in sections else "",
     }
 
 
-def meta(bars_by_section, history, mapping, section_errors=None):
+def _group(items, key):
+    out = defaultdict(list)
+    for x in items:
+        out[key(x)].append(x)
+    return out
+
+
+def known_operations(bars_by_section):
+    """{section: {operation: [products]}} — для листа «Операции» шаблона справочника."""
+    out = defaultdict(lambda: defaultdict(set))
+    for sec, bars in bars_by_section.items():
+        for b in bars:
+            out[sec][b["operation"]].add(b["product"])
+    return {sec: {op: sorted(ps) for op, ps in ops.items()} for sec, ops in out.items()}
+
+
+def meta(bars_by_section, history, mapping, section_errors=None, ops_map=None):
     days = available_days(bars_by_section)
-    unified = sorted({unify(mapping, sec, b["product"]) for sec, bars in bars_by_section.items() for b in bars}, key=str.lower)
+    namer = Namer(bars_by_section, history, mapping, ops_map)
+    unified = sorted({namer.product(sec, b["product"]) for sec, bars in bars_by_section.items() for b in bars}, key=str.lower)
     equipment = sorted({b["equipment"] for bars in bars_by_section.values() for b in bars if b["equipment"]}, key=str.lower)
+    avg_from, avg_to = default_avg_range(days)
     return {"days": days, "date_min": days[0] if days else "", "date_max": days[-1] if days else "",
+            "avg_from": avg_from, "avg_to": avg_to,
             "products": unified, "equipment": equipment, "windows": {k: v[0] for k, v in WINDOWS.items()},
             "sections_list": [{"key": k, "title": v} for k, v in SECTIONS.items()],
             "section_errors": section_errors or {}, "history_source": (history or {}).get("source", ""),
-            "history_ops": len((history or {}).get("operations", []))}
+            "history_ops": len((history or {}).get("operations", [])),
+            "chat_note": CHAT_NOTE if (history or {}).get("operations") else ""}

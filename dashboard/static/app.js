@@ -572,14 +572,14 @@ async function switchSource(next) {
 
 /* ─── вкладки ─────────────────────────────────────────────────────────────── */
 
-const TABS = ['dashboard', 'plan', 'history', 'proofing', 'batches', 'kc', 'kcops', 'kcnorms', 'gantt', 'timing', 'gmap'];
+const TABS = ['dashboard', 'plan', 'history', 'proofing', 'batches', 'kc', 'kcops', 'kcnorms', 'gantt', 'timing', 'gavg', 'gmap'];
 let activeTab = 'dashboard';
 
 // У ФК и БХМ — дашборд (+ план у ФК), у расстойки — «Сводка» и «Партии».
 function allowedTabs() {
   if (isProofing()) return ['proofing', 'batches'];
   if (isKc()) return ['kc', 'kcops', 'kcnorms'];
-  if (isGantt()) return ['gantt', 'timing', 'gmap'];
+  if (isGantt()) return ['gantt', 'timing', 'gavg', 'gmap'];
   return planEnabled() ? ['dashboard', 'plan', 'history'] : ['dashboard'];
 }
 
@@ -596,7 +596,9 @@ function showTab(name, push = true) {
   // Фильтры не относятся к журналу загрузок — там они только путают. У Ганта — своя панель.
   $('filterPanel').hidden = name === 'history' || isGantt();
   $('chips').hidden = name === 'history' || isGantt() || !activeFilters().length;
-  $('gTools').hidden = !(isGantt() && (name === 'gantt' || name === 'timing'));
+  $('gTools').hidden = !(isGantt() && (name === 'gantt' || name === 'timing' || name === 'gavg'));
+  // У среднего по продукту — период, у диаграммы и тайминга — сутки и окно.
+  document.querySelectorAll('[data-gonly]').forEach((f) => { f.hidden = (f.dataset.gonly === 'avg') !== (name === 'gavg'); });
   if (name === 'gmap') loadGanttMap();
   if (push && location.hash.slice(1) !== name) history.replaceState(null, '', '#' + name);
   store.set('fk_tab', name);
@@ -1748,9 +1750,11 @@ function bindKc() {
 
 /* ─── Гант: все цеха на одной шкале + общий тайминг ───────────────────────── */
 
-const GANTT = { date: '', window: 'full', sections: ['bhm', 'fk', 'proofing', 'kc'], product: 'all', equipment: 'all', search: '' };
+const GANTT = { date: '', window: 'full', sections: ['bhm', 'fk', 'proofing', 'kc'], product: 'all', equipment: 'all', search: '',
+  avgFrom: '', avgTo: '', collapsed: new Set(), avgOpen: new Set() };
 const G_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', kc: '#7c5cf5' };
 const G_STAGE_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', baking: '#0f766e', kc: '#7c5cf5', pack: '#9ca3af' };
+const G_NAMES = { bhm: 'БХМ', fk: 'Формовка', proofing: 'Расстойка', kc: 'КЦ' };
 let ganttData = null;
 
 function showGanttError(message) {
@@ -1762,6 +1766,7 @@ function ganttQuery(force) {
   const p = new URLSearchParams({ source: 'gantt', window: GANTT.window, sections: GANTT.sections.join(','),
     product: GANTT.product, equipment: GANTT.equipment });
   if (GANTT.date) p.set('date', GANTT.date);
+  if (GANTT.avgFrom && GANTT.avgTo) { p.set('avg_from', GANTT.avgFrom); p.set('avg_to', GANTT.avgTo); }
   if (force) p.set('refresh', '1');
   return p.toString();
 }
@@ -1769,9 +1774,16 @@ function ganttQuery(force) {
 function fillGanttTools(m) {
   const days = (m.days || []).slice().reverse();
   if (!GANTT.date || !days.includes(GANTT.date)) GANTT.date = days[0] || '';
-  $('gDate').innerHTML = days.map((d) => `<option value="${esc(d)}">${esc(d.split('-').reverse().join('.'))}</option>`).join('')
+  const dayOptions = days.map((d) => `<option value="${esc(d)}">${esc(d.split('-').reverse().join('.'))}</option>`).join('')
     || '<option value="">нет данных</option>';
+  $('gDate').innerHTML = dayOptions;
   $('gDate').value = GANTT.date;
+  if (!days.includes(GANTT.avgFrom)) GANTT.avgFrom = m.avg_from || '';
+  if (!days.includes(GANTT.avgTo)) GANTT.avgTo = m.avg_to || '';
+  $('gAvgFrom').innerHTML = dayOptions;
+  $('gAvgTo').innerHTML = dayOptions;
+  $('gAvgFrom').value = GANTT.avgFrom;
+  $('gAvgTo').value = GANTT.avgTo;
   $('gWindow').innerHTML = Object.entries(m.windows || {}).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
   $('gWindow').value = GANTT.window;
   fillSelect($('gProduct'), m.products || [], 'Все');
@@ -1790,9 +1802,10 @@ function fillGanttTools(m) {
 
 function gMinutes(iso, start) { return (new Date(iso) - start) / 60000; }
 
-function gHours(start, total) {
+function gHours(start, total, relative) {
   const out = [];
   for (let m = 0; m <= total; m += 60) {
+    if (relative) { out.push({ m, h: m / 60, rel: true }); continue; }
     const d = new Date(start.getTime() + m * 60000);
     const h = Number(new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', hourCycle: 'h23', timeZone: (meta && meta.timezone) || undefined }).format(d));
     out.push({ m, h });
@@ -1806,28 +1819,51 @@ function gBarText(b) {
 
 function gBarTip(b) {
   const end = b.end_time || (b.running ? 'идёт' : 'конец не отмечен');
-  return [`${b.section_title} · ${b.product} — ${b.operation}`,
+  return [`${b.section_title} · ${b.unified || b.product} — ${b.operation}`,
     `${b.start_time}–${end}${none(b.duration_min) ? '' : ' (' + hm(b.duration_min) + ')'}`,
     b.people ? `людей: ${b.people}${none(b.person_hours) ? '' : ', чел·ч ' + dec(b.person_hours)}` : 'людей: нет данных',
     b.qty ? `выработка: ${num(b.qty)} ${b.unit}${none(b.rate) ? '' : ` · ${dec(b.rate)} ${b.unit}/ч`}${none(b.rate_per_person) ? '' : ` · ${dec(b.rate_per_person)} ${b.unit}/чел·ч`}` : 'выработка: нет данных',
     b.equipment ? `оборудование: ${b.equipment}` : '',
+    b.operation_raw && b.operation_raw !== b.operation ? `в источнике: «${b.operation_raw}»` : '',
+    b.unified && b.unified !== b.product ? `название в цехе: «${b.product}»` : '',
     b.source === 'chat' ? 'источник: чат КЦ' : '',
     b.flag === 'check' ? '⚠ время по времени сообщения' : (b.flag === 'invalid' ? '⚠ некорректное время — не в нормах' : ''),
     b.note || ''].filter(Boolean).join(' · ');
 }
 
-// rows: [{label, sub, color?, lanes, bars:[{start, draw_end, lane, color, cls, text, tip, idx}]}], groups — заголовки цехов.
-function ganttGrid(rows, wStart, wEnd, nowIso) {
+// Выработка в час на человека; людей нет в боте — в час на всех (бледно), разные операции — не складываем.
+function gRateCell(x, several) {
+  if (several) return '<span class="muted" title="Штуки разных операций не складываем — смотри по операциям">по операциям</span>';
+  if (!none(x.rate_per_person)) return `<b>${dec(x.rate_per_person)}</b> <small>${esc(x.rate_unit)}/чел·ч</small>`;
+  if (!none(x.rate)) return `<span class="muted" title="Людей в этом цехе бот не знает — выработка в час на всех">${dec(x.rate)} ${esc(x.rate_unit)}/ч</span>`;
+  return '<span class="muted">—</span>';
+}
+
+function gPeopleCell(x, product) {
+  if (none(x.people)) return '<span class="muted" title="Людей знают только КЦ (бот и чат)">—</span>';
+  const tip = product ? `Максимум одновременно занятых продуктом${x.people_ops ? `; сумма по операциям ${x.people_ops}` : ''}` : 'Людей на операции (максимум за запуск)';
+  return `<span title="${esc(tip)}">${num(x.people)}</span>`;
+}
+
+const G_COLS = ['Оборудование', 'Людей', 'Выработка в час на чел.'];
+
+// rows: [{label, sub, kind?: 'product'|'op', key?, open?, cols?:[html×3], mob?, mini?, lanes,
+//          bars:[{start, draw_end, lane, color, cls, text, tip, idx}]}] и {group, color} — заголовки цехов.
+function ganttGrid(rows, wStart, wEnd, nowIso, opts = {}) {
   const start = new Date(wStart);
   const total = (new Date(wEnd) - start) / 60000;
   const pct = (m) => Math.max(0, Math.min(100, m / total * 100));
-  const hours = gHours(start, total);
-  const ticks = hours.map((x) => `<span class="g-tick${x.h === 8 || x.h === 20 ? ' shift' : ''}" style="left:${pct(x.m)}%">${String(x.h).padStart(2, '0')}</span>`).join('');
+  const hours = gHours(start, total, opts.relative);
+  const ticks = hours.map((x) => `<span class="g-tick${!x.rel && (x.h === 8 || x.h === 20) ? ' shift' : ''}" style="left:${pct(x.m)}%">` +
+    `${x.rel ? (x.h ? '+' + x.h + 'ч' : '0') : String(x.h).padStart(2, '0')}</span>`).join('');
   const nowM = nowIso ? gMinutes(nowIso, start) : -1;
   const nowLine = nowM > 0 && nowM < total ? `<i class="g-now" style="left:${pct(nowM)}%" title="сейчас"></i>` : '';
-  const shiftLines = hours.filter((x) => (x.h === 8 || x.h === 20) && x.m > 0 && x.m < total)
+  const shiftLines = opts.relative ? '' : hours.filter((x) => (x.h === 8 || x.h === 20) && x.m > 0 && x.m < total)
     .map((x) => `<i class="g-shift" style="left:${pct(x.m)}%"></i>`).join('');
-  let html = `<div class="gantt" style="--hours:${Math.round(total / 60)}"><div class="g-row g-head"><div class="g-label">Продукт · операция</div>` +
+  const cols = !!opts.cols;
+  const headCols = cols ? (opts.colTitles || G_COLS).map((c, i) => `<span class="g-c${i ? '' : ' g-c1'}">${esc(c)}</span>`).join('') : '';
+  let html = `<div class="gantt${cols ? ' has-cols' : ''}" style="--hours:${Math.round(total / 60)}"><div class="g-row g-head">` +
+    `<div class="g-label"><span class="g-name">${esc(opts.title || 'Продукт · операция')}</span>${headCols}</div>` +
     `<div class="g-track g-ticks">${ticks}</div></div>`;
   rows.forEach((r) => {
     if (r.group) {
@@ -1836,16 +1872,22 @@ function ganttGrid(rows, wStart, wEnd, nowIso) {
     }
     const bars = r.bars.map((b) => {
       const s = pct(gMinutes(b.start, start));
-      const top = b.lane * 26 + 3;
+      const top = r.mini ? 10 : b.lane * 26 + 3;
       if (!b.draw_end) {
-        return `<span class="g-mark" style="left:${s}%;top:${top}px;--c:${b.color}" data-tip="${esc(b.tip)}" data-gbar="${b.idx}" role="button" tabindex="0"></span>`;
+        return `<span class="g-mark${r.mini ? ' mini' : ''}" style="left:${s}%;top:${top - (r.mini ? 3 : 0)}px;--c:${b.color}" data-tip="${esc(b.tip)}" ` +
+          `${none(b.idx) ? '' : `data-gbar="${b.idx}" role="button" tabindex="0"`}></span>`;
       }
       const e = pct(gMinutes(b.draw_end, start));
-      return `<span class="g-bar ${b.cls || ''}" style="left:${s}%;width:${Math.max(e - s, 0.35)}%;top:${top}px;--c:${b.color}" ` +
-        `data-tip="${esc(b.tip)}" data-gbar="${b.idx}" role="button" tabindex="0"><b>${esc(b.text || '')}</b></span>`;
+      return `<span class="g-bar ${b.cls || ''}${r.mini ? ' mini' : ''}" style="left:${s}%;width:${Math.max(e - s, 0.35)}%;top:${top}px;--c:${b.color}" ` +
+        `data-tip="${esc(b.tip)}" ${none(b.idx) ? '' : `data-gbar="${b.idx}" role="button" tabindex="0"`}><b>${esc(r.mini ? '' : (b.text || ''))}</b></span>`;
     }).join('');
-    html += `<div class="g-row"><div class="g-label" title="${esc(r.label + ' · ' + r.sub)}"><span>${esc(r.label)}</span><small>${esc(r.sub)}</small></div>` +
-      `<div class="g-track" style="height:${r.lanes * 26 + 4}px">${shiftLines}${nowLine}${bars}</div></div>`;
+    const name = r.kind === 'product'
+      ? `<button class="g-name g-toggle" type="button" data-gprod="${esc(r.key)}" aria-expanded="${r.open}">` +
+        `<span><i class="g-caret">${r.open ? '▾' : '▸'}</i>${esc(r.label)}</span><small>${esc(r.sub)}</small>${r.mob ? `<small class="g-mob">${r.mob}</small>` : ''}</button>`
+      : `<span class="g-name"><span>${esc(r.label)}</span>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}${r.mob ? `<small class="g-mob">${r.mob}</small>` : ''}</span>`;
+    const cells = cols ? (r.cols || ['', '', '']).map((c, i) => `<span class="g-c${i ? '' : ' g-c1'}">${c}</span>`).join('') : '';
+    html += `<div class="g-row${r.kind ? ' g-' + r.kind : ''}"><div class="g-label" title="${esc(r.label + (r.sub ? ' · ' + r.sub : ''))}">${name}${cells}</div>` +
+      `<div class="g-track" style="height:${(r.mini ? 1 : r.lanes) * 26 + 4}px">${shiftLines}${nowLine}${bars}</div></div>`;
   });
   return html + '</div>';
 }
@@ -1856,31 +1898,43 @@ function renderGantt(data) {
   ganttData = data;
   lastData = data;
   if (data.day && data.day !== GANTT.date) { GANTT.date = data.day; if ($('gDate').value !== data.day) $('gDate').value = data.day; }
+  const av = data.averages || {};
+  if (av.from) { GANTT.avgFrom = av.from; GANTT.avgTo = av.to; $('gAvgFrom').value = av.from; $('gAvgTo').value = av.to; }
   const t = data.totals;
   const errors = data.section_errors || {};
-  const names = { bhm: 'БХМ', fk: 'ФК', proofing: 'Расстойка', kc: 'КЦ' };
   $('gWarn').hidden = !Object.keys(errors).length;
   $('gWarn').textContent = Object.keys(errors).length
-    ? '⚠ Не все цеха доступны: ' + Object.entries(errors).map(([k, v]) => `${names[k] || k} — ${v}`).join('; ') + '. Остальные показаны.' : '';
+    ? '⚠ Не все цеха доступны: ' + Object.entries(errors).map(([k, v]) => `${G_NAMES[k] || k} — ${v}`).join('; ') + '. Остальные показаны.' : '';
   const cards = [
     ['Операций в окне', num(t.ops), '', `закрыто ${num(t.closed)} · без конца/идут ${num(t.open)}`],
     ['Человеко-часы', t.people_known ? dec(t.person_hours) : NO_DATA, t.people_known ? 'чел·ч' : '', `людей известно у ${num(t.people_known)} операций`],
-    ['Продуктов', num(new Set(data.rows.map((r) => r.product)).size), '', `строк на шкале: ${num(data.rows.length)}`],
+    ['Продуктов', num(t.products), '', `операций-строк: ${num(data.rows.length)}`],
     ['Из чата КЦ', num(t.from_chat), '', t.check ? `время по сообщению: ${num(t.check)}` : 'до запуска бота КЦ'],
   ];
   $('gKpis').innerHTML = cards.map(([label, value, unit, note]) => `<div class="kpi"><div class="k-label">${esc(label)}</div>` +
     `<div class="k-value${value === NO_DATA ? ' k-none' : ''}"><span class="k-num">${esc(value)}</span>${unit ? `<span class="k-unit">${esc(unit)}</span>` : ''}</div>` +
     `<div class="k-note">${esc(note)}</div></div>`).join('');
   fitValues($('gKpis'));
-  $('gLegend').innerHTML = Object.entries(names).map(([k, v]) => `<span><i style="background:${G_COLORS[k]}"></i>${v}</span>`).join('') +
+  $('gLegend').innerHTML = Object.entries(G_NAMES).map(([k, v]) => `<span><i style="background:${G_COLORS[k]}"></i>${v}${k === 'kc' && t.from_chat ? ' (часть — из переписки, неточно)' : ''}</span>`).join('') +
     '<span><i class="lg-hatch"></i>время по сообщению / некорректно</span><span><i class="lg-run"></i>идёт сейчас</span>' +
     '<span><i class="lg-mark"></i>начало без отметки конца</span>';
+  $('gChatWarn').hidden = !data.chat_note;
+  $('gChatWarn').textContent = data.chat_note ? '⚠ ' + data.chat_note : '';
   drawGantt();
   renderGanttTable();
   renderTiming(data);
+  renderAverages(data);
   const fetched = formatMoment(data.now);
-  $('sourceLine').textContent = `Гант: ФК, БХМ, расстойка, КЦ (бот${data.history_source ? ' + разобранный чат' : ''}) · расчёт ${fetched}`;
-  $('periodLine').textContent = `${data.day.split('-').reverse().join('.')} · ${data.window_title} · операций: ${num(t.ops)} · продуктов: ${num(new Set(data.rows.map((r) => r.product)).size)}`;
+  $('sourceLine').textContent = `Гант: формовка, БХМ, расстойка, КЦ (бот${data.history_source ? ' + разобранный чат' : ''}) · расчёт ${fetched}`;
+  $('periodLine').textContent = `${data.day.split('-').reverse().join('.')} · ${data.window_title} · операций: ${num(t.ops)} · продуктов: ${num(t.products)}`;
+}
+
+function gProductKey(section, product) { return section + '|' + product; }
+
+// Пометка строк из разобранной переписки КЦ: эти данные неточные.
+function gChatText(fromChat, total) {
+  if (!fromChat) return '';
+  return fromChat === total ? 'из переписки, неточно' : `из переписки ${fromChat} из ${total}, неточно`;
 }
 
 function ganttRowsFiltered() {
@@ -1892,20 +1946,40 @@ function drawGantt() {
   if (!ganttData) return;
   const rows = [];
   gBarsFlat = [];
+  const visible = ganttRowsFiltered();
   let section = '';
-  ganttRowsFiltered().forEach((r) => {
-    if (r.section !== section) { section = r.section; rows.push({ group: r.section_title, color: G_COLORS[r.section] }); }
-    rows.push({ label: r.product, sub: r.operation + (r.equipment ? ' · ' + r.equipment : ''), lanes: r.lanes,
+  // Цех → продукт (сворачивается) → его операции. В строке продукта — все его операции тонкой полосой.
+  (ganttData.products || []).forEach((p) => {
+    const ops = visible.filter((r) => r.section === p.section && r.product === p.product);
+    if (!ops.length) return;
+    if (p.section !== section) { section = p.section; rows.push({ group: p.section_title, color: G_COLORS[p.section] }); }
+    const key = gProductKey(p.section, p.product);
+    const open = !GANTT.collapsed.has(key);
+    const several = p.ops > 1;
+    const color = G_COLORS[p.section];
+    rows.push({ kind: 'product', key, open, label: p.product, mini: true, lanes: 1,
+      sub: [p.ops > 1 ? `операций ${p.ops}` : ops[0].operation, none(p.busy_min) ? '' : 'занято ' + hm(p.busy_min),
+        gChatText(ops.reduce((n, r) => n + r.bars.filter((b) => b.source === 'chat').length, 0), ops.reduce((n, r) => n + r.bars.length, 0))].filter(Boolean).join(' · '),
+      cols: [p.equipment ? `<span class="g-clamp" title="${esc(p.equipment)}">${esc(p.equipment)}</span>` : '—', gPeopleCell(p, true), gRateCell(p, several)],
+      mob: [p.equipment, none(p.people) ? '' : p.people + ' чел', several ? '' : gRateCell(p, false).replace(/<[^>]+>/g, '')].filter((x) => x && x !== '—').map(esc).join(' · '),
+      bars: ops.flatMap((r) => r.bars.map((b) => ({ start: b.start, draw_end: b.draw_end, lane: 0, color,
+        cls: [b.flag !== 'ok' ? 'hatch' : ''].join(' '), tip: `${r.operation}: ${gBarTip(b)}` }))) });
+    if (!open) return;
+    ops.forEach((r) => rows.push({ kind: 'op', label: r.operation, lanes: r.lanes,
+      sub: [r.runs > 1 ? `запусков ${r.runs}` : '', gChatText(r.bars.filter((b) => b.source === 'chat').length, r.bars.length)].filter(Boolean).join(' · '),
+      cols: [esc(r.equipment || '—'), gPeopleCell(r, false), gRateCell(r, false)],
+      mob: [r.equipment, none(r.people) ? '' : r.people + ' чел', gRateCell(r, false).replace(/<[^>]+>/g, '')].filter((x) => x && x !== '—').map(esc).join(' · '),
       bars: r.bars.map((b) => {
         gBarsFlat.push(b);
-        return { start: b.start, draw_end: b.draw_end, lane: b.lane, color: G_COLORS[b.section], idx: gBarsFlat.length - 1,
+        return { start: b.start, draw_end: b.draw_end, lane: b.lane, color, idx: gBarsFlat.length - 1,
           cls: [b.flag !== 'ok' ? 'hatch' : '', b.running ? 'run' : ''].join(' '), text: gBarText(b), tip: gBarTip(b) };
-      }) });
+      }) }));
   });
-  $('gChart').innerHTML = rows.length ? ganttGrid(rows, ganttData.start, ganttData.end, ganttData.now)
+  $('gChart').innerHTML = rows.length ? ganttGrid(rows, ganttData.start, ganttData.end, ganttData.now, { cols: true })
     : '<div class="empty">Нет операций в этом окне — выбери другие сутки или окно</div>';
   $('gDetail').hidden = true;
-  $('gNote').textContent = `${ganttData.window_title} · ${num(rows.filter((r) => !r.group).length)} строк · нажми на полосу`;
+  const products = rows.filter((r) => r.kind === 'product').length;
+  $('gNote').textContent = `${ganttData.window_title} · продуктов ${num(products)} · нажми на продукт, чтобы свернуть, на полосу — подробности`;
 }
 
 function renderGanttTable() {
@@ -1930,7 +2004,7 @@ function renderTiming(data) {
   const rows = data.timing || [];
   const chains = rows.filter((r) => r.stages_count > 1).length;
   $('tNote').textContent = `ⓘ Этапы связаны по единому продукту (справочник продуктов), а не по номеру партии — общего номера у ботов нет. ` +
-    `Фасовка — отдельный бот, пока не подключён: показываем только «передано на фасовку» из чата КЦ. ` +
+    `Фасовка — отдельный бот, пока не подключён: показываем только «передано на фасовку» из чата КЦ (время по сообщению, неточно). ` +
     `Продуктов, прошедших больше одного цеха в этом окне: ${chains}.`;
   $('tLegend').innerHTML = (data.stages || []).map((s) => `<span><i style="background:${G_STAGE_COLORS[s.key]}"></i>${esc(s.title)}</span>`).join('');
   // Строка — продукт, дорожка — этап, полосы — реальные операции этапа (не сплошной интервал).
@@ -1962,21 +2036,100 @@ function renderTiming(data) {
     (r) => ({ key: 'gproduct', value: r.product }));
 }
 
+/* Среднее по продукту: средний день продукта, разворачивается до этапов и операций. */
+
+function aDay(d) { return d ? d.split('-').reverse().join('.') : ''; }
+
+function renderAverages(data) {
+  const av = data.averages || { products: [] };
+  const q = GANTT.search.trim().toLowerCase();
+  const all = av.products || [];
+  const list = all.filter((p) => !q || `${p.product} ${p.ops.map((o) => o.operation).join(' ')}`.toLowerCase().includes(q));
+  $('aNote').textContent = `ⓘ Период ${aDay(av.from)} — ${aDay(av.to)}, дней с данными: ${num(av.days || 0)}. ` +
+    (list.some((p) => p.from_chat) ? 'Среднее по КЦ посчитано по переписке — оно неточное, для норм не годится. ' : '') +
+    'Время операции — от начала работы с продуктом в эти рабочие сутки; «длится» — от первого начала до последнего конца, ' +
+    '«занято» — без пауз между запусками. Чат КЦ без отметки конца в длительность не входит.';
+  $('aCount').textContent = `продуктов: ${num(list.length)}${list.length !== all.length ? ` из ${num(all.length)}` : ''}`;
+  if (!list.length) { $('aList').innerHTML = '<div class="empty">Нет операций за этот период</div>'; return; }
+  $('aList').innerHTML = list.map((p) => {
+    const i = all.indexOf(p);
+    const open = GANTT.avgOpen.has(p.product);
+    const chips = p.stages.map((s) => `<span class="a-chip" style="--c:${G_STAGE_COLORS[s.key]}" title="${esc(s.title)}: начало +${esc(hm(s.offset_min))}, ` +
+      `длится ${none(s.span_min) ? 'нет конца' : esc(hm(s.span_min))}, дней ${s.days}"><i></i>${esc(s.title)} ${none(s.span_min) ? '…' : esc(hm(s.span_min))}</span>`).join('');
+    return `<details class="avg-item" data-aidx="${i}"${open ? ' open' : ''}><summary>` +
+      `<span class="a-name"><b>${esc(p.product)}</b><small>${esc(p.sections.join(', '))} · дней ${num(p.days)} · операций ${num(p.ops.length)}` +
+      `${p.from_chat ? ' · <span class="chat-flag">из переписки, неточно</span>' : ''}</small></span>` +
+      `<span class="a-lead"><b>${none(p.lead_min) ? '—' : esc(hm(p.lead_min))}</b><small>${p.days > 1 && !none(p.lead_min_min) ? `от ${esc(hm(p.lead_min_min))} до ${esc(hm(p.lead_min_max))}` : 'весь путь за день'}</small></span>` +
+      `<span class="a-ph"><b>${none(p.person_hours_day) ? '—' : dec(p.person_hours_day)}</b><small>чел·ч в день</small></span>` +
+      `<span class="a-chips">${chips}</span></summary><div class="avg-body">${open ? averageBody(p) : ''}</div></details>`;
+  }).join('');
+}
+
+function averageBody(p) {
+  const rows = [];
+  let end = 60;
+  p.stages.forEach((s) => {
+    const ops = p.ops.filter((o) => o.stage === s.key);
+    const color = G_STAGE_COLORS[s.key];
+    const sEnd = (s.offset_min || 0) + (s.span_min || 0);
+    end = Math.max(end, sEnd);
+    const rel = (m) => new Date((m || 0) * 60000).toISOString();
+    rows.push({ kind: 'stage', label: s.title, sub: `этап целиком · дней ${s.days}${none(s.busy_min) ? '' : ' · занято ' + hm(s.busy_min)}`, lanes: 1,
+      cols: [none(s.span_min) ? '—' : esc(hm(s.span_min)), '', ''],
+      bars: [{ start: rel(s.offset_min), draw_end: none(s.span_min) ? null : rel(s.offset_min + s.span_min), lane: 0, color, cls: 'stage',
+        text: none(s.span_min) ? '' : hm(s.span_min), tip: `${s.title}: начало +${hm(s.offset_min)} от старта продукта, длится ${none(s.span_min) ? '—' : hm(s.span_min)}` }] });
+    ops.forEach((o) => {
+      end = Math.max(end, (o.offset_min || 0) + (o.span_min || 0));
+      rows.push({ kind: 'op', label: o.operation, lanes: 1,
+        sub: `${o.section_title} · дней ${o.days}${o.no_end ? ` · без конца ${o.no_end}` : ''}${o.from_chat ? ' · из переписки' : ''}`,
+        cols: [none(o.span_min) ? '—' : esc(hm(o.span_min)), none(o.people_avg) ? '<span class="muted">—</span>' : dec(o.people_avg), gRateCell(o, false)],
+        bars: [{ start: rel(o.offset_min), draw_end: none(o.span_min) ? null : rel(o.offset_min + o.span_min), lane: 0, color,
+          cls: o.no_end ? 'hatch' : '', text: [none(o.people_avg) ? '' : dec(o.people_avg) + ' чел', o.qty_day !== '—' ? o.qty_day : ''].filter(Boolean).join(' · '),
+          tip: `${o.operation}: начало +${hm(o.offset_min)}, длится ${none(o.span_min) ? '—' : hm(o.span_min)}, занято ${none(o.busy_min) ? '—' : hm(o.busy_min)}` +
+            `${none(o.people_avg) ? '' : `, людей ${dec(o.people_avg)}`}, выработка в день ${o.qty_day}${o.equipment ? ', ' + o.equipment : ''}` }] });
+    });
+  });
+  const total = Math.ceil(end / 60) * 60;
+  const chart = ganttGrid(rows, new Date(0).toISOString(), new Date(total * 60000).toISOString(), null,
+    { relative: true, cols: true, title: 'Этап · операция', colTitles: ['Длится', 'Людей', 'Выработка в час на чел.'] });
+  const table = '<div class="table-wrap"><table class="table"><thead><tr><th>Этап</th><th>Операция</th><th class="num">Дней</th>' +
+    '<th class="num">Начало</th><th class="num">Длится</th><th class="num">Занято</th><th class="num">Людей</th>' +
+    '<th class="num">В день</th><th class="num">На чел·ч</th><th>Оборудование</th></tr></thead><tbody>' +
+    p.ops.map((o) => `<tr><td data-label="Этап"><span class="g-dot" style="--c:${G_STAGE_COLORS[o.stage]}"></span>${esc(o.stage_title)}</td>` +
+      `<td data-label="Операция">${esc(o.operation)}</td><td class="num" data-label="Дней">${num(o.days)}</td>` +
+      `<td class="num" data-label="Начало">+${esc(hm(o.offset_min))}</td><td class="num" data-label="Длится">${none(o.span_min) ? '—' : esc(hm(o.span_min))}</td>` +
+      `<td class="num" data-label="Занято">${none(o.busy_min) ? '—' : esc(hm(o.busy_min))}</td><td class="num" data-label="Людей">${none(o.people_avg) ? '—' : dec(o.people_avg)}</td>` +
+      `<td class="num" data-label="В день">${esc(o.qty_day)}</td><td class="num" data-label="На чел·ч">${gRateCell(o, false)}</td>` +
+      `<td data-label="Оборудование">${esc(o.equipment || '—')}</td></tr>`).join('') + '</tbody></table></div>';
+  return `<div class="gantt-scroll">${chart}</div>${table}`;
+}
+
 async function loadGanttMap() {
   try {
     const r = await fetch('/api/gantt/map', { cache: 'no-store' });
     const d = await r.json();
     if (!r.ok || !d.ok) throw new Error(d.error || 'сервис недоступен');
+    const sections = d.sections || {};
+    const hint = (list) => (list && list.length ? `<small class="stage-who">похоже на: ${list.map(esc).join('; ')}</small>` : '');
     const rows = [];
     Object.entries(d.products || {}).forEach(([sec, names]) => names.forEach((n) => rows.push({ sec, name: n, unified: ((d.map || {})[sec] || {})[n] || '' })));
     const mapped = rows.filter((x) => x.unified).length;
     $('mNote').textContent = d.upload_enabled ? (d.updated_at ? `загружен ${formatMoment(d.updated_at)}${d.file ? ' · ' + d.file : ''}` : 'ещё не загружали')
       : 'загрузка выключена: на сервере не задан PLAN_UPLOAD_TOKEN';
     $('mUpload').disabled = !d.upload_enabled;
-    $('mCount').textContent = `сведено ${num(mapped)} из ${num(rows.length)} названий`;
+    const hints = rows.filter((x) => (d.similar || {})[x.name]).length;
+    $('mCount').textContent = `сведено ${num(mapped)} из ${num(rows.length)} названий${hints ? ` · с подсказкой «похоже» ${num(hints)}` : ''}`;
     rows.sort((a, b) => (b.unified ? 1 : 0) - (a.unified ? 1 : 0) || a.sec.localeCompare(b.sec) || a.name.localeCompare(b.name, 'ru'));
     renderTable($('mTable'), [{ title: 'Цех' }, { title: 'Продукт в цехе' }, { title: 'Единый продукт' }], rows,
-      (x) => [esc((d.sections || {})[x.sec] || x.sec), esc(x.name), x.unified ? `<span class="tag">${esc(x.unified)}</span>` : '<span class="muted">как есть</span>']);
+      (x) => [esc(sections[x.sec] || x.sec), `<span class="cellbox">${esc(x.name)}${hint((d.similar || {})[x.name])}</span>`,
+        x.unified ? `<span class="tag">${esc(x.unified)}</span>` : '<span class="muted">как есть</span>']);
+    const ops = [];
+    Object.entries(d.operations || {}).forEach(([sec, names]) => names.forEach((n) => ops.push({ sec, name: n, unified: ((d.ops || {})[sec] || {})[n] || '' })));
+    ops.sort((a, b) => (b.unified ? 1 : 0) - (a.unified ? 1 : 0) || a.sec.localeCompare(b.sec) || a.name.localeCompare(b.name, 'ru'));
+    $('mOpsCount').textContent = `сведено ${num(ops.filter((x) => x.unified).length)} из ${num(ops.length)} названий`;
+    renderTable($('mOpsTable'), [{ title: 'Цех' }, { title: 'Операция в цехе' }, { title: 'Единая операция' }], ops,
+      (x) => [esc(sections[x.sec] || x.sec), `<span class="cellbox">${esc(x.name)}${hint(((d.similar_ops || {})[x.sec] || {})[x.name])}</span>`,
+        x.unified ? `<span class="tag">${esc(x.unified)}</span>` : '<span class="muted">как есть</span>']);
   } catch (e) {
     $('mNote').textContent = 'не удалось получить справочник: ' + e.message;
   }
@@ -1997,7 +2150,7 @@ async function uploadGanttMap(file) {
     const d = await r.json();
     if (!r.ok || !d.ok) { if (r.status === 401) store.del('fk_plan_token'); throw new Error(d.error || 'ошибка загрузки'); }
     store.set('fk_plan_token', token);
-    el.className = 'upload-result ok'; el.textContent = `Загружено соответствий: ${d.pairs}.`;
+    el.className = 'upload-result ok'; el.textContent = `Загружено соответствий: продуктов ${d.pairs}, операций ${d.op_pairs || 0}.`;
     await loadGanttMap();
     try { applyMeta(await fetchMeta('gantt')); } catch (e) { /* справочники обновятся при следующей загрузке */ }
     loadSummary(false);
@@ -2011,7 +2164,7 @@ function showGanttDetail(idx) {
   if (!b) return;
   const el = $('gDetail');
   el.hidden = false;
-  el.innerHTML = `<b>${esc(b.section_title)} · ${esc(b.product)} — ${esc(b.operation)}</b><br>` + esc(gBarTip(b)).split(' · ').slice(1).join('<br>');
+  el.innerHTML = `<b>${esc(b.section_title)} · ${esc(b.unified || b.product)} — ${esc(b.operation)}</b><br>` + esc(gBarTip(b)).split(' · ').slice(1).join('<br>');
 }
 
 function bindGantt() {
@@ -2020,7 +2173,13 @@ function bindGantt() {
   $('gWindow').addEventListener('change', () => { GANTT.window = $('gWindow').value; reload(); });
   $('gProduct').addEventListener('change', () => { GANTT.product = $('gProduct').value; reload(); });
   $('gEquipment').addEventListener('change', () => { GANTT.equipment = $('gEquipment').value; reload(); });
-  $('gSearch').addEventListener('input', () => { GANTT.search = $('gSearch').value; drawGantt(); renderGanttTable(); });
+  $('gAvgFrom').addEventListener('change', () => { GANTT.avgFrom = $('gAvgFrom').value; reload(); });
+  $('gAvgTo').addEventListener('change', () => { GANTT.avgTo = $('gAvgTo').value; reload(); });
+  $('gSearch').addEventListener('input', () => {
+    GANTT.search = $('gSearch').value;
+    drawGantt(); renderGanttTable();
+    if (ganttData) renderAverages(ganttData);
+  });
   const step = (dir) => {
     const opts = Array.from($('gDate').options).map((o) => o.value);
     const i = opts.indexOf(GANTT.date);
@@ -2029,6 +2188,24 @@ function bindGantt() {
   };
   $('gPrev').addEventListener('click', () => step(-1));
   $('gNext').addEventListener('click', () => step(1));
+  $('gExpand').addEventListener('click', () => { GANTT.collapsed.clear(); drawGantt(); });
+  $('gCollapse').addEventListener('click', () => {
+    (ganttData && ganttData.products || []).forEach((p) => GANTT.collapsed.add(gProductKey(p.section, p.product)));
+    drawGantt();
+  });
+  $('aList').addEventListener('toggle', (e) => {
+    const item = e.target;
+    if (!item.matches || !item.matches('details.avg-item') || !ganttData) return;
+    const p = ((ganttData.averages || {}).products || [])[Number(item.dataset.aidx)];
+    if (!p) return;
+    if (item.open) {
+      GANTT.avgOpen.add(p.product);
+      const body = item.querySelector('.avg-body');
+      if (!body.innerHTML) body.innerHTML = averageBody(p);
+    } else {
+      GANTT.avgOpen.delete(p.product);
+    }
+  }, true);
   document.addEventListener('click', (e) => {
     const sec = e.target.closest ? e.target.closest('[data-gsec]') : null;
     if (sec) {
@@ -2037,6 +2214,15 @@ function bindGantt() {
       if (!GANTT.sections.length) GANTT.sections = [k];
       fillGanttTools(meta);
       reload();
+      return;
+    }
+    const prod = e.target.closest ? e.target.closest('[data-gprod]') : null;
+    if (prod && prod.closest('#gChart')) {
+      const k = prod.dataset.gprod;
+      if (GANTT.collapsed.has(k)) GANTT.collapsed.delete(k); else GANTT.collapsed.add(k);
+      drawGantt();
+      const again = Array.from($('gChart').querySelectorAll('[data-gprod]')).find((x) => x.dataset.gprod === k);
+      if (again) again.focus({ preventScroll: true });
       return;
     }
     const bar = e.target.closest ? e.target.closest('[data-gbar]') : null;

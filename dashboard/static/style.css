@@ -482,6 +482,9 @@ body.modal-open{overflow:hidden}
 .g-day .btn{padding:8px 12px;font-size:18px;line-height:1}
 .g-day select{min-width:132px}
 .g-sections{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px}
+.g-chat-warn{margin:12px 20px 0;padding:9px 12px;border-radius:10px;background:#fff7e6;border:1px solid #f5d48a;color:#7a4b00;
+  font-size:13px;line-height:1.45}
+.chat-flag{color:#a15c00}
 .g-sec{font:inherit;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;min-height:38px;
   padding:7px 13px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted)}
 .g-sec i{width:10px;height:10px;border-radius:3px;opacity:.35}
@@ -498,8 +501,57 @@ body.modal-open{overflow:hidden}
 .g-row{display:grid;grid-template-columns:var(--label) 1fr;border-bottom:1px solid #f1f4f8}
 .g-label{position:sticky;left:0;z-index:2;background:#fff;padding:5px 10px;border-right:1px solid var(--line);
   display:flex;flex-direction:column;justify-content:center;min-width:0}
+.g-name{display:flex;flex-direction:column;justify-content:center;min-width:0}
 .g-label span{font-weight:600;line-height:1.25;overflow-wrap:anywhere}
 .g-label small{color:var(--muted);font-size:11.5px;line-height:1.25;overflow-wrap:anywhere}
+.g-label small.g-mob{display:none;color:#3c4658}
+/* Колонки после продукта: оборудование · людей · выработка в час на человека */
+.gantt.has-cols{--label:520px}
+.has-cols .g-label{display:grid;grid-template-columns:minmax(0,1fr) 112px 56px 104px;align-items:stretch;padding:0}
+.has-cols .g-name{padding:5px 10px}
+.g-c{display:flex;align-items:center;justify-content:flex-end;gap:3px;padding:4px 8px;border-left:1px solid #f1f4f8;
+  font-size:12px;font-weight:400;text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;min-width:0}
+.g-c1{justify-content:flex-start;text-align:left}
+.g-c b{font-weight:700;white-space:nowrap}
+.g-c .muted{white-space:nowrap}
+.g-clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.g-c small{color:var(--muted);font-size:10.5px}
+.g-head .g-c{font-size:11px;font-weight:600;color:var(--muted);line-height:1.2}
+.g-head .g-name{font-weight:600}
+.g-toggle{font:inherit;color:inherit;text-align:left;background:none;border:0;cursor:pointer;width:100%;min-height:36px}
+.g-toggle:focus-visible{outline:2px solid #2a78d6;outline-offset:-2px}
+.g-caret{font-style:normal;display:inline-block;width:14px;color:var(--muted)}
+.g-product .g-label,.g-product{background:#f8f9fc}
+.g-product .g-label span{font-weight:700}
+.g-op .g-name{padding-left:28px}
+.g-op .g-label span{font-weight:500}
+.g-stage .g-label{background:#f8f9fc}
+.g-stage .g-label span{font-weight:700}
+.g-bar.mini{height:10px;padding:0;opacity:.7;cursor:default}
+.g-bar.mini:hover{outline:0;filter:none}
+.g-mark.mini{width:9px;height:9px;margin:4px 0 0 -4px;cursor:default}
+.g-actions{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:flex-start;justify-content:space-between;margin:0 0 10px}
+.g-actions .g-legend{margin:0}
+.g-fold{display:flex;gap:6px}
+.g-fold .btn{padding:6px 10px;font-size:12.5px}
+/* Среднее по продукту */
+.avg-list{display:flex;flex-direction:column;gap:8px}
+.avg-item{border:1px solid var(--line);border-radius:12px;background:#fff}
+.avg-item[open]{border-color:#c9d6f5}
+.avg-item summary{display:grid;grid-template-columns:minmax(180px,1.4fr) 150px 110px minmax(0,3fr);gap:6px 14px;align-items:center;
+  padding:10px 14px 10px 28px;cursor:pointer;list-style:none;position:relative}
+.avg-item summary::-webkit-details-marker{display:none}
+.avg-item summary::before{content:"▸";position:absolute;left:11px;top:12px;color:var(--muted)}
+.avg-item[open] summary::before{content:"▾"}
+.avg-item summary>span{display:flex;flex-direction:column;min-width:0}
+.avg-item summary small{color:var(--muted);font-size:11.5px}
+.a-name b{overflow-wrap:anywhere}
+.a-lead b,.a-ph b{font-variant-numeric:tabular-nums}
+.avg-item summary>.a-chips{flex-direction:row;flex-wrap:wrap;gap:5px}
+.a-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;background:#f5f7fb;font-size:12px;white-space:nowrap}
+.a-chip i{width:8px;height:8px;border-radius:2px;background:var(--c)}
+.avg-body{padding:0 14px 14px}
+.avg-body .table-wrap{margin-top:10px}
 .g-track{position:relative;min-height:30px;
   background:repeating-linear-gradient(90deg,transparent 0 calc(100% / var(--hours) - 1px),#eef1f6 calc(100% / var(--hours) - 1px) calc(100% / var(--hours)))}
 .g-head{position:sticky;top:0;z-index:3;background:#fbfcfe}
@@ -526,12 +578,26 @@ body.modal-open{overflow:hidden}
   font-size:13.5px;line-height:1.55}
 .g-dot{display:inline-block;width:9px;height:9px;border-radius:3px;background:var(--c);margin-right:6px}
 @media (max-width:900px){.kpis.k4{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:900px){
+  .avg-item summary{grid-template-columns:minmax(0,1fr) auto auto}
+  .avg-item summary>.a-chips{grid-column:1 / -1}
+}
 @media (max-width:720px){
   .gantt{--label:128px;--hour:40px}
+  .gantt.has-cols{--label:150px}
+  .has-cols .g-label{grid-template-columns:minmax(0,1fr)}
+  .has-cols .g-c{display:none}
+  .g-label small.g-mob{display:block}
+  .has-cols .g-name{padding:4px 7px}
+  .g-op .g-name{padding-left:14px}
+  .avg-item summary{grid-template-columns:minmax(0,1fr) auto;padding:10px 12px 10px 22px}
+  .avg-item summary>.a-ph{display:none}
+  .avg-body{padding:0 8px 10px}
   .g-label{padding:4px 7px}
   .g-label small{font-size:10.5px}
   .gantt-tools .filters-body{padding:0 14px 10px}
   .g-sections{padding:0 14px}
+  .g-chat-warn{margin:10px 14px 0}
   .g-day select{min-width:0;flex:1}
   .gantt-tools .field:first-child{flex:1 1 100%}
   .g-day .btn{min-height:44px}

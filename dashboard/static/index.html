@@ -38,6 +38,7 @@
     <button class="tab" role="tab" data-tab="kcnorms" hidden>Нормативы</button>
     <button class="tab" role="tab" data-tab="gantt" hidden>Диаграмма Ганта</button>
     <button class="tab" role="tab" data-tab="timing" hidden>Общий тайминг</button>
+    <button class="tab" role="tab" data-tab="gavg" hidden>Среднее по продукту</button>
     <button class="tab" role="tab" data-tab="gmap" hidden>Справочник продуктов</button>
   </nav>
 
@@ -435,16 +436,19 @@
   <!-- ── Гант: все цеха на одной шкале ─────────────────────────────────── -->
   <section class="panel gantt-tools" id="gTools" hidden>
     <div class="filters-body">
-      <label class="field"><span>Рабочие сутки</span>
+      <label class="field" data-gonly="day"><span>Рабочие сутки</span>
         <span class="g-day"><button class="btn" type="button" id="gPrev" aria-label="Предыдущие сутки">‹</button>
         <select id="gDate"></select>
         <button class="btn" type="button" id="gNext" aria-label="Следующие сутки">›</button></span></label>
-      <label class="field"><span>Окно</span><select id="gWindow"></select></label>
+      <label class="field" data-gonly="day"><span>Окно</span><select id="gWindow"></select></label>
+      <label class="field" data-gonly="avg" hidden><span>Среднее с</span><select id="gAvgFrom"></select></label>
+      <label class="field" data-gonly="avg" hidden><span>по</span><select id="gAvgTo"></select></label>
       <label class="field"><span>Продукт (единый)</span><select id="gProduct"><option value="all">Все</option></select></label>
       <label class="field"><span>Оборудование</span><select id="gEquipment"><option value="all">Все</option></select></label>
       <label class="field"><span>Поиск</span><input type="search" id="gSearch" placeholder="продукт или операция" autocomplete="off"></label>
     </div>
     <div class="g-sections" id="gSections" role="group" aria-label="Цеха"></div>
+    <div class="g-chat-warn" id="gChatWarn" role="note" hidden></div>
   </section>
 
   <div class="tab-page" data-page="gantt" hidden>
@@ -453,7 +457,11 @@
     <section class="kpis k4" id="gKpis"></section>
     <section class="panel">
       <header class="panel-head"><h2>Диаграмма Ганта</h2><span class="unit" id="gNote">продукт · операция · люди · выработка · оборудование</span></header>
-      <div class="g-legend" id="gLegend"></div>
+      <div class="g-actions">
+        <div class="g-legend" id="gLegend"></div>
+        <span class="g-fold"><button class="btn" type="button" id="gExpand">Развернуть все</button>
+        <button class="btn" type="button" id="gCollapse">Свернуть все</button></span>
+      </div>
       <div class="gantt-scroll" id="gChart"></div>
       <div class="g-detail" id="gDetail" hidden></div>
     </section>
@@ -466,7 +474,7 @@
   <div class="tab-page" data-page="timing" hidden>
     <div class="plan-skew" id="tNote"></div>
     <section class="panel">
-      <header class="panel-head"><h2>Путь продукта по цехам</h2><span class="unit">БХМ → ФК → расстойка → отпекание → КЦ → фасовка</span></header>
+      <header class="panel-head"><h2>Путь продукта по цехам</h2><span class="unit">БХМ → формовка → расстойка → отпекание → КЦ → фасовка</span></header>
       <div class="g-legend" id="tLegend"></div>
       <div class="gantt-scroll" id="tChart"></div>
     </section>
@@ -476,12 +484,23 @@
     </section>
   </div>
 
+  <div class="tab-page" data-page="gavg" hidden>
+    <div class="plan-skew" id="aNote"></div>
+    <section class="panel">
+      <header class="panel-head"><h2>Среднее по продукту</h2><span class="unit" id="aCount">—</span></header>
+      <p class="plan-hint">Средний день продукта за период: каждая операция — от начала работы с продуктом в эти рабочие сутки (08–08),
+        затем среднее по дням. Нажми на продукт, чтобы развернуть этапы и операции.</p>
+      <div class="avg-list" id="aList"></div>
+    </section>
+  </div>
+
   <div class="tab-page" data-page="gmap" hidden>
     <section class="panel">
       <header class="panel-head"><h2>Справочник продуктов</h2><span class="unit" id="mNote">—</span></header>
-      <p class="plan-hint">У цехов разные названия одного продукта («Батон / ромашка» в БХМ и «Батон классический» в ФК).
-        Скачай шаблон, впиши в колонку «Единый продукт» одно название для всех цехов и загрузи файл —
-        общий тайминг свяжет этапы. Пустая ячейка — связь только по точному совпадению названия.</p>
+      <p class="plan-hint">У цехов разные названия одного продукта («Батон / ромашка» в БХМ и «Батон классический» на формовке),
+        а в КЦ операции вводят руками («Начинка», «Внесение начинки», «Набивка начинкой»).
+        Скачай шаблон: лист «Соответствия» — единый продукт, лист «Операции» — единая операция. Заполни и загрузи файл.
+        Регистр, «ё», пробелы и знаки препинания сводятся сами; похожие названия (опечатки, «фреш») только подсказываются.</p>
       <div class="plan-actions">
         <button class="btn" type="button" id="mTemplate">Скачать шаблон Excel</button>
         <button class="btn primary" type="button" id="mUpload">Загрузить справочник</button>
@@ -490,8 +509,12 @@
       <div id="mResult" class="upload-result" hidden></div>
     </section>
     <section class="panel">
-      <header class="panel-head"><h2>Текущие соответствия</h2><span class="unit" id="mCount">—</span></header>
+      <header class="panel-head"><h2>Продукты</h2><span class="unit" id="mCount">—</span></header>
       <div class="table-wrap"><table class="table" id="mTable"></table></div>
+    </section>
+    <section class="panel">
+      <header class="panel-head"><h2>Операции</h2><span class="unit" id="mOpsCount">—</span></header>
+      <div class="table-wrap"><table class="table" id="mOpsTable"></table></div>
     </section>
   </div>
 
