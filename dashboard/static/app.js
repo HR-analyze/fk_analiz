@@ -12,12 +12,12 @@ const isNarrow = () => window.innerWidth < 640;
 const FILTERS = {
   dateFrom: '', dateTo: '', equipment: 'all', product: 'all',
   employee: 'all', shift: 'all', hour: '',
-  // только у расстойки: тип печи и статус партии
-  oven: 'all', status: 'all',
+  // только у расстойки: тип печи; у расстойки и КЦ: статус; у КЦ: операция
+  oven: 'all', status: 'all', operation: 'all',
 };
 const FILTER_LABELS = {
   equipment: 'Оборудование', product: 'Продукт', employee: 'Сотрудник',
-  shift: 'Смена', hour: 'Час', date: 'Дата', oven: 'Печь', status: 'Статус',
+  shift: 'Смена', hour: 'Час', date: 'Дата', oven: 'Печь', status: 'Статус', operation: 'Операция',
 };
 const SHIFT_NAMES = { all: 'все смены', day: 'дневная смена', night: 'ночная смена' };
 
@@ -29,8 +29,18 @@ let lastData = null;
 // единица выпуска: ФК считает штуки, БХМ — килограммы теста, расстойка — штуки после печи.
 // У расстойки своя страница (партии из двух этапов), ФК и БХМ делят общую. Выбор помнится в localStorage.
 const SOURCES = { fk: { title: 'ФК', qty: 'шт' }, bhm: { title: 'БХМ', qty: 'кг' },
-                  proofing: { title: 'Расстойка', qty: 'шт', kind: 'proofing' } };
+                  proofing: { title: 'Расстойка', qty: 'шт', kind: 'proofing' },
+                  kc: { title: 'КЦ', qty: 'шт', kind: 'kc' } };
 const isProofing = () => SOURCE === 'proofing';
+const isKc = () => SOURCE === 'kc';
+// Разделы со своей страницей: открываются и без API, ошибка видна только у них.
+const OWN_PAGE = ['proofing', 'kc'];
+const hasOwnPage = (src = SOURCE) => OWN_PAGE.includes(src);
+
+function showSectionError(message) {
+  if (isKc()) showKcError(message);
+  else showProofError(message);
+}
 let SOURCE = 'fk';
 let UNIT = 'шт';
 let RATE = 'шт/ч';
@@ -494,8 +504,10 @@ function applyMeta(m) {
     ovens.map((o) => `<option value="${esc(o.code)}">${esc(o.name)}</option>`).join('');
   $('status').innerHTML = '<option value="all">Все</option>' +
     (meta.statuses || []).map((x) => `<option value="${esc(x.code)}">${esc(x.name)}</option>`).join('');
-  document.querySelectorAll('.only-proofing').forEach((el) => { el.hidden = !isProofing(); });
-  $('productLabel').textContent = isProofing() ? 'Изделие' : 'Продукт';
+  fillSelect($('operation'), meta.operations || [], 'Все');
+  // Поле фильтра видно только у источников из data-only.
+  document.querySelectorAll('[data-only]').forEach((el) => { el.hidden = !el.dataset.only.split(' ').includes(SOURCE); });
+  $('productLabel').textContent = isProofing() ? 'Изделие' : (isKc() ? 'Продукция' : 'Продукт');
 }
 
 function restoreFilters() {
@@ -507,6 +519,8 @@ function restoreFilters() {
     if (FILTERS[key] !== 'all' && !(meta[list] || []).includes(FILTERS[key])) FILTERS[key] = 'all';
   });
   if (FILTERS.oven !== 'all' && !(meta.ovens || []).some((o) => o.code === FILTERS.oven)) FILTERS.oven = 'all';
+  if (FILTERS.operation !== 'all' && !(meta.operations || []).includes(FILTERS.operation)) FILTERS.operation = 'all';
+  if (FILTERS.status !== 'all' && !(meta.statuses || []).some((x) => x.code === FILTERS.status)) FILTERS.status = 'all';
 }
 
 let switching = '';
@@ -520,17 +534,18 @@ async function switchSource(next) {
   try {
     m = await fetchMeta(next);
   } catch (e) {
-    if (next !== 'proofing') {
+    if (!hasOwnPage(next)) {
       // Источник недоступен — остаёмся на прежнем, ничего не ломая.
       switching = '';
       document.body.classList.remove('loading');
       showAlert(`Источник ${SOURCES[next].title} недоступен: ${e.message}`);
       return;
     }
-    // Расстойка открывается и без API: ошибка видна только на её странице.
+    // Расстойка и КЦ открываются и без API: ошибка видна только на их странице.
     proofFail = e.message;
-    m = { stub: true, equipment: [], products: [], employees: [], ovens: [], statuses: [], refresh_seconds: 60,
-          sources: meta && meta.sources, plan_enabled: false, units: { qty: 'шт', rate: 'шт/ч' } };
+    m = { stub: true, equipment: [], products: [], employees: [], ovens: [], statuses: [], operations: [],
+          refresh_seconds: 60, sources: meta && meta.sources, plan_enabled: false,
+          units: { qty: 'шт', rate: next === 'kc' ? 'шт/чел·ч' : 'шт/ч' } };
   }
   // Переключаемся только с готовыми справочниками: до этого момента и автообновление,
   // и фильтры работают со старым источником.
@@ -545,7 +560,7 @@ async function switchSource(next) {
   if (proofFail) {
     showAlert('');
     document.body.classList.remove('loading');
-    showProofError(proofFail);
+    showSectionError(proofFail);
     return;
   }
   await loadSummary(false);
@@ -553,12 +568,13 @@ async function switchSource(next) {
 
 /* ─── вкладки ─────────────────────────────────────────────────────────────── */
 
-const TABS = ['dashboard', 'plan', 'history', 'proofing', 'batches'];
+const TABS = ['dashboard', 'plan', 'history', 'proofing', 'batches', 'kc', 'kcops', 'kcnorms'];
 let activeTab = 'dashboard';
 
 // У ФК и БХМ — дашборд (+ план у ФК), у расстойки — «Сводка» и «Партии».
 function allowedTabs() {
   if (isProofing()) return ['proofing', 'batches'];
+  if (isKc()) return ['kc', 'kcops', 'kcnorms'];
   return planEnabled() ? ['dashboard', 'plan', 'history'] : ['dashboard'];
 }
 
@@ -765,8 +781,11 @@ function activeFilters() {
   });
   if (FILTERS.shift !== 'all') out.push({ key: 'shift', value: FILTERS.shift, text: `Смена: ${SHIFT_NAMES[FILTERS.shift]}` });
   if (FILTERS.hour !== '') out.push({ key: 'hour', value: FILTERS.hour, text: `Час: ${String(FILTERS.hour).padStart(2, '0')}:00` });
-  if (isProofing()) {
-    if (FILTERS.oven !== 'all') {
+  if (isKc() && FILTERS.operation !== 'all') {
+    out.push({ key: 'operation', value: FILTERS.operation, text: `Операция: ${FILTERS.operation}` });
+  }
+  if (hasOwnPage()) {
+    if (isProofing() && FILTERS.oven !== 'all') {
       const o = ((meta && meta.ovens) || []).find((x) => x.code === FILTERS.oven);
       out.push({ key: 'oven', value: FILTERS.oven, text: `Печь: ${o ? o.name : FILTERS.oven}` });
     }
@@ -834,6 +853,7 @@ function resetFilters() {
   FILTERS.hour = '';
   FILTERS.oven = 'all';
   FILTERS.status = 'all';
+  FILTERS.operation = 'all';
 }
 
 function syncControls() {
@@ -846,6 +866,7 @@ function syncControls() {
   $('hour').value = FILTERS.hour;
   $('oven').value = FILTERS.oven;
   $('status').value = FILTERS.status;
+  $('operation').value = FILTERS.operation;
   renderChips();
 }
 
@@ -859,6 +880,7 @@ function readControls() {
   FILTERS.hour = $('hour').value;
   FILTERS.oven = $('oven').value || 'all';
   FILTERS.status = $('status').value || 'all';
+  FILTERS.operation = $('operation').value || 'all';
   renderChips();
 }
 
@@ -866,6 +888,7 @@ function readControls() {
 
 function render(data) {
   if (data.kind === 'proofing') { renderProofing(data); return; }
+  if (data.kind === 'kc') { renderKc(data); return; }
   lastData = data;
   const lfl = data.lfl || {};
   const lflOk = lfl.available && !lfl.prev_empty;
@@ -996,6 +1019,7 @@ function query(force) {
   });
   if (FILTERS.hour !== '') p.set('hour', FILTERS.hour);
   if (isProofing()) { p.set('oven', FILTERS.oven); p.set('status', FILTERS.status); }
+  if (isKc()) { p.set('operation', FILTERS.operation); p.set('status', FILTERS.status); }
   if (force) p.set('refresh', '1');
   return p.toString();
 }
@@ -1010,11 +1034,12 @@ async function loadSummary(force) {
     if (!r.ok || !data.ok) throw new Error(data.error || 'сервис недоступен');
     showAlert(data.source && data.source.error ? 'Данные показаны из кеша: ' + data.source.error : '');
     if (data.kind === 'proofing') showProofError('');
+    if (data.kind === 'kc') showKcError('');
     render(data);
   } catch (e) {
     if (seq !== loadSeq) return;
-    // Ошибка расстойки показывается только на её странице.
-    if (isProofing()) { showAlert(''); showProofError(e.message); }
+    // Ошибка расстойки и КЦ показывается только на их странице.
+    if (hasOwnPage()) { showAlert(''); showSectionError(e.message); }
     else showAlert('Не удалось загрузить данные: ' + e.message);
   } finally {
     if (seq === loadSeq) document.body.classList.remove('loading');
@@ -1407,6 +1432,303 @@ function bindProofing() {
   });
 }
 
+/* ─── КЦ: кондитерский цех ────────────────────────────────────────────────── */
+
+// Каждая запись — самостоятельная операция: штуки разных операций одной продукции — не готовый выпуск.
+let kcData = null;
+const KC_SORTS = {
+  date: (a, b) => String(b.end_at || b.start_at).localeCompare(String(a.end_at || a.start_at)),
+  pcs: (a, b) => (b.pcs || 0) - (a.pcs || 0),
+  ph: (a, b) => (b.person_hours || 0) - (a.person_hours || 0),
+  rate: (a, b) => (b.pcs_per_ph || 0) - (a.pcs_per_ph || 0),
+  duration: (a, b) => (b.duration_min || 0) - (a.duration_min || 0),
+  product: (a, b) => (a.product + a.operation).localeCompare(b.product + b.operation, 'ru'),
+};
+const none = (v) => v === null || v === undefined;
+const decOr = (v, empty = '—') => (none(v) ? empty : dec(v));
+
+function showKcError(message) {
+  const box = $('kcError');
+  if (!message) { box.hidden = true; $('kcBody').hidden = false; return; }
+  box.hidden = false;
+  $('kcErrorText').textContent = message + (kcData ? ' Ниже — последние полученные данные.' : '');
+  $('kcBody').hidden = !kcData;
+  $('periodLine').textContent = kcData ? 'КЦ: данные не обновились — показаны последние полученные' : 'КЦ: данные недоступны';
+  $('sourceLine').textContent = 'Источник: API бота КЦ · ошибка подключения';
+}
+
+async function refreshKcMeta() {
+  try {
+    const m = await fetchMeta('kc');
+    if (!isKc()) return;
+    applyMeta(m);
+    restoreFilters();
+    syncControls();
+    markSourceButtons(meta.sources);
+  } catch (e) { /* остаёмся с тем, что есть */ }
+}
+
+function kcKpis(k, lfl) {
+  const ok = lfl && lfl.available && !lfl.prev_empty;
+  // [подпись, значение, единица, пояснение, ключ LFL, «лучше», формат прошлого]
+  const cards = [
+    ['Завершено операций', num(k.completed), '', k.cancelled ? `отменено: ${num(k.cancelled)} из ${num(k.started)} начатых` : `начато: ${num(k.started)}`,
+     'completed', 1, num],
+    ['В работе', num(k.in_work), '', 'операций на конец периода', null, 0, num],
+    ['Обработано изделий', k.completed ? num(k.pcs) : NO_DATA, k.completed ? 'шт' : '', 'по операциям, с повторами ⓘ', 'pcs', 1,
+     (v) => num(v) + ' шт'],
+    ['Человеко-часы', k.completed ? dec(k.person_hours) : NO_DATA, k.completed ? 'чел·ч' : '', 'длительность × люди', 'person_hours', 0,
+     (v) => dec(v) + ' чел·ч'],
+    ['Ср. длительность', none(k.avg_duration) ? NO_DATA : num(Math.round(k.avg_duration)), none(k.avg_duration) ? '' : 'мин',
+     none(k.avg_people) ? 'на операцию' : `людей в среднем: ${dec(k.avg_people)}`, 'avg_duration', 0,
+     (v) => (none(v) ? NO_DATA : dec(v) + ' мин')],
+    ['Ср. выработка', none(k.pcs_per_ph) ? NO_DATA : dec(k.pcs_per_ph), none(k.pcs_per_ph) ? '' : 'шт/чел·ч',
+     'смесь операций ⓘ', 'pcs_per_ph', 1, (v) => (none(v) ? NO_DATA : dec(v) + ' шт/чел·ч')],
+    ['Крит. остановки', num(k.pauses), '', k.pauses ? 'событий за период' : 'не было', 'pauses', -1, num],
+    ['Простои', k.pauses ? hm(k.stop_minutes) : '0 мин', '', 'суммарная длительность', 'stop_minutes', -1, (v) => hm(v)],
+  ];
+  const tips = { 'Обработано изделий': kcData.notes.pcs, 'Ср. выработка': kcData.notes.mix };
+  $('kKpis').innerHTML = cards.map(([label, value, unit, note, key, better, fmt]) => {
+    let delta = '';
+    if (ok && key && lfl.kpi[key]) {
+      const c = lfl.kpi[key];
+      let tip = `${lfl.prev_label}: ${fmt(c.prev)}`;
+      if (c.change === null) tip += ' · сравнить не с чем';
+      delta = `<div class="k-delta" data-tip="${esc(tip)}">${trend(c.change, better)}<span class="k-vs">${esc(lflVs(lfl))}</span></div>`;
+    }
+    const tip = tips[label] ? ` data-tip="${esc(tips[label])}" title="${esc(tips[label])}"` : '';
+    return `<div class="kpi"${tip}><div class="k-label">${esc(label)}</div>` +
+      `<div class="k-value${value === NO_DATA ? ' k-none' : ''}"><span class="k-num">${esc(value)}</span>` +
+      (unit ? `<span class="k-unit">${esc(unit)}</span>` : '') + '</div>' +
+      `<div class="k-note">${esc(note)}</div>${delta}</div>`;
+  }).join('');
+  fitValues($('kKpis'));
+}
+
+function kcLflCaption(lfl) {
+  const el = $('kLflCaption');
+  el.hidden = false;
+  if (!lfl || !lfl.available) { el.textContent = 'Сравнение с прошлым периодом: ' + ((lfl && lfl.reason) || 'недоступно'); return; }
+  const cut = lfl.partial ? `, последний день до ${lfl.cutoff} — как сегодня` : '';
+  el.textContent = lfl.prev_empty
+    ? `За прошлый период ${lfl.prev_label} с этими фильтрами данных нет — сравнивать не с чем.`
+    : `▲▼ — изменение к прошлому периоду ${lfl.prev_label} (${lfl.days} дн.${cut}) с теми же фильтрами`;
+}
+
+function kcActivity(employees) {
+  const rows = (employees || []).filter((e) => e.marks).slice(0, 14);
+  if (!rows.length) return '<div class="empty">Нет данных за выбранный период</div>';
+  const top = Math.max(1, ...rows.flatMap((e) => e.hours));
+  const head = '<div class="lh-name"></div>' + Array.from({ length: 24 }, (_, h) =>
+    `<div class="lh-hour${FILTERS.hour !== '' && Number(FILTERS.hour) === h ? ' on' : ''}">${String(h).padStart(2, '0')}</div>`).join('');
+  const body = rows.map((e) => `<div class="lh-name" title="${esc(e.employee)}">${esc(e.employee)}</div>` + e.hours.map((v, h) =>
+    `<div class="lh-cell" style="${loadTone(v / top * 100)}" data-tip="${esc(`${e.employee}, ${String(h).padStart(2, '0')}:00 — отметок: ${v}`)}">${v || ''}</div>`
+  ).join('')).join('');
+  return `<div class="loadheat">${head}${body}</div>`;
+}
+
+function kcOpCells(r) {
+  const end = r.end_time ? `${r.end_date !== r.start_date ? esc(r.end_date.slice(5)) + ' ' : ''}${esc(r.end_time)}` : (r.status === 'open' ? '…' : '—');
+  const dur = none(r.duration_min) ? (r.status === 'open' && !none(r.open_min) ? `идёт ${hm(r.open_min)}` : '—')
+    : (r.valid ? hm(r.duration_min) : `<span class="delta bad" title="Некорректное время — не входит в средние и нормы">${esc(hm(r.duration_min))}</span>`);
+  return [
+    esc(r.date.slice(5)),
+    `<span class="tag" title="${esc(r.product)}">${esc(r.product)}</span>`,
+    esc(r.operation),
+    `<span class="cellbox">${esc(r.start_time)}–${end}${r.midnight ? ' <small class="muted" title="Через полночь">🌙</small>' : ''}</span>`,
+    dur,
+    none(r.pcs) ? '—' : num(r.pcs),
+    none(r.people) ? '—' : num(r.people),
+    decOr(r.person_hours),
+    decOr(r.pcs_per_hour),
+    decOr(r.pcs_per_ph),
+    esc(r.started_by),
+    esc(r.closed_by || '—'),
+    `<span class="badge ${r.status === 'closed' ? 'done' : r.status === 'open' ? 'active' : 'cancelled'}">${esc(r.status_name)}</span>`,
+  ];
+}
+
+const KC_OP_COLUMNS = [{ title: 'Дата' }, { title: 'Продукция' }, { title: 'Операция' }, { title: 'Время' },
+  { title: 'Длительность', num: true, sort: 'duration' }, { title: 'Шт', num: true, sort: 'pcs' }, { title: 'Людей', num: true },
+  { title: 'Чел·ч', num: true, sort: 'ph' }, { title: 'Шт/ч', num: true }, { title: 'Шт/чел·ч', num: true, sort: 'rate' },
+  { title: 'Начал' }, { title: 'Завершил' }, { title: 'Статус' }];
+
+function renderKcOps() {
+  if (!kcData) return;
+  const q = ($('kOpsSearch').value || '').trim().toLowerCase();
+  const sort = KC_SORTS[$('kOpsSort').value] || KC_SORTS.date;
+  const rows = (kcData.ops || []).filter((r) => !q ||
+    `${r.product} ${r.operation} ${r.started_by} ${r.closed_by}`.toLowerCase().includes(q)).slice().sort(sort);
+  const shown = (kcData.ops || []).length;
+  $('kOpsNote').textContent = kcData.ops_total > shown
+    ? `показаны последние ${num(shown)} из ${num(kcData.ops_total)} — сузь период`
+    : `операций: ${num(rows.length)}${rows.length !== shown ? ' из ' + num(shown) : ''}`;
+  renderTable($('kOpsTable'), KC_OP_COLUMNS, rows, kcOpCells);
+  // Заголовок с сортировкой — клик меняет порядок (на телефоне — список «Сортировка»).
+  $('kOpsTable').querySelectorAll('thead th').forEach((th, i) => {
+    const key = KC_OP_COLUMNS[i].sort;
+    if (!key) return;
+    th.dataset.sort = key;
+    th.classList.add('sortable');
+    if ($('kOpsSort').value === key) th.classList.add('sorted');
+  });
+}
+
+function renderKcNorms() {
+  if (!kcData) return;
+  const q = ($('kNormsSearch').value || '').trim().toLowerCase();
+  const rows = (kcData.norms || []).filter((r) => !q || `${r.product} ${r.operation}`.toLowerCase().includes(q));
+  const lfl = kcData.lfl || {};
+  $('kNormsNote').textContent = `пар: ${num(rows.length)} · только завершённые операции`;
+  renderTable($('kNormsTable'),
+    [{ title: 'Продукция' }, { title: 'Операция' }, { title: 'Выполнений', num: true }, { title: 'Шт', num: true },
+     { title: 'Ср. время', num: true }, { title: 'Мин – макс', num: true }, { title: 'Ср. людей', num: true },
+     { title: 'Чел·ч', num: true }, { title: 'Шт/ч', num: true }, { title: 'Шт/чел·ч', num: true },
+     { title: lfl.available ? `К ${lfl.prev_label}` : 'К прошлому периоду', num: true }],
+    rows,
+    (r) => [`<span class="tag" title="${esc(r.product)}">${esc(r.product)}</span>`, esc(r.operation), num(r.completed), num(r.pcs),
+            esc(dur(r.avg_duration)),
+            none(r.min_duration) ? '—' : `${esc(hm(r.min_duration))} – ${esc(hm(r.max_duration))}`,
+            decOr(r.avg_people), dec(r.person_hours), decOr(r.pcs_per_hour), `<b>${decOr(r.pcs_per_ph)}</b>`,
+            none(r.prev_pcs_per_ph) ? '<span class="muted">не было</span>'
+              : `<span class="cellbox">${trend(r.pcs_per_ph_change, 1)} <small class="muted">было ${dec(r.prev_pcs_per_ph)}</small></span>`],
+    (r) => ({ key: 'operation', value: r.operation }));
+}
+
+function kcGroupTable(el, rows, key, title) {
+  renderTable(el,
+    [{ title }, { title: 'Операций', num: true }, { title: 'Шт', num: true }, { title: 'Чел·ч', num: true },
+     { title: 'Ср. время', num: true }, { title: 'Ср. людей', num: true }, { title: 'Шт/ч', num: true }, { title: 'Шт/чел·ч', num: true }],
+    rows,
+    (r) => [`<span class="tag">${esc(r[key])}</span>`, num(r.completed), num(r.pcs), dec(r.person_hours), esc(dur(r.avg_duration)),
+            decOr(r.avg_people), decOr(r.pcs_per_hour), decOr(r.pcs_per_ph)],
+    (r) => ({ key, value: r[key] }));
+}
+
+function renderKc(data) {
+  kcData = data;
+  lastData = data;
+  if (meta && meta.stub) refreshKcMeta();
+  const k = data.kpi;
+  const lfl = data.lfl || {};
+  $('kNote').textContent = `⚠ «Обработано изделий» — ${data.notes.pcs}; это не уникальный готовый выпуск цеха. ${data.notes.mix}`;
+  kcKpis(k, lfl);
+  kcLflCaption(lfl);
+  const daily = data.daily || [];
+  const activeDate = FILTERS.dateFrom === FILTERS.dateTo ? FILTERS.dateFrom : undefined;
+  $('kChartOps').innerHTML = barChart(daily.map((d) => ({ label: d.date.slice(5), key: d.date, value: d.completed })),
+    { color: '#3b6ef5', filterKey: 'date', unit: 'операций', activeValue: activeDate,
+      compare: lfl.available ? daily.map((d) => d.lfl_completed) : [],
+      compareTip: (i) => (daily[i].lfl_date ? ` · ${daily[i].lfl_date.slice(5)} (неделей раньше): ${num(daily[i].lfl_completed)}` : '') })
+    + (daily.length && lfl.available ? chartLegend([['box', '#3b6ef5', 'за день'], ['box', GHOST_COLOR, 'неделей раньше']]) : '');
+  $('kChartPcs').innerHTML = barChart(daily.map((d) => ({ label: d.date.slice(5), key: d.date, value: d.pcs })),
+    { color: '#7c5cf5', filterKey: 'date', unit: 'шт', activeValue: activeDate,
+      compare: lfl.available ? daily.map((d) => d.lfl_pcs) : [],
+      compareTip: (i) => ` · чел·ч ${dec(daily[i].person_hours)}` +
+        (daily[i].lfl_date ? ` · неделей раньше: ${num(daily[i].lfl_pcs)} шт, ${pctText(daily[i].lfl_change)}` : '') })
+    + (daily.length && lfl.available ? chartLegend([['box', '#7c5cf5', 'за день'], ['box', GHOST_COLOR, 'неделей раньше']]) : '');
+  $('kChartHourly').innerHTML = barChart((data.hourly || []).map((h) => ({ label: h.label, key: String(h.hour), value: h.value })),
+    { color: '#3fbf94', rotate: true, filterKey: 'hour', unit: 'шт', activeValue: FILTERS.hour,
+      compareTip: (i) => ` · операций ${num(data.hourly[i].completed)}` });
+  $('kChartStops').innerHTML = barChart((data.pause_daily || []).map((d) => ({ label: d.date.slice(5), key: d.date, value: d.minutes })),
+    { color: '#e34948', filterKey: 'date', unit: 'мин', activeValue: activeDate,
+      compareTip: (i) => ` · событий ${num(data.pause_daily[i].count)}` });
+  const cap = isNarrow() ? 8 : 12;
+  $('kChartProducts').innerHTML = barChart((data.top_products || []).slice(0, cap),
+    { color: '#f0a63c', rotate: true, filterKey: 'product', unit: 'шт', activeValue: FILTERS.product });
+  $('kChartOperations').innerHTML = barChart((data.top_operations || []).slice(0, cap),
+    { color: '#2a78d6', rotate: true, filterKey: 'operation', unit: 'шт', activeValue: FILTERS.operation });
+  $('kChartLaborP').innerHTML = barChart((data.labor_products || []).slice(0, cap),
+    { color: '#eb6834', rotate: true, filterKey: 'product', unit: 'чел·ч', activeValue: FILTERS.product });
+  $('kChartLaborO').innerHTML = barChart((data.labor_operations || []).slice(0, cap),
+    { color: '#0f766e', rotate: true, filterKey: 'operation', unit: 'чел·ч', activeValue: FILTERS.operation });
+
+  renderTable($('kHeavyTable'),
+    [{ title: 'Продукция' }, { title: 'Операция' }, { title: 'Чел·ч', num: true }, { title: 'Выполнений', num: true },
+     { title: 'Ср. время', num: true }, { title: 'Ср. людей', num: true }, { title: 'Шт/чел·ч', num: true }],
+    data.heavy || [],
+    (r) => [`<span class="tag">${esc(r.product)}</span>`, esc(r.operation), `<b>${dec(r.person_hours)}</b>`, num(r.completed),
+            esc(dur(r.avg_duration)), decOr(r.avg_people), decOr(r.pcs_per_ph)],
+    (r) => ({ key: 'operation', value: r.operation }));
+
+  $('kChartReasons').innerHTML = pieChart(data.pause_reasons || []);
+  renderTable($('kShiftTable'),
+    [{ title: 'Смена' }, { title: 'Операций', num: true }, { title: 'Шт', num: true }, { title: 'Чел·ч', num: true },
+     { title: 'Шт/чел·ч', num: true }],
+    data.shifts || [],
+    (r) => [`<span class="cellbox">${esc(r.shift_date.slice(5))} · ${esc(r.shift_name)}${r.midnight ? ` <small class="muted" title="Операций через полночь">🌙 ${num(r.midnight)}</small>` : ''}</span>`,
+            num(r.completed), num(r.pcs), dec(r.person_hours), decOr(r.pcs_per_ph)],
+    (r) => ({ key: 'shift', value: r.shift }));
+
+  renderAnalysis(data.analysis, $('kAnalysis'));
+
+  renderTable($('kEmployeeTable'),
+    [{ title: 'Сотрудник' }, { title: 'Начал', num: true }, { title: 'Завершил', num: true }, { title: 'Отменил', num: true },
+     { title: 'Операций с отметкой', num: true }, { title: 'Шт в завершённых им (группой)', num: true }, { title: 'Остановки', num: true }],
+    data.employees || [],
+    (e) => [`<span class="tag">${esc(e.employee)}</span>`, num(e.started), num(e.closed), num(e.cancelled), num(e.ops),
+            num(e.pcs_closed), e.pauses ? `${num(e.pauses)} · ${hm(e.stop)}` : '—'],
+    (e) => ({ key: 'employee', value: e.employee }));
+  $('kActivity').innerHTML = kcActivity(data.employees);
+
+  const opened = data.open_ops || [];
+  $('kOpenNote').textContent = opened.length ? `сейчас в работе: ${num(opened.length)}` : 'нет операций в работе';
+  renderTable($('kOpenTable'),
+    [{ title: 'Продукция' }, { title: 'Операция' }, { title: 'Начало' }, { title: 'Идёт', num: true },
+     { title: 'Людей', num: true }, { title: 'Начал' }],
+    opened,
+    (r) => [`<span class="tag">${esc(r.product)}</span>`, esc(r.operation), `${esc(r.start_date.slice(5))} ${esc(r.start_time)}`,
+            none(r.open_min) ? '—' : esc(hm(r.open_min)), none(r.people) ? '—' : num(r.people), esc(r.started_by)]);
+
+  renderTable($('kDailyTable'),
+    [{ title: 'Дата' }, { title: 'Начато', num: true }, { title: 'Завершено', num: true }, { title: 'Шт', num: true },
+     { title: 'Чел·ч', num: true }, { title: 'Ср. время', num: true }, { title: 'Шт/чел·ч', num: true },
+     { title: 'Простои', num: true }, { title: 'Шт неделей раньше', num: true }],
+    daily,
+    (d) => [`<span class="cellbox">${esc(d.date)} <span class="muted">${esc(d.weekday)}</span></span>`, num(d.started),
+            num(d.completed), num(d.pcs), dec(d.person_hours), esc(dur(d.avg_duration)), decOr(d.pcs_per_ph),
+            d.pauses ? `${num(d.pauses)} · ${hm(d.stop)}` : '—',
+            d.lfl_date ? `<span class="cellbox">${num(d.lfl_pcs)} ${trend(d.lfl_change, 1)}</span>` : '—'],
+    (d) => ({ key: 'date', value: d.date }));
+
+  renderTable($('kPauseTable'),
+    [{ title: 'Дата' }, { title: 'Причина' }, { title: 'Время' }, { title: 'Длительность', num: true }, { title: 'Сотрудник' }],
+    data.pause_rows || [],
+    (r) => [esc(r.date), esc(r.reason), `${esc(r.start_time)}–${esc(r.end_time)}`, esc(hm(r.minutes)), esc(r.user_name)]);
+
+  $('kNormsWarn').textContent = `ⓘ ${data.notes.norms} Шт/чел·ч в паре = Σ шт / Σ чел·ч, а не среднее по записям; ` +
+    'мин – макс — по корректно закрытым операциям.';
+  renderKcNorms();
+  kcGroupTable($('kProductTable'), data.products || [], 'product', 'Продукция');
+  kcGroupTable($('kOperationTable'), data.operations || [], 'operation', 'Операция');
+  renderKcOps();
+  mountExportButtons();
+
+  const src = data.source || {};
+  const fetched = formatMoment(src.fetched_at);
+  const modes = { 'kc-api': 'API бота КЦ', 'kc-demo': 'тестовые данные КЦ (demo)' };
+  const skipped = (data.excluded_dates || []).length ? ` · скрыто дат: ${data.excluded_dates.join(', ')}` : '';
+  $('sourceLine').textContent = `Источник: ${modes[src.mode] || src.mode || '—'} · снимок от ${fetched} · автообновление ${meta ? meta.refresh_seconds : 60} с${skipped}`;
+  $('periodLine').textContent = `Период ${FILTERS.dateFrom || 'начало'} – ${FILTERS.dateTo || 'сегодня'} · ${SHIFT_NAMES[FILTERS.shift]} · ` +
+    `операций завершено: ${num(k.completed)} · обработано изделий по операциям: ${k.completed ? num(k.pcs) + ' шт' : 'нет данных'} · обновлено ${fetched}`;
+}
+
+function bindKc() {
+  $('kOpsSearch').addEventListener('input', renderKcOps);
+  $('kOpsSort').addEventListener('change', renderKcOps);
+  $('kNormsSearch').addEventListener('input', renderKcNorms);
+  $('kOpsTable').addEventListener('click', (e) => {
+    const th = e.target.closest ? e.target.closest('th[data-sort]') : null;
+    if (!th) return;
+    $('kOpsSort').value = th.dataset.sort;
+    renderKcOps();
+  });
+  $('kcRetry').addEventListener('click', async () => {
+    await refreshKcMeta();
+    loadSummary(true);
+  });
+}
+
 /* ─── тултип ──────────────────────────────────────────────────────────────── */
 
 function moveTip(e, text) {
@@ -1494,7 +1816,7 @@ function bindEvents() {
   $('apply').addEventListener('click', () => { readControls(); loadSummary(false); });
   $('reset').addEventListener('click', () => { resetFilters(); syncControls(); loadSummary(false); });
   $('refresh').addEventListener('click', () => loadSummary(true));
-  ['dateFrom', 'dateTo', 'equipment', 'product', 'employee', 'shift', 'hour', 'oven', 'status'].forEach((id) =>
+  ['dateFrom', 'dateTo', 'equipment', 'product', 'employee', 'shift', 'hour', 'oven', 'status', 'operation'].forEach((id) =>
     $(id).addEventListener('change', () => { readControls(); loadSummary(false); }));
 
   $('exportPdf').addEventListener('click', () => download('/api/export/pdf?' + query(false)));
@@ -1502,6 +1824,7 @@ function bindEvents() {
     b.addEventListener('click', () => switchSource(b.dataset.source)));
   $('exportAll').addEventListener('click', () => exportWidget('all'));
   bindProofing();
+  bindKc();
   initDropzone();
 
   let width = window.innerWidth;
@@ -1524,11 +1847,12 @@ async function init() {
   try {
     m = await fetchMeta(SOURCE);
   } catch (e) {
-    if (SOURCE === 'proofing') {
-      // Расстойка недоступна — показываем ошибку на её странице, ФК и БХМ доступны кнопками.
+    if (hasOwnPage()) {
+      // Расстойка или КЦ недоступны — ошибка на их странице, остальные разделы доступны кнопками.
       proofFail = e.message;
       try { const fk = await fetchMeta('fk'); m = { ...fk, stub: true, equipment: [], products: [], employees: [],
-        ovens: [], statuses: [], date_min: '', date_max: '', plan_enabled: false, units: { qty: 'шт', rate: 'шт/ч' } }; } catch (e2) { /* ничего */ }
+        ovens: [], statuses: [], operations: [], date_min: '', date_max: '', plan_enabled: false,
+        units: { qty: 'шт', rate: isKc() ? 'шт/чел·ч' : 'шт/ч' } }; } catch (e2) { /* ничего */ }
     } else if (SOURCE !== 'fk') {
       // Сохранённый БХМ сейчас недоступен — открываем ФК, а не пустую страницу.
       notice = `Источник ${SOURCES[SOURCE].title} недоступен (${e.message}) — показан ФК.`;
@@ -1551,7 +1875,7 @@ async function init() {
   initTabs();
   applySourceUi();
   await refreshPlanState();
-  if (proofFail) showProofError(proofFail);
+  if (proofFail) showSectionError(proofFail);
   else await loadSummary(false);
   if (notice) showAlert(notice);
 

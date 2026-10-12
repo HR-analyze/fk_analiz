@@ -476,7 +476,8 @@ def test_app_proofing_down_does_not_break_fk_and_bhm():
                 assert r.status == 200 and h["ok"] and "proofing" in h
                 assert KEY not in json.dumps(h)
                 r = await client.get("/api/meta?source=fk")
-                assert (await r.json())["sources"] == {"fk": True, "bhm": True, "proofing": True}
+                sources_state = (await r.json())["sources"]
+                assert {k: sources_state[k] for k in ("fk", "bhm", "proofing")} == {"fk": True, "bhm": True, "proofing": True}
             with patched(ps, PROOFING_SOURCE_MODE="off"):
                 r = await client.get("/api/summary?source=proofing")
                 assert r.status == 503 and "не настроен" in (await r.json())["error"]

@@ -14,6 +14,7 @@
       <button class="src-btn active" type="button" role="radio" aria-checked="true" data-source="fk">ФК</button>
       <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="bhm">БХМ</button>
       <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="proofing">Расстойка</button>
+      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="kc" title="Кондитерский цех">КЦ</button>
     </div>
     <div class="head-row">
       <h1>Аналитический отчёт по производству</h1>
@@ -31,6 +32,9 @@
     <button class="tab" role="tab" data-tab="history">История загрузок</button>
     <button class="tab" role="tab" data-tab="proofing" hidden>Сводка</button>
     <button class="tab" role="tab" data-tab="batches" hidden>Партии</button>
+    <button class="tab" role="tab" data-tab="kc" hidden>Сводка</button>
+    <button class="tab" role="tab" data-tab="kcops" hidden>Операции</button>
+    <button class="tab" role="tab" data-tab="kcnorms" hidden>Нормативы</button>
   </nav>
 
   <details class="panel filters" id="filterPanel">
@@ -41,9 +45,10 @@
     <div class="filters-body">
       <label class="field"><span>Дата от</span><input type="date" id="dateFrom"></label>
       <label class="field"><span>до</span><input type="date" id="dateTo"></label>
-      <label class="field"><span>Оборудование</span><select id="equipment"><option value="all">Все</option></select></label>
+      <label class="field" data-only="fk bhm proofing"><span>Оборудование</span><select id="equipment"><option value="all">Все</option></select></label>
       <label class="field"><span id="productLabel">Продукт</span><select id="product"><option value="all">Все</option></select></label>
-      <label class="field only-proofing" hidden><span>Тип печи</span><select id="oven"><option value="all">Все</option></select></label>
+      <label class="field" data-only="proofing" hidden><span>Тип печи</span><select id="oven"><option value="all">Все</option></select></label>
+      <label class="field" data-only="kc" hidden><span>Операция</span><select id="operation"><option value="all">Все</option></select></label>
       <label class="field"><span>Сотрудник</span><select id="employee"><option value="all">Все</option></select></label>
       <label class="field"><span>Смена</span><select id="shift">
         <option value="all">Все</option>
@@ -51,7 +56,7 @@
         <option value="night">Ночь 20–08</option>
       </select></label>
       <label class="field"><span>Час</span><select id="hour"><option value="">Все</option></select></label>
-      <label class="field only-proofing" hidden><span>Статус партии</span><select id="status"><option value="all">Все</option></select></label>
+      <label class="field" data-only="proofing kc" hidden><span id="statusLabel">Статус</span><select id="status"><option value="all">Все</option></select></label>
       <div class="field actions">
         <button class="btn primary" id="apply">Применить</button>
         <button class="btn" id="reset">Сброс</button>
@@ -275,6 +280,151 @@
           <input type="search" id="pBatchSearch" placeholder="например, багет" autocomplete="off"></label>
       </div>
       <div class="table-wrap"><table class="table batch-table" id="pBatchTable"></table></div>
+    </section>
+  </div>
+
+  <!-- ── КЦ: сводка ───────────────────────────────────────────────────────── -->
+  <div class="tab-page" data-page="kc" hidden>
+    <div class="proof-error" id="kcError" hidden>
+      <div><b>Раздел «КЦ» сейчас недоступен.</b> <span id="kcErrorText"></span></div>
+      <p>ФК, БХМ и расстойка работают независимо — переключись на них кнопками сверху.</p>
+      <button class="btn" type="button" id="kcRetry">Повторить</button>
+    </div>
+    <div id="kcBody">
+    <div class="plan-skew kc-note" id="kNote"></div>
+    <section class="kpis k8" id="kKpis"></section>
+    <p class="lfl-caption" id="kLflCaption" hidden></p>
+
+    <section class="grid-2 kc-grid">
+      <article class="panel" data-widget="daily">
+        <header class="panel-head"><h2>Завершено операций по дням</h2><span class="unit">по времени завершения · нажми на столбец</span></header>
+        <div id="kChartOps" class="chart"></div>
+      </article>
+      <article class="panel" data-widget="daily">
+        <header class="panel-head"><h2>Обработано изделий по дням</h2><span class="unit">шт, сумма по операциям · нажми на столбец</span></header>
+        <div id="kChartPcs" class="chart"></div>
+      </article>
+    </section>
+
+    <section class="grid-2 kc-grid">
+      <article class="panel" data-widget="hourly">
+        <header class="panel-head"><h2>Обработано изделий по часам</h2><span class="unit">шт по часу завершения · нажми на столбец</span></header>
+        <div id="kChartHourly" class="chart"></div>
+      </article>
+      <article class="panel" data-widget="pauses">
+        <header class="panel-head"><h2>Динамика простоев</h2><span class="unit">минуты по дням</span></header>
+        <div id="kChartStops" class="chart"></div>
+      </article>
+    </section>
+
+    <section class="grid-2 kc-grid">
+      <article class="panel" data-widget="products">
+        <header class="panel-head"><h2>Объём по продукции</h2><span class="unit">шт по операциям · нажми на столбец</span></header>
+        <div id="kChartProducts" class="chart"></div>
+      </article>
+      <article class="panel" data-widget="operations">
+        <header class="panel-head"><h2>Объём по операциям</h2><span class="unit">шт · нажми на столбец</span></header>
+        <div id="kChartOperations" class="chart"></div>
+      </article>
+    </section>
+
+    <section class="grid-2 kc-grid">
+      <article class="panel" data-widget="products">
+        <header class="panel-head"><h2>Человеко-часы по продукции</h2><span class="unit">чел·ч · нажми на столбец</span></header>
+        <div id="kChartLaborP" class="chart"></div>
+      </article>
+      <article class="panel" data-widget="operations">
+        <header class="panel-head"><h2>Человеко-часы по операциям</h2><span class="unit">чел·ч · нажми на столбец</span></header>
+        <div id="kChartLaborO" class="chart"></div>
+      </article>
+    </section>
+
+    <section class="panel" data-widget="norms">
+      <header class="panel-head"><h2>Трудоёмкие операции</h2><span class="unit">топ пар «продукция + операция» по чел·ч · все — во вкладке «Нормативы»</span></header>
+      <div class="table-wrap"><table class="table" id="kHeavyTable"></table></div>
+    </section>
+
+    <section class="grid-2 kc-grid">
+      <article class="panel" data-widget="reasons">
+        <header class="panel-head"><h2>Критические остановки по причинам</h2><span class="unit">минуты</span></header>
+        <div id="kChartReasons" class="chart"></div>
+      </article>
+      <article class="panel" data-widget="shifts">
+        <header class="panel-head"><h2>По сменам</h2><span class="unit">ночь 20–08 — к дате её начала</span></header>
+        <div class="table-wrap"><table class="table" id="kShiftTable"></table></div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <header class="panel-head"><h2>Сводка фактов</h2><span class="unit">попадает в PDF</span></header>
+      <div id="kAnalysis" class="analysis"></div>
+    </section>
+
+    <section class="panel" data-widget="employees">
+      <header class="panel-head"><h2>Сотрудники</h2><span class="unit">кто начал и кто завершил · people — численность группы, выработка людям не приписывается · нажми на строку</span></header>
+      <div class="table-wrap"><table class="table" id="kEmployeeTable"></table></div>
+    </section>
+
+    <section class="panel" data-widget="activity">
+      <header class="panel-head"><h2>Активность сотрудников по часам</h2><span class="unit">отметок начала, завершения и отмены</span></header>
+      <div id="kActivity" class="loadwrap"></div>
+    </section>
+
+    <section class="panel" data-widget="open_ops">
+      <header class="panel-head"><h2>Операции в работе</h2><span class="unit" id="kOpenNote">—</span></header>
+      <div class="table-wrap"><table class="table" id="kOpenTable"></table></div>
+    </section>
+
+    <section class="panel" data-widget="daily">
+      <header class="panel-head"><h2>Сводка по дням</h2><span class="unit">нажми на строку</span></header>
+      <div class="table-wrap"><table class="table" id="kDailyTable"></table></div>
+    </section>
+
+    <section class="panel" data-widget="pauses">
+      <header class="panel-head"><h2>Журнал критических остановок</h2><span class="unit">последние записи</span></header>
+      <div class="table-wrap"><table class="table" id="kPauseTable"></table></div>
+    </section>
+    </div>
+  </div>
+
+  <!-- ── КЦ: операции ─────────────────────────────────────────────────────── -->
+  <div class="tab-page" data-page="kcops" hidden>
+    <section class="panel" data-widget="ops">
+      <header class="panel-head"><h2>Операции</h2><span class="unit" id="kOpsNote">—</span></header>
+      <div class="batch-tools">
+        <label class="field"><span>Поиск: продукция, операция, сотрудник</span>
+          <input type="search" id="kOpsSearch" placeholder="например, купание" autocomplete="off"></label>
+        <label class="field"><span>Сортировка</span><select id="kOpsSort">
+          <option value="date">сначала новые</option>
+          <option value="pcs">больше штук</option>
+          <option value="ph">больше чел·ч</option>
+          <option value="rate">выше шт/чел·ч</option>
+          <option value="duration">дольше</option>
+          <option value="product">по продукции</option>
+        </select></label>
+      </div>
+      <div class="table-wrap"><table class="table batch-table" id="kOpsTable"></table></div>
+    </section>
+  </div>
+
+  <!-- ── КЦ: нормативы ────────────────────────────────────────────────────── -->
+  <div class="tab-page" data-page="kcnorms" hidden>
+    <section class="panel" data-widget="norms">
+      <header class="panel-head"><h2>Нормативы по продукции и операциям</h2><span class="unit" id="kNormsNote">—</span></header>
+      <div class="plan-skew" id="kNormsWarn"></div>
+      <div class="batch-tools">
+        <label class="field"><span>Поиск: продукция или операция</span>
+          <input type="search" id="kNormsSearch" placeholder="например, ромовая баба" autocomplete="off"></label>
+      </div>
+      <div class="table-wrap"><table class="table" id="kNormsTable"></table></div>
+    </section>
+    <section class="panel" data-widget="products">
+      <header class="panel-head"><h2>Трудозатраты по продукции</h2><span class="unit">нажми на строку</span></header>
+      <div class="table-wrap"><table class="table" id="kProductTable"></table></div>
+    </section>
+    <section class="panel" data-widget="operations">
+      <header class="panel-head"><h2>Трудозатраты по операциям</h2><span class="unit">нажми на строку</span></header>
+      <div class="table-wrap"><table class="table" id="kOperationTable"></table></div>
     </section>
   </div>
 

@@ -11,9 +11,10 @@ RUN apt-get update \
     && pip install --no-cache-dir -r requirements.txt
 
 COPY app.py aggregate.py sources.py bhm_source.py plans.py pg_plan_store.py exports.py \
-    proofing_source.py proofing_aggregate.py proofing_exports.py ./
+    proofing_source.py proofing_aggregate.py proofing_exports.py \
+    kc_source.py kc_aggregate.py kc_exports.py ./
 COPY static ./static
-COPY demo_data.json bhm_demo_data.json proofing_demo_data.json ./
+COPY demo_data.json bhm_demo_data.json proofing_demo_data.json kc_demo_data.json ./
 RUN mkdir -p /app/data
 
 EXPOSE 8090

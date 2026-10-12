@@ -12,6 +12,7 @@
     python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090
     python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090 --source bhm
     python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090 --source proofing
+    python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090 --source kc
 Код возврата 1, если хоть одна проверка провалилась.
 """
 import argparse
@@ -22,7 +23,7 @@ WIDTHS = [(360, "малый телефон"), (390, "iPhone"), (414, "больш
           (768, "планшет"), (1024, "ноутбук"), (1440, "десктоп"), (1920, "широкий")]
 TABS = ["dashboard", "plan", "history"]
 # У расстойки свои вкладки: сводка и таблица партий.
-SOURCE_TABS = {"bhm": ["dashboard"], "proofing": ["proofing", "batches"]}
+SOURCE_TABS = {"bhm": ["dashboard"], "proofing": ["proofing", "batches"], "kc": ["kc", "kcops", "kcnorms"]}
 
 # Поломка вёрстки часто живёт МЕЖДУ типовыми разрешениями: на 390px шрифт уже
 # ужат медиазапросом, на 1440px места вдоволь, а на 820px значение не влезает.
@@ -205,7 +206,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://127.0.0.1:8090")
     ap.add_argument("--chrome", default="", help="путь к бинарю Chromium, если Playwright его не находит")
-    ap.add_argument("--source", default="fk", choices=("fk", "bhm", "proofing"), help="какой источник проверять")
+    ap.add_argument("--source", default="fk", choices=("fk", "bhm", "proofing", "kc"), help="какой источник проверять")
     args = ap.parse_args()
     print(f"Проверка вёрстки: {args.url} (источник {args.source})\n")
     problems = asyncio.run(run(args.url, args.chrome, args.source))

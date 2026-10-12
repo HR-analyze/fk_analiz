@@ -1,4 +1,4 @@
-"""Read-only веб-дашборд: ФК, БХМ и расстойка. В базы ботов только чтение, никаких записей."""
+"""Read-only веб-дашборд: ФК, БХМ, расстойка и КЦ. В базы ботов только чтение, никаких записей."""
 import asyncio
 import base64
 import binascii
@@ -15,11 +15,14 @@ from aiohttp import web
 
 import aggregate
 import exports
+import kc_aggregate
+import kc_exports
 import plans as plan_store
 import proofing_aggregate
 import proofing_exports
 import proofing_source as proofing_mod
 from bhm_source import BhmSource
+from kc_source import KcSource
 from proofing_source import PhotoNotFound, ProofingSource
 from sources import TZ, DataSource
 
@@ -36,9 +39,11 @@ REFRESH_SECONDS = int(os.getenv("REFRESH_SECONDS", "60"))
 EXCLUDE_DATES = tuple(d.strip() for d in os.getenv("EXCLUDE_DATES", "").split(",") if d.strip())
 BHM_EXCLUDE_DATES = tuple(d.strip() for d in os.getenv("BHM_EXCLUDE_DATES", "").split(",") if d.strip())
 PROOFING_EXCLUDE_DATES = tuple(d.strip() for d in os.getenv("PROOFING_EXCLUDE_DATES", "").split(",") if d.strip())
+KC_EXCLUDE_DATES = tuple(d.strip() for d in os.getenv("KC_EXCLUDE_DATES", "").split(",") if d.strip())
 source = DataSource()
 bhm_source = BhmSource()
 proofing_source = ProofingSource()
+kc_source = KcSource()
 
 # Источники дашборда. ФК — по умолчанию: старые ссылки без ?source= работают как раньше.
 # У БХМ своя единица (кг) и нет загрузки плана — вкладки плана для него скрыты.
@@ -52,6 +57,10 @@ SOURCES = {
     # появится согласованный источник планов расстойки.
     "proofing": {"title": "Расстойка", "data": proofing_source, "exclude": PROOFING_EXCLUDE_DATES, "plans": False,
                  "units": {"qty": "шт", "rate": "шт/ч"}, "file": "proofing", "kind": "proofing"},
+    # КЦ — самостоятельные операции без маршрута: свои расчёты (kc_aggregate) и выгрузки
+    # (kc_exports). Штуки операций не складываются в готовый выпуск. Плана нет.
+    "kc": {"title": "КЦ", "data": kc_source, "exclude": KC_EXCLUDE_DATES, "plans": False,
+           "units": {"qty": "шт", "rate": "шт/чел·ч"}, "file": "kc", "kind": "kc"},
 }
 
 
@@ -67,11 +76,25 @@ def pick_source(request):
         raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
             {"ok": False, "error": "раздел «Расстойка» не настроен: задай PROOFING_API_URL и PROOFING_API_KEY"},
             ensure_ascii=False))
+    if key == "kc" and not kc_source.enabled:
+        raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
+            {"ok": False, "error": "раздел «КЦ» не настроен: задай KC_API_URL и KC_API_KEY"}, ensure_ascii=False))
     return key, SOURCES[key]
 
 
 def sources_state():
-    return {"fk": True, "bhm": bhm_source.enabled, "proofing": proofing_source.enabled}
+    return {"fk": True, "bhm": bhm_source.enabled, "proofing": proofing_source.enabled, "kc": kc_source.enabled}
+
+
+async def kc_snapshot(force=False):
+    """Снимок КЦ или понятная 503 — только для раздела КЦ, остальные разделы не задеты."""
+    try:
+        return await kc_source.get(force=force)
+    except Exception as exc:
+        raise web.HTTPServiceUnavailable(content_type="application/json", text=json.dumps(
+            {"ok": False, "source_key": "kc",
+             "error": f"API кондитерского цеха недоступно: {exc}. Проверь KC_API_URL, KC_API_KEY и работу бота КЦ."},
+            ensure_ascii=False))
 
 
 async def proofing_snapshot(force=False):
@@ -103,7 +126,7 @@ async def health(request):
         return web.json_response({"ok": False, "error": f"{type(exc).__name__}: {exc}", **source.describe()}, status=503)
     # БХМ и расстойка — дополнительные источники: их недоступность не делает контейнер нездоровым.
     return web.json_response({"ok": True, **source.describe(), "bhm": bhm_source.describe(),
-                              "proofing": proofing_source.describe()})
+                              "proofing": proofing_source.describe(), "kc": kc_source.describe()})
 
 
 async def meta(request):
@@ -115,6 +138,14 @@ async def meta(request):
             "source": proofing_source.describe(), "source_key": key, "sources": sources_state(),
             "units": src["units"], "plan_enabled": False, "plan_upload_enabled": False,
             **proofing_aggregate.build_meta(snapshot, src["exclude"]),
+        }))
+    if src.get("kind") == "kc":
+        snapshot = await kc_snapshot()
+        return no_store(web.json_response({
+            "ok": True, "kind": "kc", "timezone": str(TZ), "refresh_seconds": REFRESH_SECONDS,
+            "source": kc_source.describe(), "source_key": key, "sources": sources_state(),
+            "units": src["units"], "plan_enabled": False, "plan_upload_enabled": False,
+            **kc_aggregate.build_meta(snapshot, src["exclude"]),
         }))
     snapshot = await src["data"].get()
     return no_store(web.json_response({
@@ -262,12 +293,48 @@ async def collect_proofing(request, key, src):
     return payload, filters, stamp
 
 
+KC_STATUS_LABELS = {"all": "все", **kc_aggregate.STATUS_NAMES}
+
+
+async def collect_kc(request, key, src):
+    """КЦ: одна выборка и один расчёт для страницы, Excel и PDF."""
+    q = request.query
+    args = {name: q.get(name, default).strip() for name, default in (
+        ("date_from", ""), ("date_to", ""), ("product", "all"), ("operation", "all"), ("employee", "all"),
+        ("shift", "all"), ("hour", ""), ("status", "all"))}
+    snapshot = await kc_snapshot(force=q.get("refresh") == "1")
+    payload = kc_aggregate.build_summary(snapshot, args, exclude_dates=src["exclude"], now=datetime.now(TZ))
+    payload.update(source=kc_source.describe(), source_key=key, source_title=src["title"], units=src["units"],
+                   plan_enabled=False, excluded_dates=list(src["exclude"]))
+    f = payload["filters_applied"]
+
+    def named(value):
+        return "все" if value in ("all", "") else value
+
+    filters = [
+        ("Источник", "КЦ — кондитерский цех"),
+        ("Период", f"{f['date_from'] or 'начало'} – {f['date_to'] or 'сегодня'}"),
+        ("Продукция", named(f["product"])),
+        ("Операция", named(f["operation"])),
+        ("Сотрудник", named(f["employee"])),
+        ("Смена", SHIFT_LABELS.get(f["shift"], f["shift"])),
+        ("Час", f"{f['hour']:02d}:00" if f["hour"] is not None else "все"),
+        ("Статус операции", KC_STATUS_LABELS.get(f["status"], f["status"])),
+        ("Скрытые даты", ", ".join(src["exclude"]) or "нет"),
+    ]
+    stamp = {**args, "equipment": "all", "hour": "" if f["hour"] is None else str(f["hour"]), "shift": f["shift"],
+             "source": key}
+    return payload, filters, stamp
+
+
 async def collect(request):
     """Одна выборка и один расчёт для страницы, Excel и PDF — цифры всегда совпадают."""
     q = request.query
     key, src = pick_source(request)
     if src.get("kind") == "proofing":
         return await collect_proofing(request, key, src)
+    if src.get("kind") == "kc":
+        return await collect_kc(request, key, src)
     exclude_dates = src["exclude"]
     args = {
         "date_from": q.get("date_from", "").strip(),
@@ -334,7 +401,7 @@ def _stamp(args):
         parts.append(args["shift"])
     if args["hour"]:
         parts.append(f"h{args['hour']}")
-    for key in ("oven", "status"):
+    for key in ("oven", "operation", "status"):
         if args.get(key, "all") not in ("all", ""):
             parts.append(re.sub(r"[^\w-]+", "-", args[key], flags=re.UNICODE)[:24])
     return "_".join(parts)
@@ -346,6 +413,8 @@ async def summary(request):
     payload["filters"] = filters
     if payload.get("kind") == "proofing":
         payload["analysis"] = proofing_aggregate.build_analysis(payload, filters)
+    elif payload.get("kind") == "kc":
+        payload["analysis"] = kc_aggregate.build_analysis(payload, filters)
     else:
         payload["analysis"] = aggregate.build_analysis(payload, filters)
     return no_store(web.json_response(payload))
@@ -372,6 +441,19 @@ async def export_proofing(request, kind):
     return _attachment(blob, f"proofing_svodka_{_stamp(args)}.pdf", "application/pdf")
 
 
+async def export_kc(request, kind):
+    widget = request.query.get("widget", "all").strip() or "all"
+    if kind == "xlsx" and widget != "all" and widget not in kc_exports.ALL_WIDGETS:
+        return web.json_response({"ok": False, "error": f"неизвестный виджет: {widget}"}, status=400)
+    payload, filters, args = await collect(request)
+    if kind == "xlsx":
+        blob = await asyncio.to_thread(kc_exports.build_xlsx, payload, widget, filters)
+        return _attachment(blob, f"kc_{widget}_{_stamp(args)}.xlsx", XLSX_TYPE)
+    analysis = kc_aggregate.build_analysis(payload, filters)
+    blob = await asyncio.to_thread(kc_exports.build_pdf, payload, analysis, filters)
+    return _attachment(blob, f"kc_svodka_{_stamp(args)}.pdf", "application/pdf")
+
+
 async def proofing_photo(request):
     """Фото партии по запросу: браузер видит только этот адрес дашборда, ключ бота — нет."""
     if not proofing_source.enabled:
@@ -392,6 +474,8 @@ async def proofing_photo(request):
 async def export_xlsx(request):
     if request.query.get("source", "").strip().lower() == "proofing":
         return await export_proofing(request, "xlsx")
+    if request.query.get("source", "").strip().lower() == "kc":
+        return await export_kc(request, "xlsx")
     widget = request.query.get("widget", "all").strip() or "all"
     if widget != "all" and widget not in exports.ALL_WIDGETS:
         return web.json_response({"ok": False, "error": f"неизвестный виджет: {widget}"}, status=400)
@@ -413,6 +497,8 @@ async def export_xlsx(request):
 async def export_pdf(request):
     if request.query.get("source", "").strip().lower() == "proofing":
         return await export_proofing(request, "pdf")
+    if request.query.get("source", "").strip().lower() == "kc":
+        return await export_kc(request, "pdf")
     payload, filters, args = await collect(request)
     analysis = aggregate.build_analysis(payload, filters)
     title = "Сводка по производству" if args["source"] == "fk" else f"Сводка по производству {payload['source_title']}"
@@ -446,6 +532,10 @@ def validate_relax():
         raise RuntimeError("RelaxDev dashboard: PROOFING_API_KEY required for PROOFING_API_URL")
     if os.getenv("PROOFING_SOURCE_MODE", "").strip().lower() == "api" and not os.getenv("PROOFING_API_URL", "").strip():
         raise RuntimeError("RelaxDev dashboard: PROOFING_API_URL required for PROOFING_SOURCE_MODE=api")
+    if os.getenv("KC_API_URL", "").strip() and not os.getenv("KC_API_KEY", "").strip():
+        raise RuntimeError("RelaxDev dashboard: KC_API_KEY required for KC_API_URL")
+    if os.getenv("KC_SOURCE_MODE", "").strip().lower() == "api" and not os.getenv("KC_API_URL", "").strip():
+        raise RuntimeError("RelaxDev dashboard: KC_API_URL required for KC_SOURCE_MODE=api")
 
 
 async def start_storage(app):
@@ -501,6 +591,7 @@ def build_app():
 
 
 if __name__ == "__main__":
-    log.info("FK dashboard starting on port %s (source=%s, bhm=%s, proofing=%s)",
-             PORT, source.describe()["mode"], bhm_source.describe()["mode"], proofing_source.describe()["mode"])
+    log.info("FK dashboard starting on port %s (source=%s, bhm=%s, proofing=%s, kc=%s)", PORT,
+             source.describe()["mode"], bhm_source.describe()["mode"], proofing_source.describe()["mode"],
+             kc_source.describe()["mode"])
     web.run_app(build_app(), host="0.0.0.0", port=PORT, access_log=None)

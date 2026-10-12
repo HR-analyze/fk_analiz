@@ -460,3 +460,16 @@ body.modal-open{overflow:hidden}
   .stage-who{text-align:right}
   .cellbox{text-align:right}
 }
+
+/* ── КЦ: кондитерский цех ─────────────────────────────────────────────── */
+.kc-note{margin-bottom:16px}
+.tab-page[data-page="kc"] .grid-2 > *,.tab-page[data-page="kcnorms"] .grid-2 > *{min-width:0}
+.table th.sortable{cursor:pointer;user-select:none}
+.table th.sortable::after{content:" ↕";color:#b0b8c6}
+.table th.sorted{color:var(--blue)}
+.table th.sorted::after{content:" ↓";color:var(--blue)}
+.kpi[data-tip]{cursor:help}
+@media (max-width:720px){
+  /* четыре раздела в один ряд на 360px: ужимаем поля кнопок, а не текст */
+  .src-btn{padding:8px 4px;font-size:14px;letter-spacing:0}
+}
