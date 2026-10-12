@@ -2015,7 +2015,7 @@ function renderTiming(data) {
   const rows = data.timing || [];
   const chains = rows.filter((r) => r.stages_count > 1).length;
   $('tNote').textContent = `ⓘ Этапы связаны по единому продукту (справочник продуктов), а не по номеру партии — общего номера у ботов нет. ` +
-    `Фасовка — отдельный бот, пока не подключён: показываем только «передано на фасовку» из переписки кондитерского цеха (время по сообщению, неточно). ` +
+    `Фасовка — отдельный бот, пока не подключён: показываем только «сдано / передано на фасовку» из переписки кондитерского цеха (время по сообщению, неточно). ` +
     `Продуктов, прошедших больше одного цеха в этом окне: ${chains}.`;
   $('tLegend').innerHTML = (data.stages || []).map((s) => `<span><i style="background:${G_STAGE_COLORS[s.key]}"></i>${esc(s.title)}</span>`).join('');
   // Строка — продукт, дорожка — этап, полосы — реальные операции этапа (не сплошной интервал).
@@ -2037,7 +2037,7 @@ function renderTiming(data) {
       r.stages.map((s) => {
         if (s.key === 'pack') {
           const hs = s.handoffs || [];
-          return hs.length ? hs.map((h) => `передано ${num(h.qty)} ${esc(h.unit)} в ${esc(h.time)}`).join('<br>') : '<span class="muted">нет источника</span>';
+          return hs.length ? hs.map((h) => `сдано ${none(h.qty) ? '' : num(h.qty) + ' ' + esc(h.unit) + ' '}в ${esc(h.time)}`).join('<br>') : '<span class="muted">нет источника</span>';
         }
         if (!s.present) return '<span class="muted">—</span>';
         return `<span class="cellbox"><b>${esc(s.start_time.slice(6))}–${esc(s.end_time ? s.end_time.slice(6) : '…')}</b>` +

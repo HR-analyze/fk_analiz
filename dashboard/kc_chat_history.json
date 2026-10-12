@@ -1,11 +1,84 @@
 {
 "source": "Тайминги КЦ (Telegram), выгрузка 06–12.10.2026",
-"parsed_by": "ручной разбор, номера сообщений в msgs",
+"parsed_by": "разбор по сменам с перепроверкой, номера сообщений в msgs",
 "operations": [
 {
 "id": "tg-849894-0",
 "msgs": [
 "849894",
+"849895",
+"849899",
+"849920"
+],
+"product": "Круассан миндальный",
+"operation": "Нарезка",
+"people": 3,
+"qty": 3960,
+"unit": "шт",
+"plan": 4008,
+"start_at": "2026-10-06T20:00:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "3960 шт — промежуточный отчёт на 07:51 07.10, работа продолжается; конца в переписке нет"
+},
+{
+"id": "tg-849894-1",
+"msgs": [
+"849894",
+"849895",
+"849899"
+],
+"product": "Круассан миндальный",
+"operation": "Приготовление крема",
+"people": 1,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-06T20:00:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "конца и количества в переписке нет"
+},
+{
+"id": "tg-849894-2",
+"msgs": [
+"849894",
+"849895",
+"849899",
+"849915"
+],
+"product": "Ромовая баба фреш",
+"operation": "Не указана",
+"people": 2,
+"qty": 1038,
+"unit": "шт",
+"plan": 1036,
+"start_at": "2026-10-06T20:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-07T05:05:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "в плане указано «фреш»"
+},
+{
+"id": "tg-849894-3",
+"msgs": [
+"849894",
+"849895",
+"849899",
 "849906"
 ],
 "product": "Круассан с малиной",
@@ -18,72 +91,17 @@
 "start_exact": true,
 "end_at": "2026-10-06T22:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-849894-1",
-"msgs": [
-"849894"
-],
-"product": "Круассан миндальный",
-"operation": "Нарезка",
-"people": 3,
-"qty": null,
-"unit": "шт",
-"plan": 4008,
-"start_at": "2026-10-06T20:00:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": "«3ч.-нарезка»; к 07:51 07.10 сделано 3960 шт, работа продолжалась"
-},
-{
-"id": "tg-849894-2",
-"msgs": [
-"849894"
-],
-"product": "Круассан миндальный",
-"operation": "Приготовление крема",
-"people": 1,
-"qty": null,
-"unit": "",
-"plan": null,
-"start_at": "2026-10-06T20:00:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": "«1ч.-готовит крем»"
-},
-{
-"id": "tg-849894-3",
-"msgs": [
-"849894",
-"849915"
-],
-"product": "Ромовая баба",
-"operation": "Не указана",
-"people": 2,
-"qty": 1038,
-"unit": "шт",
-"plan": 1036,
-"start_at": "2026-10-06T20:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-07T05:05:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
+"note": "в первом сообщении начало 21:31, в итоговом 21:30–22:30"
 },
 {
 "id": "tg-849897-0",
 "msgs": [
 "849897",
+"849899",
 "849909"
 ],
 "product": "Булка Много мака",
@@ -96,9 +114,32 @@
 "start_exact": true,
 "end_at": "2026-10-06T23:55:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "заказ на 07.10"
+},
+{
+"id": "tg-849908-0",
+"msgs": [
+"849908"
+],
+"product": "Чизкейк Сан-Себастьян",
+"operation": "Нарезка",
+"people": 1,
+"qty": 55,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-06T22:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-06T23:50:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "передано на фасовку 55 изделий"
 },
 {
 "id": "tg-849907-0",
@@ -116,28 +157,11 @@
 "start_exact": true,
 "end_at": "2026-10-07T00:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "конец — следующим сообщением «Закончили в 00:00, 520 шт»"
-},
-{
-"id": "tg-849908-0",
-"msgs": [
-"849908"
-],
-"product": "Чизкейк Сан-Себастьян",
-"operation": "Нарезка",
-"people": 1,
-"qty": 55,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-06T22:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-06T23:50:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": "передано на фасовку 55 изделий"
+"note": "«Закончили в 00:00» без названия продукта; отнесено по количеству 520 при плане 518; переход через полночь"
 },
 {
 "id": "tg-849910-0",
@@ -154,6 +178,8 @@
 "start_exact": true,
 "end_at": "2026-10-07T02:20:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
@@ -174,9 +200,11 @@
 "start_exact": true,
 "end_at": "2026-10-07T04:10:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "в тексте «заполнение начинкой»"
 },
 {
 "id": "tg-849914-0",
@@ -194,9 +222,11 @@
 "start_exact": true,
 "end_at": "2026-10-07T05:45:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "5 замесов"
+"note": "5 замесов, план 54 пласта"
 },
 {
 "id": "tg-849917-0",
@@ -208,15 +238,17 @@
 "operation": "Разлив бисквита",
 "people": 2,
 "qty": 55,
-"unit": "пласт",
+"unit": "лист",
 "plan": null,
 "start_at": "2026-10-07T05:50:00+03:00",
 "start_exact": true,
 "end_at": "2026-10-07T07:45:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "«55 листов»"
+"note": "«Работа завершена» без названия продукта — единственная открытая операция с выработкой в листах/пластах"
 },
 {
 "id": "tg-849918-0",
@@ -234,9 +266,11 @@
 "start_exact": true,
 "end_at": "2026-10-07T07:57:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению «Выполнено 470 шт»"
+"note": "повторная работа по тому же плану 518; «Выполнено-470 шт» без продукта и времени — конец по времени сообщения; миндальный на 07:51 ещё продолжался"
 },
 {
 "id": "tg-849925-0",
@@ -253,9 +287,53 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "Конца и итога в переписке нет"
+},
+{
+"id": "tg-849927-0",
+"msgs": [
+"849927"
+],
+"product": "Торт Три шоколада",
+"operation": "Грунтовка",
+"people": 3,
+"qty": null,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-07T08:45:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Конца нет; следующий этап (подготовка форм с 15:40) делали 2 чел., как конец не взят"
+},
+{
+"id": "tg-849928-0",
+"msgs": [
+"849928"
+],
+"product": "Булка Много мака",
+"operation": "Набивка начинкой, промочка сиропом",
+"people": 2,
+"qty": null,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-07T09:00:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Конца нет; внесение начинки ночной сменой с 20:20 — отдельная операция"
 },
 {
 "id": "tg-849926-0",
@@ -273,47 +351,11 @@
 "start_exact": false,
 "end_at": "2026-10-07T11:00:00+03:00",
 "end_exact": false,
+"start_src": "message",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "начало и конец — по сообщениям"
-},
-{
-"id": "tg-849927-0",
-"msgs": [
-"849927"
-],
-"product": "Торт Три шоколада",
-"operation": "Грунтовка",
-"people": 3,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-07T08:45:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-849928-0",
-"msgs": [
-"849928"
-],
-"product": "Булка Много мака",
-"operation": "Набивка начинкой, промочка сиропом",
-"people": 2,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-07T09:00:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"note": "Начало по сообщению «начали», конец по сообщению «приготовили»"
 },
 {
 "id": "tg-849977-0",
@@ -330,13 +372,16 @@
 "start_exact": false,
 "end_at": "2026-10-07T12:37:00+03:00",
 "end_exact": false,
+"start_src": "",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "начало не указано; «25.3 пластов»"
+"note": "Заказ закрыт, 25,3 пласта; начало не указано"
 },
 {
-"id": "tg-850024-0",
+"id": "tg-849978-0",
 "msgs": [
+"849978",
 "850024",
 "850033",
 "850066"
@@ -351,28 +396,11 @@
 "start_exact": true,
 "end_at": "2026-10-07T15:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-850042-0",
-"msgs": [
-"850042"
-],
-"product": "Торт Вацлавский",
-"operation": "Приготовление крема",
-"people": null,
-"qty": null,
-"unit": "",
-"plan": null,
-"start_at": "2026-10-07T15:46:00+03:00",
-"start_exact": false,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "check",
-"note": "начало — по сообщению"
+"note": "Переход команды объявлен в 12:40, точное начало по уточнению 14:00; факт не указан"
 },
 {
 "id": "tg-850067-0",
@@ -389,9 +417,53 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "Конца нет"
+},
+{
+"id": "tg-850042-0",
+"msgs": [
+"850042"
+],
+"product": "Торт Вацлавский",
+"operation": "Приготовление крема",
+"people": null,
+"qty": null,
+"unit": "кг",
+"plan": null,
+"start_at": "2026-10-07T15:46:00+03:00",
+"start_exact": false,
+"end_at": null,
+"end_exact": false,
+"start_src": "message",
+"end_src": "",
+"status": "open",
+"flag": "check",
+"note": "Конца нет; в 17:53 контроль заварного крема (далее выдержка 15 мин) — не отчёт о завершении"
+},
+{
+"id": "tg-850069-0",
+"msgs": [
+"850069"
+],
+"product": "Трубочка с заварным кремом",
+"operation": "Внесение начинки",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-07T16:00:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Конца нет; фото в 19:20 — фотоотчёт, не конец"
 },
 {
 "id": "tg-850068-0",
@@ -408,29 +480,33 @@
 "start_at": "2026-10-07T16:09:00+03:00",
 "start_exact": false,
 "end_at": "2026-10-07T16:25:00+03:00",
-"end_exact": true,
+"end_exact": false,
+"start_src": "message",
+"end_src": "inferred",
 "status": "closed",
 "flag": "check",
-"note": "«идёт подготовка»; конец — начало декора"
+"note": "«Идёт подготовка» — начало по сообщению; конец = начало декора той же бригадой"
 },
 {
-"id": "tg-850069-0",
+"id": "tg-850070-0",
 "msgs": [
-"850069"
+"850070"
 ],
-"product": "Трубочка с заварным кремом",
-"operation": "Начинка",
-"people": 1,
+"product": "Торт Три шоколада",
+"operation": "Сборка, подготовка колец",
+"people": 2,
 "qty": null,
-"unit": "шт",
+"unit": "",
 "plan": null,
-"start_at": "2026-10-07T16:00:00+03:00",
-"start_exact": true,
+"start_at": "2026-10-07T16:15:00+03:00",
+"start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
-"flag": "ok",
-"note": "«Начинка трубочки»"
+"flag": "check",
+"note": "Двое помогают, пока ждут крем на тирамису; начало по сообщению"
 },
 {
 "id": "tg-850075-0",
@@ -442,20 +518,23 @@
 "product": "Торт Вацлавский",
 "operation": "Декор",
 "people": 5,
-"qty": null,
+"qty": 562,
 "unit": "шт",
 "plan": 562,
 "start_at": "2026-10-07T16:25:00+03:00",
 "start_exact": true,
 "end_at": "2026-10-07T19:40:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "«20.1 пластов»; конец — по сообщению «закончили»"
+"note": "20,1 пласта; второй отчёт о начале с 16:29; закончили на заказ — факт принят равным заказу"
 },
 {
-"id": "tg-850150-0",
+"id": "tg-850148-0",
 "msgs": [
+"850148",
 "850150"
 ],
 "product": "Шоколадная салями",
@@ -468,9 +547,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "Конца нет"
 },
 {
 "id": "tg-850190-0",
@@ -488,9 +569,11 @@
 "start_exact": true,
 "end_at": "2026-10-07T22:40:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "кольцо заварное 2400 + эклер 360"
+"note": "кольцо заварное 2400 шт + эклер 360 шт, план выполнен полностью"
 },
 {
 "id": "tg-850191-0",
@@ -507,68 +590,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-850198-0",
-"msgs": [
-"850198",
-"850289"
-],
-"product": "Ромовая баба",
-"operation": "Прокол шпажкой",
-"people": 2,
-"qty": 1014,
-"unit": "шт",
-"plan": 1014,
-"start_at": "2026-10-07T20:15:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-08T06:50:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-850204-0",
-"msgs": [
-"850204",
-"850271"
-],
-"product": "Булка Много мака",
-"operation": "Внесение начинки",
-"people": 1,
-"qty": 2160,
-"unit": "шт",
-"plan": 2160,
-"start_at": "2026-10-07T20:20:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-08T03:30:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-850206-0",
-"msgs": [
-"850206"
-],
-"product": "Канеле с ванильным кремом",
-"operation": "Подготовка формочек",
-"people": 1,
-"qty": 162,
-"unit": "форма",
-"plan": null,
-"start_at": "2026-10-07T20:40:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"note": "конец нарезки не указан; в 22:10 начался розлив Сан-Себастьян (1 чел.), но что это тот же сотрудник, в тексте не сказано"
 },
 {
 "id": "tg-850207-0",
@@ -586,9 +612,76 @@
 "start_exact": true,
 "end_at": "2026-10-07T21:10:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": "крем миндальный, 1 замес"
+},
+{
+"id": "tg-850198-0",
+"msgs": [
+"850198",
+"850289"
+],
+"product": "Ромовая баба",
+"operation": "Прокол",
+"people": 2,
+"qty": 1014,
+"unit": "шт",
+"plan": 1014,
+"start_at": "2026-10-07T20:15:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-08T06:50:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "прокол шпажкой; конец на следующую дату"
+},
+{
+"id": "tg-850204-0",
+"msgs": [
+"850204",
+"850271"
+],
+"product": "Булка Много мака",
+"operation": "Внесение начинки",
+"people": 1,
+"qty": 2160,
+"unit": "шт",
+"plan": 2160,
+"start_at": "2026-10-07T20:20:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-08T03:30:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "конец на следующую дату"
+},
+{
+"id": "tg-850206-0",
+"msgs": [
+"850206"
+],
+"product": "Канеле с ванильным кремом",
+"operation": "Подготовка форм",
+"people": 1,
+"qty": 162,
+"unit": "форма",
+"plan": null,
+"start_at": "2026-10-07T20:40:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "в тексте «формочек на капелле» — отнесено к канеле (162 формы × 8 = 1296 шт, ровно столько разлито канеле в 03:15–05:30); конец не указан; в переписке: «Подготовка формочек»"
 },
 {
 "id": "tg-850221-0",
@@ -606,9 +699,11 @@
 "start_exact": true,
 "end_at": "2026-10-07T21:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "подготовка инвентаря, оборудования, выкладка п/ф на столы"
 },
 {
 "id": "tg-850229-0",
@@ -626,29 +721,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T00:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "без декора лепестком"
-},
-{
-"id": "tg-850261-0",
-"msgs": [
-"850261",
-"850268"
-],
-"product": "Круассан с миндальным кремом",
-"operation": "Декор миндальным лепестком",
-"people": 1,
-"qty": 940,
-"unit": "шт",
-"plan": 940,
-"start_at": "2026-10-08T01:10:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-08T02:50:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
+"note": "промочка сиропом, крем на низ, накрывание верхом, отсадка крема сверху; без декора лепестком; количество в отчёте о завершении не указано; конец на следующую дату"
 },
 {
 "id": "tg-850251-0",
@@ -665,6 +742,30 @@
 "start_exact": true,
 "end_at": "2026-10-07T22:45:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": ""
+},
+{
+"id": "tg-850243-0",
+"msgs": [
+"850243",
+"850244"
+],
+"product": "Чизкейк Сан-Себастьян",
+"operation": "Розлив в формы",
+"people": 1,
+"qty": 115,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-07T22:10:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-07T22:45:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
@@ -684,29 +785,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T00:15:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "сообщение дописано в 03:29 — конец 00:15 корректен"
-},
-{
-"id": "tg-850243-0",
-"msgs": [
-"850243",
-"850244"
-],
-"product": "Чизкейк Сан-Себастьян",
-"operation": "Розлив в формы",
-"people": 1,
-"qty": 115,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-07T22:10:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-07T22:45:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
+"note": "в тексте «Круассан с карамелью»; переход через полночь, конец 08.10; сообщение дописано правкой в 03:29"
 },
 {
 "id": "tg-850256-0",
@@ -719,14 +802,59 @@
 "people": 1,
 "qty": 2,
 "unit": "замес",
-"plan": null,
+"plan": 4,
 "start_at": "2026-10-07T23:30:00+03:00",
 "start_exact": true,
 "end_at": "2026-10-08T00:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "2 замеса из 4; по двум частям всего 240 шт (поправка в 850325)"
+"note": "первая часть, 2 замеса из 4; указанный план 94 изделия мастер позже назвал ошибочным; итог по обеим частям 240 шт (поправка 850325); конец на следующую дату"
+},
+{
+"id": "tg-850261-0",
+"msgs": [
+"850261",
+"850268"
+],
+"product": "Круассан с миндальным кремом",
+"operation": "Декор миндальным лепестком",
+"people": 1,
+"qty": 940,
+"unit": "шт",
+"plan": 940,
+"start_at": "2026-10-08T01:10:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-08T02:50:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": ""
+},
+{
+"id": "tg-850266-0",
+"msgs": [
+"850266"
+],
+"product": "Торт Тирамису",
+"operation": "Разлив бисквита",
+"people": 2,
+"qty": 54,
+"unit": "пласт",
+"plan": 54,
+"start_at": "2026-10-08T01:50:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-08T02:40:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "сообщение дописано правкой в 04:35"
 },
 {
 "id": "tg-850264-0",
@@ -744,28 +872,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T03:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "вторая часть, 2 замеса"
-},
-{
-"id": "tg-850266-0",
-"msgs": [
-"850266"
-],
-"product": "Торт Тирамису",
-"operation": "Разлив бисквита",
-"people": 2,
-"qty": 54,
-"unit": "пласт",
-"plan": 54,
-"start_at": "2026-10-08T01:50:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-08T02:40:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": "сообщение дописано в 04:35"
+"note": "вторая часть, 2 замеса; итог по обеим частям 240 шт"
 },
 {
 "id": "tg-850266-1",
@@ -782,9 +893,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T04:25:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "сообщение дописано в 04:35"
+"note": "сообщение дописано правкой в 04:35"
 },
 {
 "id": "tg-850270-0",
@@ -802,9 +915,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T05:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "розлив в силиконовые формы; сделано больше плана (1296 = 162 формы × 8)"
 },
 {
 "id": "tg-850272-0",
@@ -822,6 +937,8 @@
 "start_exact": true,
 "end_at": "2026-10-08T05:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
@@ -842,9 +959,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": "к 07:46 сделано 283 шт, работа продолжалась"
+"note": "промежуточный отчёт в 07:46: сделано 283 шт, работа продолжается; конец не найден, в т.ч. в следующих сообщениях"
 },
 {
 "id": "tg-850286-0",
@@ -862,26 +981,31 @@
 "start_exact": true,
 "end_at": "2026-10-08T07:09:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению «Операция завершена»"
+"note": "конец — время сообщения «Операция завершена»"
 },
 {
-"id": "tg-850309-0",
+"id": "tg-850908-0",
 "msgs": [
-"850309"
+"850908",
+"850909"
 ],
-"product": "Булка Много мака",
-"operation": "Покрытие глазурью",
-"people": 2,
-"qty": null,
+"product": "Кольцо заварное",
+"operation": "Не указана",
+"people": 1,
+"qty": 2500,
 "unit": "шт",
 "plan": null,
-"start_at": "2026-10-08T08:50:00+03:00",
+"start_at": "2026-10-08T08:00:00+03:00",
 "start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
+"end_at": "2026-10-08T19:10:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
 "flag": "ok",
 "note": ""
 },
@@ -901,28 +1025,55 @@
 "start_exact": true,
 "end_at": "2026-10-08T10:45:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "в 10:45 отдали на фасовку"
+"note": "В 10:45 готовое отдали на фасовку."
+},
+{
+"id": "tg-850309-0",
+"msgs": [
+"850309",
+"850922"
+],
+"product": "Булка Много мака",
+"operation": "Покрытие глазурью",
+"people": 2,
+"qty": 14,
+"unit": "шпилька",
+"plan": null,
+"start_at": "2026-10-08T08:50:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-08T19:35:00+03:00",
+"end_exact": false,
+"start_src": "text",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "Следующий этап после ночного обмакивания в сиропе. Конец по общему сообщению о закрытии булки мак: 14 шпилек, всего работали 4 человека."
 },
 {
 "id": "tg-850311-0",
 "msgs": [
-"850311"
+"850311",
+"850922"
 ],
 "product": "Булка Много мака",
-"operation": "Начинка маковая",
+"operation": "Внесение начинки",
 "people": 1,
-"qty": null,
-"unit": "шт",
+"qty": 14,
+"unit": "шпилька",
 "plan": null,
 "start_at": "2026-10-08T08:50:00+03:00",
 "start_exact": true,
-"end_at": null,
+"end_at": "2026-10-08T19:35:00+03:00",
 "end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"start_src": "text",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "Маковая начинка. Конец по общему сообщению о закрытии булки мак (14 шпилек)."
 },
 {
 "id": "tg-850322-0",
@@ -931,8 +1082,8 @@
 "850421"
 ],
 "product": "Эклер пряный латте",
-"operation": "Начинка и декор",
-"people": 2,
+"operation": "Внесение начинки",
+"people": 1,
 "qty": 562,
 "unit": "шт",
 "plan": null,
@@ -940,28 +1091,76 @@
 "start_exact": true,
 "end_at": "2026-10-08T11:53:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "1 начиняет кремом, 1 декор; конец — по сообщению"
+"note": "Начинка кремом. Шла параллельно с декором."
+},
+{
+"id": "tg-850322-1",
+"msgs": [
+"850322",
+"850421"
+],
+"product": "Эклер пряный латте",
+"operation": "Декор",
+"people": 1,
+"qty": 562,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-08T09:30:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-08T11:53:00+03:00",
+"end_exact": false,
+"start_src": "text",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "Шёл параллельно с начинкой."
 },
 {
 "id": "tg-850323-0",
 "msgs": [
-"850323"
+"850323",
+"850926"
 ],
 "product": "Булка Сладкое сердце фреш",
 "operation": "Не указана",
 "people": 2,
-"qty": null,
+"qty": 2234,
 "unit": "шт",
 "plan": 2234,
 "start_at": "2026-10-08T09:35:00+03:00",
 "start_exact": true,
-"end_at": null,
+"end_at": "2026-10-08T19:46:00+03:00",
 "end_exact": false,
-"status": "open",
+"start_src": "text",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "Конец по сообщению «Закрыли»."
+},
+{
+"id": "tg-850324-0",
+"msgs": [
+"850324"
+],
+"product": "Бисквит азиатский",
+"operation": "Подготовка сырья",
+"people": 1,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": null,
+"start_exact": false,
+"end_at": "2026-10-08T09:40:00+03:00",
+"end_exact": true,
+"start_src": "",
+"end_src": "text",
+"status": "closed",
 "flag": "ok",
-"note": "закрыто к 19:46 (2234 шт)"
+"note": "Новый бисквит. Время начала не указано."
 },
 {
 "id": "tg-850326-0",
@@ -979,29 +1178,34 @@
 "start_exact": true,
 "end_at": "2026-10-08T10:21:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "новинка; конец — по сообщению"
+"note": "Параллельно готовили сырьё на второй замес. Конец по сообщению «2 замеса замесили»."
 },
 {
 "id": "tg-850345-0",
 "msgs": [
 "850345",
-"850378"
+"850378",
+"850404"
 ],
 "product": "Бисквит азиатский",
-"operation": "Разлив в кольца",
+"operation": "Разлив бисквита",
 "people": 2,
-"qty": null,
-"unit": "",
+"qty": 2,
+"unit": "замес",
 "plan": null,
 "start_at": "2026-10-08T10:21:00+03:00",
 "start_exact": false,
-"end_at": "2026-10-08T10:55:00+03:00",
-"end_exact": true,
+"end_at": "2026-10-08T11:22:00+03:00",
+"end_exact": false,
+"start_src": "message",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "в 10:55 отдали в печное отделение"
+"note": "В 10:55 первую часть перелили в кольца и отдали в печь, к 11:22 закончили весь разлив и отдали на выпечку.; в переписке: «Разлив в кольца»"
 },
 {
 "id": "tg-850403-0",
@@ -1019,9 +1223,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T12:42:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "сгущёнка 150 + фисташка 180; конец — по сообщению"
+"note": "Одна бригада сделала варёную сгущёнку (150 шт) и фисташку (180 шт)."
 },
 {
 "id": "tg-850405-0",
@@ -1029,8 +1235,8 @@
 "850405",
 "850406"
 ],
-"product": "Крем (раскладка по шмекам)",
-"operation": "Раскладка крема",
+"product": "Не указан",
+"operation": "Раскладка крема по шмекам",
 "people": 4,
 "qty": null,
 "unit": "",
@@ -1039,9 +1245,32 @@
 "start_exact": true,
 "end_at": "2026-10-08T11:24:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "продукция не указана"
+"note": "Продукт не указан. Возможно, это крем на кольцо творожное (санконтроль в 12:19), но в тексте этого нет."
+},
+{
+"id": "tg-850409-0",
+"msgs": [
+"850409"
+],
+"product": "Не указан",
+"operation": "Сборка",
+"people": 7,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-08T11:30:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Начали сразу после раскладки крема. Продукт не указан. Возможно, кольцо творожное (санконтроль в 12:19), но в тексте этого нет. Конца нет."
 },
 {
 "id": "tg-850468-0",
@@ -1050,7 +1279,7 @@
 "850870"
 ],
 "product": "Эклер ванильный фреш",
-"operation": "Начинка",
+"operation": "Внесение начинки",
 "people": 2,
 "qty": 1140,
 "unit": "шт",
@@ -1059,9 +1288,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T18:04:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению"
+"note": "После этого бригада перешла на эклер шоколадный фреш."
 },
 {
 "id": "tg-850534-0",
@@ -1069,7 +1300,7 @@
 "850534",
 "850923"
 ],
-"product": "Канеле с ванильным кремом",
+"product": "Канеле с ванильным кремом фреш",
 "operation": "Не указана",
 "people": 2,
 "qty": 877,
@@ -1079,9 +1310,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T19:40:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению «закрыли»"
+"note": "Конец по сообщению «закрыли»."
 },
 {
 "id": "tg-850535-0",
@@ -1099,47 +1332,11 @@
 "start_exact": true,
 "end_at": "2026-10-08T16:40:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
-},
-{
-"id": "tg-850605-0",
-"msgs": [
-"850605"
-],
-"product": "Торт Три шоколада",
-"operation": "Грунтовка",
-"people": 2,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-08T15:40:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-850606-0",
-"msgs": [
-"850606"
-],
-"product": "Торт Три шоколада",
-"operation": "Склейка коржей",
-"people": 2,
-"qty": 300,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-08T15:40:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": "бисквит 300 шт"
 },
 {
 "id": "tg-850611-0",
@@ -1157,29 +1354,77 @@
 "start_exact": true,
 "end_at": "2026-10-08T16:38:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению"
+"note": "Санконтроль: крем недобит, его нужно пробить."
 },
 {
-"id": "tg-850696-0",
+"id": "tg-850605-0",
 "msgs": [
-"850696",
-"850907"
+"850605",
+"850778"
 ],
-"product": "Торт Бакинский",
-"operation": "Сборка",
-"people": 4,
-"qty": 21,
-"unit": "пласт",
-"plan": 27,
-"start_at": "2026-10-08T16:55:00+03:00",
+"product": "Торт Три шоколада",
+"operation": "Грунтовка",
+"people": 2,
+"qty": null,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-08T15:40:00+03:00",
 "start_exact": true,
-"end_at": "2026-10-08T19:07:00+03:00",
+"end_at": "2026-10-08T17:24:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "inferred",
 "status": "closed",
 "flag": "check",
-"note": "из 27 пластов собрали 21 — не хватило вишни"
+"note": "Конец выведен: в 17:24 начался следующий этап этого торта (декор). Кто делал декор, не указано, поэтому нужна проверка."
+},
+{
+"id": "tg-850606-0",
+"msgs": [
+"850606",
+"850778"
+],
+"product": "Торт Три шоколада",
+"operation": "Склейка коржей",
+"people": 2,
+"qty": 300,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-08T15:40:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-08T17:24:00+03:00",
+"end_exact": false,
+"start_src": "text",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "300 шт — это количество бисквита (коржей). Конец выведен: в 17:24 начался декор этого торта (60 шт)."
+},
+{
+"id": "tg-850691-0",
+"msgs": [
+"850691",
+"850696"
+],
+"product": "Торт Бакинский",
+"operation": "Подготовка к сборке",
+"people": null,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-08T16:38:00+03:00",
+"start_exact": false,
+"end_at": "2026-10-08T16:55:00+03:00",
+"end_exact": false,
+"start_src": "message",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "Подготовка на 15 минут сразу после сборки Вацлавского. Продукт и конец выведены по следующему сообщению: сборка Бакинского началась в 16:55."
 },
 {
 "id": "tg-850777-0",
@@ -1197,9 +1442,33 @@
 "start_exact": true,
 "end_at": "2026-10-08T19:40:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению «закрыли заказ»"
+"note": "Бригада перешла с круассана с малиной. Заказ на 522 шт закрыт. Ночью по такому же заказу было 283 шт на 07:46, поэтому записи могут частично пересекаться."
+},
+{
+"id": "tg-850696-0",
+"msgs": [
+"850696",
+"850907"
+],
+"product": "Торт Бакинский",
+"operation": "Сборка",
+"people": 4,
+"qty": 21,
+"unit": "пласт",
+"plan": 27,
+"start_at": "2026-10-08T16:55:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-08T19:07:00+03:00",
+"end_exact": false,
+"start_src": "text",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "Собрали 21 пласт из 27: не хватило вишни, ждут вишню."
 },
 {
 "id": "tg-850778-0",
@@ -1216,9 +1485,11 @@
 "start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
 "flag": "check",
-"note": "начало — по сообщению"
+"note": "Начало по сообщению «Начинаем». Конца в чате нет."
 },
 {
 "id": "tg-850876-0",
@@ -1226,7 +1497,7 @@
 "850876"
 ],
 "product": "Эклер шоколадный фреш",
-"operation": "Начинка и глазировка",
+"operation": "Внесение начинки и глазировка",
 "people": 2,
 "qty": null,
 "unit": "шт",
@@ -1235,14 +1506,18 @@
 "start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
 "flag": "check",
-"note": "начало — по сообщению"
+"note": "Начинку и глазировку делают те же 2 человека, перешли с эклера ванильного. Конца в чате нет."
 },
 {
 "id": "tg-850907-0",
 "msgs": [
 "850907",
+"850929",
+"850931",
 "850932"
 ],
 "product": "Торт Вацлавский",
@@ -1255,35 +1530,81 @@
 "start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
 "flag": "check",
-"note": "начало — по сообщению"
+"note": "Начало по сообщению «начинаем». Число людей уточнили позже. Конца нет."
 },
 {
-"id": "tg-850908-0",
+"id": "tg-850926-0",
 "msgs": [
-"850908",
-"850909"
+"850926"
 ],
-"product": "Кольцо заварное",
+"product": "Булка Сладкое сердце с посыпкой фреш",
 "operation": "Не указана",
-"people": 1,
-"qty": 2500,
+"people": null,
+"qty": 947,
 "unit": "шт",
 "plan": null,
-"start_at": "2026-10-08T08:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-08T19:10:00+03:00",
-"end_exact": true,
+"start_at": null,
+"start_exact": false,
+"end_at": "2026-10-08T19:46:00+03:00",
+"end_exact": false,
+"start_src": "",
+"end_src": "message",
 "status": "closed",
-"flag": "ok",
-"note": ""
+"flag": "check",
+"note": "В чате есть только закрытие, начало не указано."
+},
+{
+"id": "tg-850926-1",
+"msgs": [
+"850926"
+],
+"product": "Улитка с изюмом фреш",
+"operation": "Не указана",
+"people": null,
+"qty": 191,
+"unit": "шт",
+"plan": null,
+"start_at": null,
+"start_exact": false,
+"end_at": "2026-10-08T19:46:00+03:00",
+"end_exact": false,
+"start_src": "",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "В чате есть только закрытие, начало не указано."
+},
+{
+"id": "tg-850926-2",
+"msgs": [
+"850926"
+],
+"product": "Улитка с маком фреш",
+"operation": "Не указана",
+"people": null,
+"qty": 149,
+"unit": "шт",
+"plan": null,
+"start_at": null,
+"start_exact": false,
+"end_at": "2026-10-08T19:46:00+03:00",
+"end_exact": false,
+"start_src": "",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "В чате есть только закрытие, начало не указано."
 },
 {
 "id": "tg-850995-0",
 "msgs": [
 "850995",
-"851019"
+"851019",
+"851024"
 ],
 "product": "Круассан с шоколадом фреш",
 "operation": "Не указана",
@@ -1295,19 +1616,23 @@
 "start_exact": false,
 "end_at": "2026-10-09T09:40:00+03:00",
 "end_exact": false,
+"start_src": "message",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "начало и конец — по сообщениям"
+"note": "начали после санобработки, время в тексте не указано, взято время сообщения; при бракераже поправили декор"
 },
 {
 "id": "tg-850996-0",
 "msgs": [
 "850996",
+"851002",
 "851174",
+"851223",
 "851249"
 ],
 "product": "Трубочка с заварным кремом",
-"operation": "Начинка",
+"operation": "Внесение начинки",
 "people": 2,
 "qty": 864,
 "unit": "шт",
@@ -1316,9 +1641,32 @@
 "start_exact": true,
 "end_at": "2026-10-09T17:18:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "к 14:47 сделано 420; «сдали 864» — по сообщению"
+"note": "в 14:47 промежуточно сделано 420 шт, крем ещё готовился (не конец); 851223 дублирует 851174; в 17:18 сдано 864 шт (в сообщении «с ванильным кремом»); в переписке: «Начинка»"
+},
+{
+"id": "tg-850997-0",
+"msgs": [
+"850997"
+],
+"product": "Булка Много мака",
+"operation": "Подготовка оборудования",
+"people": null,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-09T08:40:00+03:00",
+"start_exact": false,
+"end_at": "2026-10-09T09:00:00+03:00",
+"end_exact": false,
+"start_src": "message",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "сборка чистого оборудования для маковой начинки; конец: в 9:00 началось начинение этой булки"
 },
 {
 "id": "tg-850998-0",
@@ -1335,6 +1683,8 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
 "note": ""
@@ -1352,11 +1702,13 @@
 "plan": null,
 "start_at": "2026-10-09T08:40:00+03:00",
 "start_exact": true,
-"end_at": null,
+"end_at": "2026-10-09T09:26:00+03:00",
 "end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"start_src": "text",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "конец: начат следующий этап, разлив по формам (сообщение в 09:26)"
 },
 {
 "id": "tg-851000-0",
@@ -1364,7 +1716,7 @@
 "851000"
 ],
 "product": "Булка Много мака",
-"operation": "Пропитка",
+"operation": "Пропитка сиропом",
 "people": 1,
 "qty": null,
 "unit": "шт",
@@ -1373,9 +1725,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "в переписке: «Пропитка»"
 },
 {
 "id": "tg-851001-0",
@@ -1392,14 +1746,17 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": "с посыпкой 947 + без посыпки 2234"
+"note": "заказ: с посыпкой 947 + без посыпки 2234"
 },
 {
 "id": "tg-851006-0",
 "msgs": [
-"851006"
+"851006",
+"851135"
 ],
 "product": "Торт Тирамису",
 "operation": "Раскладка бисквита в формы",
@@ -1411,17 +1768,63 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "в 12:37 бракераж, конец не указан"
+},
+{
+"id": "tg-851008-0",
+"msgs": [
+"851008",
+"851027"
+],
+"product": "Булка Много мака",
+"operation": "Внесение начинки и глазировка",
+"people": 2,
+"qty": null,
+"unit": "шт",
+"plan": 4870,
+"start_at": "2026-10-09T09:00:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "план взят из заказа на пропитку той же булки; в 10:09 недовес начинки, вызвана инженерная служба; в переписке: «Начинка и глазировка»"
+},
+{
+"id": "tg-851006-1",
+"msgs": [
+"851006"
+],
+"product": "Торт Тирамису",
+"operation": "Приготовление крема",
+"people": null,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-09T09:11:00+03:00",
+"start_exact": false,
+"end_at": null,
+"end_exact": false,
+"start_src": "message",
+"end_src": "",
+"status": "open",
+"flag": "check",
+"note": "крем «в процессе» на момент сообщения, фактическое начало могло быть раньше"
 },
 {
 "id": "tg-851007-0",
 "msgs": [
-"851007"
+"851007",
+"851034"
 ],
 "product": "Кольцо творожное",
-"operation": "Начинка",
+"operation": "Внесение начинки",
 "people": 2,
 "qty": null,
 "unit": "шт",
@@ -1430,36 +1833,20 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851008-0",
-"msgs": [
-"851008"
-],
-"product": "Булка Много мака",
-"operation": "Начинка и глазировка",
-"people": 2,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-09T09:00:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"note": "в 10:11 бракераж готового изделия, это не конец; в переписке: «Начинка»"
 },
 {
 "id": "tg-851009-0",
 "msgs": [
-"851009"
+"851009",
+"851017"
 ],
 "product": "Бисквит китайский",
-"operation": "Разлив",
+"operation": "Разлив бисквита",
 "people": 6,
 "qty": null,
 "unit": "",
@@ -1468,9 +1855,11 @@
 "start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
 "flag": "check",
-"note": "новинка; начало — по сообщению"
+"note": "производственная проработка новинки; «идет разлив», поэтому взято время сообщения; в 09:36 проверка веса при разливе (780 г); в переписке: «Разлив»"
 },
 {
 "id": "tg-851014-0",
@@ -1488,6 +1877,8 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
 "note": ""
@@ -1499,7 +1890,7 @@
 "851056"
 ],
 "product": "Круассан миндальный",
-"operation": "Посыпка сахарной пудрой",
+"operation": "Посыпка",
 "people": null,
 "qty": 850,
 "unit": "шт",
@@ -1508,9 +1899,11 @@
 "start_exact": true,
 "end_at": "2026-10-09T10:32:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению «отдали в заказ»"
+"note": "конец: сообщение «отдали в заказ 850 шт»; в переписке: «Посыпка сахарной пудрой»"
 },
 {
 "id": "tg-851026-0",
@@ -1527,6 +1920,8 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
 "note": ""
@@ -1547,15 +1942,18 @@
 "start_exact": true,
 "end_at": "2026-10-09T11:13:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению"
+"note": "сделано 214 из 220"
 },
 {
 "id": "tg-851059-0",
 "msgs": [
 "851059",
-"851175"
+"851175",
+"851224"
 ],
 "product": "Торт Клубничный со сливками",
 "operation": "Грунтовка",
@@ -1567,9 +1965,11 @@
 "start_exact": true,
 "end_at": "2026-10-09T12:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "новинка"
+"note": "новинка; 851224 дублирует 851175; после грунтовки увезли в холодильную камеру"
 },
 {
 "id": "tg-851060-0",
@@ -1586,6 +1986,8 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
 "note": ""
@@ -1604,11 +2006,13 @@
 "plan": 487,
 "start_at": "2026-10-09T11:13:00+03:00",
 "start_exact": false,
-"end_at": "2026-10-09T15:58:00+03:00",
+"end_at": "2026-10-09T15:45:00+03:00",
 "end_exact": false,
+"start_src": "message",
+"end_src": "inferred",
 "status": "closed",
 "flag": "check",
-"note": "начало и конец — по сообщениям"
+"note": "начало: сообщение о подготовке к отделке; конец: та же бригада в 15:45 начала круассан со сгущёнкой; о сдаче заказа сообщили в 15:58"
 },
 {
 "id": "tg-851163-0",
@@ -1626,9 +2030,11 @@
 "start_exact": false,
 "end_at": "2026-10-09T14:53:00+03:00",
 "end_exact": false,
+"start_src": "message",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "начало и конец — по сообщениям"
+"note": "«глазируем»: работа уже шла, начало взято по сообщению"
 },
 {
 "id": "tg-851164-0",
@@ -1637,7 +2043,7 @@
 "851323"
 ],
 "product": "Эклер ванильный",
-"operation": "Начинка",
+"operation": "Внесение начинки",
 "people": 2,
 "qty": 1124,
 "unit": "шт",
@@ -1646,9 +2052,11 @@
 "start_exact": false,
 "end_at": "2026-10-09T18:50:00+03:00",
 "end_exact": true,
+"start_src": "message",
+"end_src": "text",
 "status": "closed",
 "flag": "check",
-"note": "вместе с шоколадным эклером; начало — по сообщению"
+"note": "начало работы объявлено вместе с шоколадным эклером; в 18:50 заказ сдан; в переписке: «Начинка»"
 },
 {
 "id": "tg-851177-0",
@@ -1665,9 +2073,11 @@
 "start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
 "flag": "check",
-"note": "начало — по сообщению"
+"note": "вместе со «2-м кремом»"
 },
 {
 "id": "tg-851225-0",
@@ -1685,9 +2095,11 @@
 "start_exact": true,
 "end_at": "2026-10-09T16:42:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению"
+"note": "конец: сообщение «заказ отдали», после него бригада перешла на фисташковые"
 },
 {
 "id": "tg-851240-0",
@@ -1704,9 +2116,11 @@
 "start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
 "flag": "check",
-"note": "начало — по сообщению"
+"note": "«доделываем»: начало взято по сообщению, могли начать раньше"
 },
 {
 "id": "tg-851285-0",
@@ -1714,7 +2128,7 @@
 "851285"
 ],
 "product": "Торт Тирамису",
-"operation": "Разлив сырного мусса",
+"operation": "Заливка муссом",
 "people": null,
 "qty": null,
 "unit": "шт",
@@ -1723,28 +2137,54 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "доделывают заказ; в переписке: «Разлив сырного мусса»"
 },
 {
-"id": "tg-851323-0",
+"id": "tg-851285-1",
 "msgs": [
+"851285"
+],
+"product": "Чизкейк Сан-Себастьян",
+"operation": "Подготовка форм",
+"people": null,
+"qty": null,
+"unit": "форма",
+"plan": null,
+"start_at": null,
+"start_exact": false,
+"end_at": "2026-10-09T18:00:00+03:00",
+"end_exact": false,
+"start_src": "",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "формы для вечернего разлива сделаны; начало не указано"
+},
+{
+"id": "tg-851164-1",
+"msgs": [
+"851164",
 "851323"
 ],
 "product": "Эклер шоколадный",
-"operation": "Начинка",
-"people": null,
+"operation": "Внесение начинки",
+"people": 2,
 "qty": null,
 "unit": "шт",
 "plan": 1157,
 "start_at": "2026-10-09T18:50:00+03:00",
-"start_exact": true,
+"start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "inferred",
+"end_src": "",
 "status": "open",
-"flag": "ok",
-"note": ""
+"flag": "check",
+"note": "начало работы с обоими эклерами объявлено в 14:42; в 18:50 ванильные сданы, и та же бригада начиняет шоколадные, поэтому начало взято равным концу ванильных; в переписке: «Начинка»"
 },
 {
 "id": "tg-851324-0",
@@ -1761,6 +2201,8 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
 "note": ""
@@ -1781,67 +2223,11 @@
 "start_exact": true,
 "end_at": "2026-10-10T10:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851454-0",
-"msgs": [
-"851454",
-"851888"
-],
-"product": "Трубочка с заварным кремом",
-"operation": "Набивка кремом",
-"people": 1,
-"qty": 884,
-"unit": "шт",
-"plan": 884,
-"start_at": "2026-10-10T08:59:00+03:00",
-"start_exact": false,
-"end_at": "2026-10-10T18:00:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "check",
-"note": "«1-2 человека»; начало — по сообщению"
-},
-{
-"id": "tg-851455-0",
-"msgs": [
-"851455"
-],
-"product": "Булка Много мака",
-"operation": "Начинка",
-"people": null,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-10T08:55:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851456-0",
-"msgs": [
-"851456"
-],
-"product": "Булка Сладкое сердце и булка с корицей",
-"operation": "Глазировка, пропитка гелем",
-"people": 1,
-"qty": null,
-"unit": "шт",
-"plan": 3878,
-"start_at": "2026-10-10T09:02:00+03:00",
-"start_exact": false,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "check",
-"note": "сладкое сердце 2678 + корица 1200; начало — по сообщению"
+"note": "В начале работал 1 сотрудник, в итоге 2; заказ закрыт"
 },
 {
 "id": "tg-851458-0",
@@ -1849,7 +2235,7 @@
 "851458"
 ],
 "product": "Эклер пряный латте",
-"operation": "Набивка",
+"operation": "Внесение начинки",
 "people": 2,
 "qty": null,
 "unit": "шт",
@@ -1858,9 +2244,119 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "Конца в переписке нет; в переписке: «Набивка»"
+},
+{
+"id": "tg-851402-0",
+"msgs": [
+"851402",
+"851455"
+],
+"product": "Булка Много мака",
+"operation": "Заправка бункера начинкой",
+"people": null,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-10T08:32:00+03:00",
+"start_exact": false,
+"end_at": "2026-10-10T08:55:00+03:00",
+"end_exact": false,
+"start_src": "message",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "Подготовка к начинке после санобработки; конец = начало внесения начинки (следующий этап того же продукта)"
+},
+{
+"id": "tg-851455-0",
+"msgs": [
+"851455",
+"851642"
+],
+"product": "Булка Много мака",
+"operation": "Внесение начинки",
+"people": 2,
+"qty": null,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-10T08:55:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-10T10:24:00+03:00",
+"end_exact": false,
+"start_src": "text",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "Конец — верхняя граница: в 10:24 заказ назван выполненным; доп. объём (5–6 шпилек) передан в ночь"
+},
+{
+"id": "tg-851454-0",
+"msgs": [
+"851454",
+"851888"
+],
+"product": "Трубочка с заварным кремом фреш",
+"operation": "Внесение начинки",
+"people": 1,
+"qty": 884,
+"unit": "шт",
+"plan": 884,
+"start_at": "2026-10-10T08:59:00+03:00",
+"start_exact": false,
+"end_at": "2026-10-10T18:00:00+03:00",
+"end_exact": true,
+"start_src": "message",
+"end_src": "text",
+"status": "closed",
+"flag": "check",
+"note": "В итоге указано 1–2 человека; заказ закрыт; в переписке: «Набивка кремом»"
+},
+{
+"id": "tg-851456-0",
+"msgs": [
+"851456"
+],
+"product": "Булка Сладкое сердце фреш",
+"operation": "Глазировка, пропитка гелем",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": 2678,
+"start_at": "2026-10-10T09:02:00+03:00",
+"start_exact": false,
+"end_at": null,
+"end_exact": false,
+"start_src": "message",
+"end_src": "",
+"status": "open",
+"flag": "check",
+"note": "1 сотрудник на оба продукта (вместе с булкой с корицей); конца в переписке нет"
+},
+{
+"id": "tg-851456-1",
+"msgs": [
+"851456"
+],
+"product": "Булка с корицей",
+"operation": "Глазировка, пропитка гелем",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": 1200,
+"start_at": "2026-10-10T09:02:00+03:00",
+"start_exact": false,
+"end_at": null,
+"end_exact": false,
+"start_src": "message",
+"end_src": "",
+"status": "open",
+"flag": "check",
+"note": "1 сотрудник на оба продукта (вместе со сладким сердцем); конца в переписке нет"
 },
 {
 "id": "tg-851546-0",
@@ -1868,23 +2364,26 @@
 "851546"
 ],
 "product": "Бисквит китайский",
-"operation": "Разбивка в кольца",
+"operation": "Разлив бисквита",
 "people": 3,
-"qty": 120,
+"qty": null,
 "unit": "кольцо",
-"plan": null,
+"plan": 120,
 "start_at": "2026-10-10T09:39:00+03:00",
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "120 колец указано при старте — объём задания, не факт; конца нет; в переписке: «Разбивка в кольца»"
 },
 {
 "id": "tg-851557-0",
 "msgs": [
-"851557"
+"851557",
+"851882"
 ],
 "product": "Торт Вацлавский",
 "operation": "Подготовка декора",
@@ -1894,11 +2393,34 @@
 "plan": null,
 "start_at": "2026-10-10T09:46:00+03:00",
 "start_exact": false,
-"end_at": null,
-"end_exact": false,
-"status": "open",
+"end_at": "2026-10-10T17:00:00+03:00",
+"end_exact": true,
+"start_src": "message",
+"end_src": "text",
+"status": "closed",
 "flag": "check",
-"note": "начало — по сообщению"
+"note": "Конец — закрытие заказа Вацлавского в 17:00 (может включать доп. сборку пластов по указанию)"
+},
+{
+"id": "tg-851829-0",
+"msgs": [
+"851829"
+],
+"product": "Круассан миндальный фреш",
+"operation": "Посыпка",
+"people": null,
+"qty": 1304,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-10T10:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-10T10:30:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": ""
 },
 {
 "id": "tg-851589-0",
@@ -1916,9 +2438,11 @@
 "start_exact": true,
 "end_at": "2026-10-10T14:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "отдали на нарезку"
+"note": "После грунтовки отдали на нарезку"
 },
 {
 "id": "tg-851659-0",
@@ -1935,9 +2459,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "Конца в переписке нет"
 },
 {
 "id": "tg-851827-0",
@@ -1954,28 +2480,11 @@
 "start_exact": true,
 "end_at": "2026-10-10T11:15:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851827-1",
-"msgs": [
-"851827"
-],
-"product": "Круассан с фисташковым кремом",
-"operation": "Не указана",
-"people": 1,
-"qty": 170,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-10T11:20:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-10T12:30:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
+"note": "Заказ закрыт"
 },
 {
 "id": "tg-851828-0",
@@ -1992,28 +2501,74 @@
 "start_exact": true,
 "end_at": "2026-10-10T13:15:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "Раскладка в формочки"
+},
+{
+"id": "tg-851827-1",
+"msgs": [
+"851827"
+],
+"product": "Круассан с фисташковым кремом",
+"operation": "Не указана",
+"people": 1,
+"qty": 170,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-10T11:20:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-10T12:30:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
 },
 {
-"id": "tg-851829-0",
+"id": "tg-851854-0",
 "msgs": [
-"851829"
+"851854"
 ],
-"product": "Круассан миндальный фреш",
-"operation": "Посыпка",
-"people": null,
-"qty": 1304,
+"product": "Торт Клубничный",
+"operation": "Нарезка",
+"people": 1,
+"qty": null,
 "unit": "шт",
 "plan": null,
-"start_at": "2026-10-10T10:00:00+03:00",
+"start_at": "2026-10-10T14:00:00+03:00",
 "start_exact": true,
-"end_at": "2026-10-10T10:30:00+03:00",
-"end_exact": true,
-"status": "closed",
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
 "flag": "ok",
-"note": ""
+"note": "Параллельно 1 сотрудник украшает; конца нет"
+},
+{
+"id": "tg-851854-1",
+"msgs": [
+"851854"
+],
+"product": "Торт Клубничный",
+"operation": "Декор",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-10T14:00:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Идёт параллельно нарезке; конца нет"
 },
 {
 "id": "tg-851830-0",
@@ -2031,9 +2586,11 @@
 "start_exact": true,
 "end_at": "2026-10-10T15:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "начали 1 чел., к концу 2"
+"note": "Начинал 1 сотрудник, к концу 2"
 },
 {
 "id": "tg-851831-0",
@@ -2051,47 +2608,11 @@
 "start_exact": true,
 "end_at": "2026-10-10T15:20:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "отдали на фасовку"
-},
-{
-"id": "tg-851854-0",
-"msgs": [
-"851854"
-],
-"product": "Торт Клубничный",
-"operation": "Нарезка",
-"people": 1,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-10T14:00:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": "параллельно украшает ещё 1 чел."
-},
-{
-"id": "tg-851854-1",
-"msgs": [
-"851854"
-],
-"product": "Торт Клубничный",
-"operation": "Украшение",
-"people": 1,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-10T14:00:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"note": "Отдали на фасовку, заказ закрыт"
 },
 {
 "id": "tg-851855-0",
@@ -2108,34 +2629,18 @@
 "start_at": "2026-10-10T15:00:00+03:00",
 "start_exact": true,
 "end_at": "2026-10-10T15:10:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851857-0",
-"msgs": [
-"851857"
-],
-"product": "Торт Три шоколада",
-"operation": "Грунтовка",
-"people": null,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-10T15:10:00+03:00",
-"start_exact": true,
-"end_at": null,
 "end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"start_src": "text",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "Конец = начало грунтовки того же торта (следующий этап)"
 },
 {
 "id": "tg-851870-0",
 "msgs": [
 "851870",
+"851878",
 "851883"
 ],
 "product": "Торт Три шоколада",
@@ -2148,9 +2653,33 @@
 "start_exact": true,
 "end_at": "2026-10-10T17:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "Распорционирование бисквитной массы"
+},
+{
+"id": "tg-851857-0",
+"msgs": [
+"851857",
+"851858"
+],
+"product": "Торт Три шоколада",
+"operation": "Грунтовка",
+"people": null,
+"qty": null,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-10T15:10:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Руководство просило ускорить; конца в переписке нет"
 },
 {
 "id": "tg-851877-0",
@@ -2158,7 +2687,7 @@
 "851877"
 ],
 "product": "Торт Тирамису",
-"operation": "Заливка массы",
+"operation": "Заливка муссом",
 "people": 2,
 "qty": null,
 "unit": "",
@@ -2167,9 +2696,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "Конца в переписке нет; в переписке: «Заливка массы»"
 },
 {
 "id": "tg-851880-0",
@@ -2187,9 +2718,11 @@
 "start_exact": true,
 "end_at": "2026-10-10T17:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "Заказ закрыт"
 },
 {
 "id": "tg-851889-0",
@@ -2206,70 +2739,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851895-0",
-"msgs": [
-"851895",
-"851904"
-],
-"product": "Чизкейк Сан-Себастьян",
-"operation": "Подготовка форм",
-"people": 2,
-"qty": 3,
-"unit": "замес",
-"plan": null,
-"start_at": "2026-10-10T20:28:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-10T21:30:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851897-0",
-"msgs": [
-"851897",
-"851903",
-"851910"
-],
-"product": "Шоколадная салями",
-"operation": "Формовка",
-"people": 4,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-10T21:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-10T22:50:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": "начали 1 чел., добавили +3"
-},
-{
-"id": "tg-851896-0",
-"msgs": [
-"851896",
-"851946"
-],
-"product": "Круассан с миндальным кремом",
-"operation": "Нарезка",
-"people": 2,
-"qty": null,
-"unit": "шт",
-"plan": 2060,
-"start_at": "2026-10-10T20:30:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-11T07:00:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
+"note": "Конца в переписке нет"
 },
 {
 "id": "tg-851902-0",
@@ -2287,9 +2761,141 @@
 "start_exact": true,
 "end_at": "2026-10-10T22:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": "переходящая с дневной смены"
+},
+{
+"id": "tg-851895-0",
+"msgs": [
+"851895",
+"851904"
+],
+"product": "Чизкейк Сан-Себастьян",
+"operation": "Подготовка форм",
+"people": 2,
+"qty": 3,
+"unit": "замес",
+"plan": null,
+"start_at": "2026-10-10T20:28:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-10T21:30:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "формы на 3 замеса"
+},
+{
+"id": "tg-851895-1",
+"msgs": [
+"851895"
+],
+"product": "Шоколадная салями",
+"operation": "Приготовление",
+"people": 2,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-10T20:29:00+03:00",
+"start_exact": false,
+"end_at": "2026-10-10T21:00:00+03:00",
+"end_exact": false,
+"start_src": "message",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "конец выведен: в 21:00 начался следующий этап того же продукта (формовка)"
+},
+{
+"id": "tg-851896-0",
+"msgs": [
+"851896",
+"851946"
+],
+"product": "Круассан с миндальным кремом",
+"operation": "Нарезка",
+"people": 2,
+"qty": null,
+"unit": "шт",
+"plan": 2060,
+"start_at": "2026-10-10T20:30:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-11T07:00:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "конец — ответом на исходное сообщение; количество не указано"
+},
+{
+"id": "tg-851897-0",
+"msgs": [
+"851897",
+"851903",
+"851910"
+],
+"product": "Шоколадная салями",
+"operation": "Формовка",
+"people": 4,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-10T21:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-10T22:50:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "начинал 1 чел., в 21:43 добавлено +3 чел., чтобы отдать заказ"
+},
+{
+"id": "tg-851938-0",
+"msgs": [
+"851938"
+],
+"product": "Булка Много мака",
+"operation": "Внесение начинки, обмакивание в сиропе",
+"people": 2,
+"qty": 1320,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-10T21:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-11T02:45:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": ""
+},
+{
+"id": "tg-851914-0",
+"msgs": [
+"851914"
+],
+"product": "Круассан с миндальным кремом",
+"operation": "Ароматизация в сиропе",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-10T21:40:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "конец нигде не указан"
 },
 {
 "id": "tg-851909-0",
@@ -2298,7 +2904,7 @@
 "851913"
 ],
 "product": "Чизкейк Сан-Себастьян",
-"operation": "Формовка",
+"operation": "Розлив в формы",
 "people": 1,
 "qty": 3,
 "unit": "замес",
@@ -2307,9 +2913,11 @@
 "start_exact": true,
 "end_at": "2026-10-10T23:35:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "розлив; в переписке: «Формовка»"
 },
 {
 "id": "tg-851912-0",
@@ -2327,28 +2935,11 @@
 "start_exact": true,
 "end_at": "2026-10-11T04:40:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "invalid",
-"note": "мастер: тайминг некорректен, по факту 40–45 мин — в нормы не идёт"
-},
-{
-"id": "tg-851914-0",
-"msgs": [
-"851914"
-],
-"product": "Круассан с миндальным кремом",
-"operation": "Ароматизация в сиропе",
-"people": 1,
-"qty": null,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-10T21:40:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"note": "мастер: тайминг некорректен, сотрудника отвлекали на другие задачи, по факту 40–45 мин"
 },
 {
 "id": "tg-851937-0",
@@ -2356,7 +2947,7 @@
 "851937"
 ],
 "product": "Торт Тирамису",
-"operation": "Формовка бисквита",
+"operation": "Разлив бисквита",
 "people": 2,
 "qty": 3,
 "unit": "замес",
@@ -2365,9 +2956,11 @@
 "start_exact": true,
 "end_at": "2026-10-11T01:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "в переписке: «Формовка бисквита»"
 },
 {
 "id": "tg-851937-1",
@@ -2375,8 +2968,8 @@
 "851937"
 ],
 "product": "Торт Вацлавский",
-"operation": "Формовка бисквита",
-"people": null,
+"operation": "Разлив бисквита",
+"people": 2,
 "qty": null,
 "unit": "",
 "plan": null,
@@ -2384,28 +2977,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851938-0",
-"msgs": [
-"851938"
-],
-"product": "Булка Много мака",
-"operation": "Внесение начинки, обмакивание в сиропе",
-"people": 2,
-"qty": 1320,
-"unit": "шт",
-"plan": null,
-"start_at": "2026-10-10T21:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-11T02:45:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
+"note": "начата в момент окончания бисквита Тирамису, вероятно той же бригадой (число людей отдельно не названо); конец не указан — в отчёте 02:56 дано только начало; в переписке: «Формовка бисквита»"
 },
 {
 "id": "tg-851939-0",
@@ -2422,9 +2998,11 @@
 "start_exact": true,
 "end_at": "2026-10-11T03:50:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "формы для бисквита; конец дописан правкой"
 },
 {
 "id": "tg-851940-0",
@@ -2433,7 +3011,7 @@
 "851943"
 ],
 "product": "Торт Три шоколада",
-"operation": "Формовка бисквита",
+"operation": "Разлив бисквита",
 "people": 2,
 "qty": 3,
 "unit": "замес",
@@ -2442,9 +3020,11 @@
 "start_exact": true,
 "end_at": "2026-10-11T05:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "в переписке: «Формовка бисквита»"
 },
 {
 "id": "tg-851942-0",
@@ -2462,9 +3042,11 @@
 "start_exact": true,
 "end_at": "2026-10-11T06:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "сделано больше плана"
 },
 {
 "id": "tg-851945-0",
@@ -2482,6 +3064,8 @@
 "start_exact": true,
 "end_at": "2026-10-11T07:45:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
@@ -2491,8 +3075,8 @@
 "msgs": [
 "851952"
 ],
-"product": "Канеле с ванильным кремом",
-"operation": "Формовка",
+"product": "Канеле с ванильным кремом фреш",
+"operation": "Розлив в формы",
 "people": 2,
 "qty": null,
 "unit": "шт",
@@ -2501,124 +3085,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851964-0",
-"msgs": [
-"851964"
-],
-"product": "Торт Бакинский",
-"operation": "Не указана",
-"people": 4,
-"qty": null,
-"unit": "шт",
-"plan": 1982,
-"start_at": "2026-10-11T09:00:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851965-0",
-"msgs": [
-"851965"
-],
-"product": "Булка Сладкое сердце",
-"operation": "Пропитка гелем и сиропом",
-"people": 1,
-"qty": null,
-"unit": "шт",
-"plan": 2084,
-"start_at": "2026-10-11T09:00:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851966-0",
-"msgs": [
-"851966"
-],
-"product": "Булка Много мака",
-"operation": "Не указана",
-"people": 2,
-"qty": null,
-"unit": "шт",
-"plan": 4592,
-"start_at": "2026-10-11T09:30:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851977-0",
-"msgs": [
-"851977"
-],
-"product": "Торт Тирамису",
-"operation": "Нарезка бисквита",
-"people": 1,
-"qty": null,
-"unit": "",
-"plan": null,
-"start_at": "2026-10-11T11:05:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851968-0",
-"msgs": [
-"851968",
-"851984"
-],
-"product": "Эклер пряный латте",
-"operation": "Набивка",
-"people": 2,
-"qty": 565,
-"unit": "шт",
-"plan": 565,
-"start_at": "2026-10-11T09:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-11T11:40:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851969-0",
-"msgs": [
-"851969"
-],
-"product": "Торт Три шоколада",
-"operation": "Нарезка бисквита",
-"people": 2,
-"qty": null,
-"unit": "",
-"plan": null,
-"start_at": "2026-10-11T08:45:00+03:00",
-"start_exact": true,
-"end_at": null,
-"end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"note": "в тексте «фреш»; конец не найден (в 08:52 только санконтроль розлива теста); в переписке: «Формовка»"
 },
 {
 "id": "tg-851970-0",
@@ -2635,29 +3106,96 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "Конца в чате нет"
 },
 {
-"id": "tg-851971-0",
+"id": "tg-851969-0",
 "msgs": [
-"851971",
-"852031"
+"851969"
 ],
-"product": "Трубочка с заварным кремом",
-"operation": "Начинка",
-"people": 1,
-"qty": 930,
-"unit": "шт",
+"product": "Торт Три шоколада",
+"operation": "Нарезка бисквита",
+"people": 2,
+"qty": null,
+"unit": "",
 "plan": null,
-"start_at": "2026-10-11T10:39:00+03:00",
+"start_at": "2026-10-11T08:45:00+03:00",
 "start_exact": true,
-"end_at": "2026-10-11T14:54:00+03:00",
+"end_at": "2026-10-11T11:45:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "inferred",
 "status": "closed",
 "flag": "check",
-"note": "отдали на фасовку; конец — по сообщению"
+"note": "Конец выведен: в 11:45 бригада из 2 человек начала следующий этап этого же торта — сборку"
+},
+{
+"id": "tg-851964-0",
+"msgs": [
+"851964"
+],
+"product": "Торт Бакинский",
+"operation": "Не указана",
+"people": 4,
+"qty": null,
+"unit": "шт",
+"plan": 1982,
+"start_at": "2026-10-11T09:00:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Операция не названа; санконтроль в 11:23 отмечает сборку Бакинского. В 10:44 один человек ушёл на сборку Вацлавского, но работа по Бакинскому продолжалась. Конца в чате нет"
+},
+{
+"id": "tg-851965-0",
+"msgs": [
+"851965"
+],
+"product": "Булка Сладкое сердце",
+"operation": "Пропитка сиропом, покрытие гелем",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": 2084,
+"start_at": "2026-10-11T09:00:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Конца в чате нет; в переписке: «Пропитка гелем и сиропом»"
+},
+{
+"id": "tg-851968-0",
+"msgs": [
+"851968",
+"851984"
+],
+"product": "Эклер пряный латте",
+"operation": "Внесение начинки",
+"people": 2,
+"qty": 565,
+"unit": "шт",
+"plan": 565,
+"start_at": "2026-10-11T09:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-11T11:40:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "Заказ закрыт; в переписке: «Набивка»"
 },
 {
 "id": "tg-851972-0",
@@ -2665,7 +3203,7 @@
 "851972"
 ],
 "product": "Кольцо творожное",
-"operation": "Набивка кремом",
+"operation": "Внесение начинки",
 "people": 1,
 "qty": null,
 "unit": "шт",
@@ -2674,9 +3212,76 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "Набивка творожным кремом. Конца в чате нет, в 12:59 был только санконтроль; в переписке: «Набивка кремом»"
+},
+{
+"id": "tg-851966-0",
+"msgs": [
+"851966"
+],
+"product": "Булка Много мака",
+"operation": "Не указана",
+"people": 2,
+"qty": null,
+"unit": "шт",
+"plan": 4592,
+"start_at": "2026-10-11T09:30:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "Операция не названа; санконтроль в 11:00 проверял наполнение начинкой. Конца в чате нет"
+},
+{
+"id": "tg-851967-0",
+"msgs": [
+"851967",
+"851977"
+],
+"product": "Торт Тирамису",
+"operation": "Нарезка бисквита",
+"people": 1,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-11T10:33:00+03:00",
+"start_exact": false,
+"end_at": "2026-10-11T12:05:00+03:00",
+"end_exact": false,
+"start_src": "message",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "В 10:33 нарезка уже шла (время в тексте не указано), в 11:07 мастер повторно написал «11:05 нарезка бисквита». Конец выведен: в 12:05 начали следующий этап этого же торта — пропитку первого слоя"
+},
+{
+"id": "tg-851971-0",
+"msgs": [
+"851971",
+"852031"
+],
+"product": "Трубочка с заварным кремом",
+"operation": "Внесение начинки",
+"people": 1,
+"qty": 930,
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-11T10:39:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-11T14:54:00+03:00",
+"end_exact": false,
+"start_src": "text",
+"end_src": "message",
+"status": "closed",
+"flag": "check",
+"note": "Конец взят по времени сообщения «отдали на фасовку, заказ закрыт»"
 },
 {
 "id": "tg-851973-0",
@@ -2693,29 +3298,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-851985-0",
-"msgs": [
-"851985",
-"852032"
-],
-"product": "Эклер ванильный",
-"operation": "Набивка",
-"people": 2,
-"qty": 1154,
-"unit": "шт",
-"plan": 1154,
-"start_at": "2026-10-11T11:45:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-11T15:40:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
+"note": "На сборку перевели одного человека с Бакинского. Конца в чате нет"
 },
 {
 "id": "tg-851986-0",
@@ -2733,9 +3320,33 @@
 "start_exact": true,
 "end_at": "2026-10-11T12:15:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "Заказ закрыт"
+},
+{
+"id": "tg-851985-0",
+"msgs": [
+"851985",
+"852032"
+],
+"product": "Эклер ванильный",
+"operation": "Внесение начинки",
+"people": 2,
+"qty": 1154,
+"unit": "шт",
+"plan": 1154,
+"start_at": "2026-10-11T11:45:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-11T15:40:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "Заказ закрыт; в переписке: «Набивка»"
 },
 {
 "id": "tg-851991-0",
@@ -2753,9 +3364,11 @@
 "start_exact": true,
 "end_at": "2026-10-11T14:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "отправили в мороз"
+"note": "240 тортов отправили в заморозку"
 },
 {
 "id": "tg-851993-0",
@@ -2770,11 +3383,13 @@
 "plan": null,
 "start_at": "2026-10-11T12:05:00+03:00",
 "start_exact": true,
-"end_at": null,
+"end_at": "2026-10-11T12:35:00+03:00",
 "end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"start_src": "text",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "Конец выведен: в 12:35 те же 2 человека начали следующий этап этого же торта — заливку муссом"
 },
 {
 "id": "tg-851998-0",
@@ -2792,9 +3407,32 @@
 "start_exact": true,
 "end_at": "2026-10-11T13:30:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": "первый слой"
+"note": "Первый слой; после него торты поставили в холодильник на стабилизацию"
+},
+{
+"id": "tg-852030-0",
+"msgs": [
+"852030"
+],
+"product": "Торт Тирамису",
+"operation": "Заливка муссом",
+"people": 2,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-11T14:22:00+03:00",
+"start_exact": false,
+"end_at": null,
+"end_exact": false,
+"start_src": "message",
+"end_src": "",
+"status": "open",
+"flag": "check",
+"note": "Продолжение заливки после стабилизации первого слоя. Точное время начала не указано, взято время сообщения. Конца в чате нет"
 },
 {
 "id": "tg-852033-0",
@@ -2802,7 +3440,7 @@
 "852033"
 ],
 "product": "Эклер шоколадный",
-"operation": "Набивка",
+"operation": "Внесение начинки",
 "people": null,
 "qty": null,
 "unit": "шт",
@@ -2811,7 +3449,53 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
+"flag": "ok",
+"note": "Число людей не указано. Конца в чате нет; в переписке: «Набивка»"
+},
+{
+"id": "tg-852064-0",
+"msgs": [
+"852064",
+"852075"
+],
+"product": "Канеле с ванильным кремом",
+"operation": "Внесение начинки",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": 1010,
+"start_at": "2026-10-11T20:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-11T22:50:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": ""
+},
+{
+"id": "tg-852068-0",
+"msgs": [
+"852068",
+"852069"
+],
+"product": "Кольцо заварное",
+"operation": "Отсадка",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": 2000,
+"start_at": "2026-10-11T20:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-11T20:40:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
 "flag": "ok",
 "note": ""
 },
@@ -2831,26 +3515,8 @@
 "start_exact": true,
 "end_at": "2026-10-11T23:00:00+03:00",
 "end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-852064-0",
-"msgs": [
-"852064",
-"852075"
-],
-"product": "Канеле с ванильным кремом",
-"operation": "Внесение начинки",
-"people": 1,
-"qty": null,
-"unit": "шт",
-"plan": 1010,
-"start_at": "2026-10-11T20:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-11T22:50:00+03:00",
-"end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
@@ -2871,9 +3537,11 @@
 "start_exact": true,
 "end_at": "2026-10-11T20:20:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "invalid",
-"note": "конец указан равным началу — ошибка ввода"
+"note": "конец указан равным началу (20:20) — ошибка ввода; сообщение об окончании отправлено в 21:42"
 },
 {
 "id": "tg-852066-0",
@@ -2891,9 +3559,11 @@
 "start_exact": false,
 "end_at": "2026-10-11T21:42:00+03:00",
 "end_exact": false,
+"start_src": "message",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "начало и конец — по сообщениям"
+"note": "время начала не указано — по сообщению; конец — по сообщению «Закончили»"
 },
 {
 "id": "tg-852067-0",
@@ -2910,29 +3580,11 @@
 "start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
 "flag": "check",
-"note": "начало — по сообщению"
-},
-{
-"id": "tg-852068-0",
-"msgs": [
-"852068",
-"852069"
-],
-"product": "Кольцо заварное",
-"operation": "Отсадка",
-"people": 1,
-"qty": null,
-"unit": "шт",
-"plan": 2000,
-"start_at": "2026-10-11T20:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-11T20:40:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
+"note": "время начала не указано — по сообщению; об окончании не сообщали"
 },
 {
 "id": "tg-852072-0",
@@ -2950,9 +3602,11 @@
 "start_exact": true,
 "end_at": "2026-10-12T03:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "переход через полночь"
 },
 {
 "id": "tg-852073-0",
@@ -2960,7 +3614,7 @@
 "852073"
 ],
 "product": "Чизкейк Сан-Себастьян",
-"operation": "Формовка",
+"operation": "Розлив в формы",
 "people": 2,
 "qty": 2,
 "unit": "замес",
@@ -2969,9 +3623,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "об окончании не сообщали; в переписке: «Формовка»"
 },
 {
 "id": "tg-852074-0",
@@ -2989,9 +3645,11 @@
 "start_exact": true,
 "end_at": "2026-10-12T00:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "переход через полночь"
 },
 {
 "id": "tg-852078-0",
@@ -3008,9 +3666,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "«Количество 720 шт» — задание на нарезку; об окончании не сообщали (промочка/декор с 01:25 записана под другим названием продукта и другим числом людей, поэтому конец не выводится)"
 },
 {
 "id": "tg-852079-0",
@@ -3025,11 +3685,13 @@
 "plan": null,
 "start_at": "2026-10-11T23:30:00+03:00",
 "start_exact": true,
-"end_at": null,
+"end_at": "2026-10-11T23:45:00+03:00",
 "end_exact": false,
-"status": "open",
-"flag": "ok",
-"note": ""
+"start_src": "text",
+"end_src": "inferred",
+"status": "closed",
+"flag": "check",
+"note": "«с машиной» — опечатка, «с малиной»; конец выведен: в 23:45 один сотрудник начал следующий этап того же продукта — внесение начинки"
 },
 {
 "id": "tg-852098-0",
@@ -3046,9 +3708,11 @@
 "start_exact": true,
 "end_at": "2026-10-12T00:45:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "переход через полночь"
 },
 {
 "id": "tg-852099-0",
@@ -3057,7 +3721,7 @@
 "852104"
 ],
 "product": "Торт Тирамису",
-"operation": "Формовка бисквита",
+"operation": "Разлив бисквита",
 "people": 2,
 "qty": 3,
 "unit": "замес",
@@ -3066,9 +3730,11 @@
 "start_exact": true,
 "end_at": "2026-10-12T02:40:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "в переписке: «Формовка бисквита»"
 },
 {
 "id": "tg-852100-0",
@@ -3086,9 +3752,11 @@
 "start_exact": true,
 "end_at": "2026-10-12T05:02:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению"
+"note": "конец — по сообщению «Закончили»"
 },
 {
 "id": "tg-852101-0",
@@ -3106,6 +3774,8 @@
 "start_exact": true,
 "end_at": "2026-10-12T02:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
@@ -3126,6 +3796,8 @@
 "start_exact": true,
 "end_at": "2026-10-12T04:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
 "note": ""
@@ -3137,7 +3809,7 @@
 "852108"
 ],
 "product": "Бисквит азиатский",
-"operation": "Формовка",
+"operation": "Разлив бисквита",
 "people": 2,
 "qty": 1,
 "unit": "замес",
@@ -3146,29 +3818,34 @@
 "start_exact": true,
 "end_at": "2026-10-12T03:20:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "в переписке: «Формовка»"
 },
 {
 "id": "tg-852107-0",
 "msgs": [
 "852107",
+"852126",
 "852129"
 ],
 "product": "Торт Вацлавский",
 "operation": "Сборка",
 "people": 2,
-"qty": null,
+"qty": 12,
 "unit": "лист",
 "plan": null,
 "start_at": "2026-10-12T03:04:00+03:00",
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": "к 07:42 сделано 12 листов, осталось 8"
+"note": "промежуточно на 07:42: сделано 12 листов, осталось 8, работа продолжается (закончился крем); окончание в переписке не найдено"
 },
 {
 "id": "tg-852110-0",
@@ -3186,9 +3863,11 @@
 "start_exact": true,
 "end_at": "2026-10-12T07:10:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "количество дописано правкой в 07:15, после окончания — фактически сделано"
 },
 {
 "id": "tg-852111-0",
@@ -3197,7 +3876,7 @@
 "852113"
 ],
 "product": "Круассан с шоколадом",
-"operation": "Подготовка крема",
+"operation": "Приготовление крема",
 "people": 1,
 "qty": null,
 "unit": "",
@@ -3206,9 +3885,11 @@
 "start_exact": true,
 "end_at": "2026-10-12T05:00:00+03:00",
 "end_exact": true,
+"start_src": "text",
+"end_src": "text",
 "status": "closed",
 "flag": "ok",
-"note": ""
+"note": "в переписке: «Подготовка крема»"
 },
 {
 "id": "tg-852114-0",
@@ -3226,9 +3907,11 @@
 "start_exact": true,
 "end_at": "2026-10-12T06:58:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению"
+"note": "конец — по сообщению «Закончили»"
 },
 {
 "id": "tg-852115-0",
@@ -3236,7 +3919,7 @@
 "852115"
 ],
 "product": "Канеле с ванильным кремом",
-"operation": "Формовка",
+"operation": "Розлив в формы",
 "people": 1,
 "qty": null,
 "unit": "шт",
@@ -3245,9 +3928,11 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "об окончании не сообщали; в переписке: «Формовка»"
 },
 {
 "id": "tg-852120-0",
@@ -3265,9 +3950,11 @@
 "start_exact": false,
 "end_at": "2026-10-12T07:30:00+03:00",
 "end_exact": true,
+"start_src": "message",
+"end_src": "text",
 "status": "closed",
 "flag": "check",
-"note": "начало — по сообщению"
+"note": "время начала не указано — по сообщению (фактически могли начать раньше); количество сделанного не указано"
 },
 {
 "id": "tg-852122-0",
@@ -3284,14 +3971,19 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "об окончании не сообщали"
 },
 {
-"id": "tg-852127-0",
+"id": "tg-852125-0",
 "msgs": [
-"852127"
+"852125",
+"852127",
+"852130",
+"852131"
 ],
 "product": "Ромовая баба",
 "operation": "Прокол",
@@ -3303,28 +3995,54 @@
 "start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
 "flag": "check",
-"note": "«на текущий момент стоит 4 человека»"
+"note": "время начала не указано — первое упоминание в 07:40 («на текущий момент 4 человека, проколы делают»); с 07:43 по указанию конвейер: 2 прокалывают, 2 промачивают; окончание не найдено"
 },
 {
-"id": "tg-852137-0",
+"id": "tg-852129-0",
 "msgs": [
-"852137"
+"852129"
 ],
-"product": "Булка Много мака",
-"operation": "Отделка глазурью",
+"product": "Торт Вацлавский",
+"operation": "Приготовление крема",
 "people": 1,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-12T07:42:00+03:00",
+"start_exact": false,
+"end_at": null,
+"end_exact": false,
+"start_src": "message",
+"end_src": "",
+"status": "open",
+"flag": "check",
+"note": "крем для сборки закончился, замешивают новый — начало по сообщению; окончание не найдено"
+},
+{
+"id": "tg-852130-0",
+"msgs": [
+"852130",
+"852131"
+],
+"product": "Ромовая баба",
+"operation": "Промочка",
+"people": 2,
 "qty": null,
 "unit": "шт",
 "plan": null,
-"start_at": "2026-10-12T09:15:00+03:00",
-"start_exact": true,
+"start_at": "2026-10-12T07:43:00+03:00",
+"start_exact": false,
 "end_at": null,
 "end_exact": false,
+"start_src": "message",
+"end_src": "",
 "status": "open",
-"flag": "ok",
-"note": ""
+"flag": "check",
+"note": "начата по указанию работать конвейером (2 человека из 4 переведены с прокола на промочку), начало — по сообщению «Принято»; окончание не найдено"
 },
 {
 "id": "tg-852138-0",
@@ -3332,7 +4050,7 @@
 "852138"
 ],
 "product": "Трубочка с заварным кремом",
-"operation": "Набивка кремом, обсыпка крошкой",
+"operation": "Внесение начинки, обсыпка крошкой",
 "people": 1,
 "qty": null,
 "unit": "шт",
@@ -3341,48 +4059,32 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "конца нет; 852149 — бракераж без тайминга; в переписке: «Набивка кремом, обсыпка крошкой»"
 },
 {
-"id": "tg-852139-0",
+"id": "tg-852142-0",
 "msgs": [
-"852139",
-"852329"
+"852142"
 ],
-"product": "Эклер шоколадный",
-"operation": "Начинка и декор",
-"people": 1,
+"product": "Торт Бакинский",
+"operation": "Сборка",
+"people": 2,
 "qty": null,
-"unit": "шт",
-"plan": 1082,
-"start_at": "2026-10-12T10:00:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-12T13:40:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": ""
-},
-{
-"id": "tg-852140-0",
-"msgs": [
-"852140"
-],
-"product": "Торт Тирамису",
-"operation": "Нарезка бисквитных коржей",
-"people": 1,
-"qty": null,
-"unit": "",
-"plan": null,
-"start_at": "2026-10-12T09:30:00+03:00",
+"unit": "пласт",
+"plan": 26,
+"start_at": "2026-10-12T08:30:00+03:00",
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "конца нет; 852233 — контроль веса крема без тайминга; в переписке: «Сборка пластов»"
 },
 {
 "id": "tg-852141-0",
@@ -3400,28 +4102,119 @@
 "start_exact": true,
 "end_at": "2026-10-12T13:40:00+03:00",
 "end_exact": false,
+"start_src": "text",
+"end_src": "message",
 "status": "closed",
 "flag": "check",
-"note": "конец — по сообщению"
+"note": "конец — по времени сообщения «Закончили» без указания времени; 852195 — санконтроль"
 },
 {
-"id": "tg-852142-0",
+"id": "tg-852137-0",
 "msgs": [
-"852142"
+"852137"
 ],
-"product": "Торт Бакинский",
-"operation": "Сборка пластов",
-"people": 2,
+"product": "Булка Много мака",
+"operation": "Покрытие глазурью",
+"people": 1,
 "qty": null,
-"unit": "пласт",
-"plan": 26,
-"start_at": "2026-10-12T08:30:00+03:00",
+"unit": "шт",
+"plan": null,
+"start_at": "2026-10-12T09:15:00+03:00",
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
+"note": "конца в переписке нет; 852157 и 852228 — санконтроль (вес, начинение), без тайминга; в переписке: «Отделка глазурью»"
+},
+{
+"id": "tg-852140-0",
+"msgs": [
+"852140"
+],
+"product": "Торт Тирамису",
+"operation": "Нарезка бисквита",
+"people": 1,
+"qty": null,
+"unit": "",
+"plan": null,
+"start_at": "2026-10-12T09:30:00+03:00",
+"start_exact": true,
+"end_at": null,
+"end_exact": false,
+"start_src": "text",
+"end_src": "",
+"status": "open",
+"flag": "ok",
+"note": "конца нет; в переписке: «Нарезка бисквитных коржей»"
+},
+{
+"id": "tg-852197-0",
+"msgs": [
+"852197",
+"852271"
+],
+"product": "Начинка вишнёвая",
+"operation": "Формовка",
+"people": 1,
+"qty": 29,
+"unit": "кг",
+"plan": null,
+"start_at": "2026-10-12T09:30:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-12T12:35:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "один сотрудник одним интервалом готовил вишнёвую начинку и заварной крем (отдельная запись); интервал общий, при суммировании трудозатрат не задваивать"
+},
+{
+"id": "tg-852197-1",
+"msgs": [
+"852197",
+"852271"
+],
+"product": "Крем заварной",
+"operation": "Формовка",
+"people": 1,
+"qty": 141,
+"unit": "кг",
+"plan": null,
+"start_at": "2026-10-12T09:30:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-12T12:35:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "тот же сотрудник и интервал, что и вишнёвая начинка (одно сообщение на два полуфабриката); при суммировании трудозатрат не задваивать"
+},
+{
+"id": "tg-852139-0",
+"msgs": [
+"852139",
+"852329"
+],
+"product": "Эклер шоколадный",
+"operation": "Начинка и декор",
+"people": 1,
+"qty": null,
+"unit": "шт",
+"plan": 1082,
+"start_at": "2026-10-12T10:00:00+03:00",
+"start_exact": true,
+"end_at": "2026-10-12T13:40:00+03:00",
+"end_exact": true,
+"start_src": "text",
+"end_src": "text",
+"status": "closed",
+"flag": "ok",
+"note": "начинка и декор закончены в 13:40; фактическое количество не указано; 852170 — бракераж без тайминга"
 },
 {
 "id": "tg-852143-0",
@@ -3438,32 +4231,25 @@
 "start_exact": true,
 "end_at": null,
 "end_exact": false,
+"start_src": "text",
+"end_src": "",
 "status": "open",
 "flag": "ok",
-"note": ""
-},
-{
-"id": "tg-852197-0",
-"msgs": [
-"852197",
-"852271"
-],
-"product": "Начинка вишнёвая и крем заварной",
-"operation": "Формовка",
-"people": 1,
-"qty": 170,
-"unit": "кг",
-"plan": null,
-"start_at": "2026-10-12T09:30:00+03:00",
-"start_exact": true,
-"end_at": "2026-10-12T12:35:00+03:00",
-"end_exact": true,
-"status": "closed",
-"flag": "ok",
-"note": "вишня 29 кг + заварной крем 141 кг"
+"note": "554 шт — объём задания на декор (дописано после замечания указывать количество), не факт; конца нет; 852199 — санконтроль"
 }
 ],
 "handoffs": [
+{
+"product": "Булка Много мака",
+"at": "2026-10-06T21:50:00+03:00",
+"exact": false,
+"qty": null,
+"unit": "шт",
+"msgs": [
+"849896",
+"849899"
+]
+},
 {
 "product": "Чизкейк Сан-Себастьян",
 "at": "2026-10-06T23:50:00+03:00",
@@ -3491,7 +4277,68 @@
 "qty": 750,
 "unit": "шт",
 "msgs": [
+"850310",
 "850400"
+]
+},
+{
+"product": "Круассан миндальный",
+"at": "2026-10-09T10:32:00+03:00",
+"exact": false,
+"qty": 850,
+"unit": "шт",
+"msgs": [
+"851056"
+]
+},
+{
+"product": "Круассан с малиной",
+"at": "2026-10-09T11:13:00+03:00",
+"exact": false,
+"qty": 214,
+"unit": "шт",
+"msgs": [
+"851061"
+]
+},
+{
+"product": "Круассан крем чиз фреш",
+"at": "2026-10-09T15:58:00+03:00",
+"exact": false,
+"qty": 487,
+"unit": "шт",
+"msgs": [
+"851225"
+]
+},
+{
+"product": "Круассан со сгущёнкой",
+"at": "2026-10-09T16:42:00+03:00",
+"exact": false,
+"qty": 65,
+"unit": "шт",
+"msgs": [
+"851240"
+]
+},
+{
+"product": "Трубочка с заварным кремом",
+"at": "2026-10-09T17:18:00+03:00",
+"exact": false,
+"qty": 864,
+"unit": "шт",
+"msgs": [
+"851249"
+]
+},
+{
+"product": "Эклер ванильный",
+"at": "2026-10-09T18:50:00+03:00",
+"exact": true,
+"qty": 1124,
+"unit": "шт",
+"msgs": [
+"851323"
 ]
 },
 {

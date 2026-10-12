@@ -126,7 +126,7 @@ def test_chat_history_is_consistent():
             assert o["end_at"] >= o["start_at"], o
         assert (o["status"] == "closed") == bool(o["end_at"]), o
         assert o["people"] is None or 1 <= o["people"] <= 50, o
-        assert o["unit"] in ("", "шт", "кг", "пласт", "лист", "замес", "форма", "кольцо"), o
+        assert o["unit"] in ("", "шт", "кг", "пласт", "лист", "замес", "форма", "кольцо", "шпилька"), o
     assert {h_["product"] for h_ in h["handoffs"]} >= {"Чизкейк Сан-Себастьян", "Трубочка с заварным кремом"}
     # тексты сообщений и имена в файл не попадают
     raw = (HERE.parent / "kc_chat_history.json").read_text(encoding="utf-8")

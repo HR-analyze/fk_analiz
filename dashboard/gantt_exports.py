@@ -16,6 +16,11 @@ def _v(value):
     return "" if value is None else value
 
 
+def _qty(h):
+    """«930 шт » или пусто: в переписке количество при сдаче называли не всегда."""
+    return "" if h.get("qty") is None else f"{h['qty']:g} {h['unit']} "
+
+
 def _hm(minutes):
     if minutes is None:
         return ""
@@ -102,7 +107,7 @@ def timing_rows(summary):
         for st in t["stages"]:
             if st["key"] == "pack":
                 hs = st.get("handoffs") or []
-                row.append("; ".join(f"передано {h['qty']} {h['unit']} в {h['time']}" for h in hs) or "нет источника")
+                row.append("; ".join(f"сдано {_qty(h)}в {h['time']}" for h in hs) or "нет источника")
             elif st.get("present"):
                 row.append(f"{st['start_time']}–{st['end_time'] or '…'} · {_hm(st['span_min']) or '—'}"
                            f" · {st['qty']}" + (f" · до {st['people_max']} чел." if st.get("people_max") else "")
@@ -143,7 +148,7 @@ def build_analysis(summary, filters=None):
         blocks.append(("Общий тайминг", ["В этом окне нет продукта, найденного больше чем в одном цехе. "
                                          "Сведи названия в справочнике продуктов, если у цехов они разные."]))
     if summary["handoffs"]:
-        blocks.append(("Передано на фасовку (из чата кондитерского цеха)", [f"{h['product']} — {h['qty']} {h['unit']} в {h['time']}"
+        blocks.append(("Сдано / передано на фасовку (из чата кондитерского цеха)", [f"{h['product']} — {_qty(h)}в {h['time']}"
                                                            for h in summary["handoffs"]]))
     errors = summary.get("section_errors") or {}
     if errors:
@@ -191,7 +196,8 @@ def build_xlsx(summary, filters, mapping, ops_map=None):
     sheet("Общий тайминг", timing_columns(summary), timing_rows(summary))
     sheet("Среднее по продукту", AVG_COLUMNS, average_rows(summary))
     sheet("Передано на фасовку", ["Продукт", "Когда", "Количество", "Ед.", "Время точное"],
-          [[h["product"], h["time"], h["qty"], h["unit"], "да" if h["exact"] else "по сообщению"] for h in summary["handoffs"]])
+          [[h["product"], h["time"], _v(h["qty"]), h["unit"] if h["qty"] is not None else "", "да" if h["exact"] else "по сообщению"]
+           for h in summary["handoffs"]])
     sheet("Справочник продуктов", ["Цех", "Продукт в цехе", "Единый продукт"],
           [[SECTIONS.get(sec, sec), name, unified] for sec, items in sorted(mapping.items()) for name, unified in sorted(items.items())])
     sheet("Справочник операций", ["Цех", "Операция в цехе", "Единая операция"],
