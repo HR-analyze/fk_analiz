@@ -64,8 +64,9 @@ def grouped_rows(summary):
     """Как на диаграмме: строка продукта, под ней его операции."""
     out = []
     for p in summary.get("products", []):
+        made = (p["qty"] or "") + (f" ({p['output_from']})" if p.get("output_from") and p["ops"] > 1 and p["qty"] else "")
         out.append([p["section_title"], p["product"], f"все операции: {p['ops']}", "продукт", p["runs"], _v(p["busy_min"]),
-                    p["equipment"], _v(p["people"]), _v(p["person_hours"]), p["qty"] or "", _rate_text(p)])
+                    p["equipment"], _v(p["people"]), _v(p["person_hours"]), made, _rate_text(p)])
         for r in summary["rows"]:
             if r["section"] == p["section"] and r["product"] == p["product"]:
                 out.append([r["section_title"], r["product"], r["operation"], "операция", r["runs"], _v(r["busy_min"]),

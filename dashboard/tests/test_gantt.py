@@ -185,10 +185,24 @@ def test_rows_grouped_by_product_with_columns():
     prod = next(x for x in s["products"] if x["product"] == "Булка Много мака")
     assert prod["ops"] == 2 and prod["section_title"] == "Кондитерский цех"
     assert prod["people"] == 5 and prod["people_ops"] == 5          # 09:30–10:00 работают обе операции
-    assert prod["rate_per_person"] is None and prod["qty"] == ""    # штуки разных операций не складываем
+    # выработка продукта — самая массовая операция (глазурь, 100 шт), операции не складываются:
+    # 100 шт / (2 + 1,5) чел·ч всех операций; в час — / 60 мин работы с продуктом
+    assert (prod["qty"], prod["rate_per_person"], prod["rate"]) == ("100 шт", 28.6, 100.0)
+    assert prod["output_from"] == "Кондитерский цех · Отделка глазурью"
     bread = next(x for x in s["products"] if x["product"] == "Багет")
     assert bread["section_title"] == "Формовочный цех" and bread["people"] is None
     assert bread["rate_per_person"] is None and bread["rate"] == 900.0 and bread["equipment"] == "Rondo"
+
+    # тестозаготовочный цех: людей нет — кг продукта в час работы с ним (замес 200 кг, работа 08:00–09:00)
+    bhm = {"production": [{"id": f"b{i}", "user_name": "О", "equipment": eq, "product": "Багет", "operation": op,
+                           "start_time": st, "end_time": en, "qty": qty, "status": "closed",
+                           "created_at": at(7, 9).isoformat(), "date": "2026-10-07"}
+                          for i, (op, eq, st, en, qty) in enumerate([("Сборка теста", "Daxner", "08:00", "08:20", None),
+                                                                     ("Замес теста", "Diosna", "08:20", "08:40", 200.0),
+                                                                     ("Отлежка теста", "Без оборудования", "08:40", "09:00", None)])]}
+    s = gantt.build(gantt.collect_bars({"bhm": bhm}, {}), {}, {}, "2026-10-07", "full", now=NOW)
+    dough = s["products"][0]
+    assert (dough["ops"], dough["qty"], dough["rate"], dough["rate_per_person"]) == (3, "200 кг", 200.0, None)
 
 
 def test_peak_people_relay_is_not_parallel():

@@ -454,6 +454,20 @@ def _day_output(items):
     return {"qty": qty, "unit": unit, "stage": stage, "operation": op}
 
 
+def _product_rate(items, busy_min):
+    """Выработка продукта в строке диаграммы (несколько операций): как в «Среднем по продукту» —
+    количество последнего этапа, самая массовая операция (операции не складываются).
+    На человека — / чел·ч всех операций продукта; людей нет — / время работы с продуктом в окне."""
+    out = _day_output(items)
+    if not out:
+        return {"rate": None, "rate_per_person": None, "rate_unit": "", "qty": "", "output_from": ""}
+    ph = _person_hours(items)
+    return {"rate": round(out["qty"] / (busy_min / 60), 1) if busy_min else None,
+            "rate_per_person": round(out["qty"] / ph, 1) if ph else None,
+            "rate_unit": out["unit"], "qty": _qty_text({out["unit"]: out["qty"]}),
+            "output_from": f"{STAGES[STAGE_INDEX[out['stage']]]['title']} · {out['operation']}"}
+
+
 def averages(bars_by_section, namer, day_from, day_to, sections=None, product="all", equipment="all", now=None):
     """Средний день продукта за период: когда от начала работы с продуктом идёт каждая операция
     и этап и сколько длится. Каждые рабочие сутки продукта — один «прогон»."""
@@ -598,8 +612,9 @@ def build(bars_by_section, history, mapping, day, mode="full", sections=None, pr
                                      key=lambda kv: (order[kv[0][0]], kv[0][1].lower())):
         ops = sorted({b["operation"] for b in items})
         stats = _row_stats(items, now, (start, end))
-        if len(ops) > 1:  # штуки разных операций не складываем в «выработку продукта»
-            stats.update(rate=None, rate_per_person=None, qty="")
+        stats["output_from"] = ops[0] if len(ops) == 1 else ""
+        if len(ops) > 1:
+            stats.update(_product_rate(items, stats["busy_min"]))
         known = [bar_end(b, now) for b in items if bar_end(b, now)]
         products.append({"section": sec, "section_title": SECTIONS[sec], "product": prod, "ops": len(ops),
                          "runs": len(items), **stats, "people": _peak_people(items, now),

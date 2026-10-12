@@ -1838,12 +1838,24 @@ function gBarTip(b) {
     b.note || ''].filter(Boolean).join(' · ');
 }
 
-// Выработка в час на человека; людей нет в боте — в час на всех (бледно), разные операции — не складываем.
-function gRateCell(x, several) {
-  if (several) return '<span class="muted" title="Штуки разных операций не складываем — смотри по операциям">по операциям</span>';
-  if (!none(x.rate_per_person)) return `<b>${dec(x.rate_per_person)}</b> <small>${esc(x.rate_unit)}/чел·ч</small>`;
-  if (!none(x.rate)) return `<span class="muted" title="Людей в этом цехе бот не знает — выработка в час на всех">${dec(x.rate)} ${esc(x.rate_unit)}/ч</span>`;
-  return '<span class="muted">—</span>';
+// Выработка в час на человека; людей нет в боте — в час на всех (бледно).
+// product=true — строка продукта: количество последнего этапа (самая массовая операция, операции не
+// складываются) / чел·ч всех операций продукта, без людей — / время работы с продуктом в окне.
+function gRateCell(x, product) {
+  const src = product && x.output_from ? `Продукт: ${x.qty || '—'} — ${x.output_from}. ` : '';
+  const how = product
+    ? 'Операции не складываем: одни и те же изделия проходят несколько операций.'
+    : 'Сделано / человеко-часы операции.';
+  if (!none(x.rate_per_person)) {
+    const tip = src + (product ? 'Делим на человеко-часы всех операций продукта. ' : '') + how;
+    return `<span title="${esc(tip)}"><b>${dec(x.rate_per_person)}</b> <small>${esc(x.rate_unit)}/чел·ч</small></span>`;
+  }
+  if (!none(x.rate)) {
+    const tip = src + 'Людей в этом цехе бот не знает — выработка в час на всех' +
+      (product ? ' за время работы с продуктом («занято»). ' + how : '.');
+    return `<span class="muted" title="${esc(tip)}">${dec(x.rate)} ${esc(x.rate_unit)}/ч</span>`;
+  }
+  return '<span class="muted" title="Нет закрытых операций с количеством">—</span>';
 }
 
 function gPeopleCell(x, product) {
@@ -1966,13 +1978,12 @@ function drawGantt() {
     // Свёрнут по умолчанию; развёрнут сам, если выбран один продукт или идёт поиск — иначе найденное не видно.
     const fold = gFoldMap();
     const open = fold.has(key) ? fold.get(key) : (GANTT.product !== 'all' || !!GANTT.search.trim());
-    const several = p.ops > 1;
     const color = G_COLORS[p.section];
     rows.push({ kind: 'product', key, open, label: p.product, mini: true, lanes: 1,
       sub: [p.ops > 1 ? `операций ${p.ops}` : ops[0].operation, none(p.busy_min) ? '' : 'занято ' + hm(p.busy_min),
         gChatText(ops.reduce((n, r) => n + r.bars.filter((b) => b.source === 'chat').length, 0), ops.reduce((n, r) => n + r.bars.length, 0))].filter(Boolean).join(' · '),
-      cols: [p.equipment ? `<span class="g-clamp" title="${esc(p.equipment)}">${esc(p.equipment)}</span>` : '—', gPeopleCell(p, true), gRateCell(p, several)],
-      mob: [p.equipment, none(p.people) ? '' : p.people + ' чел', several ? '' : gRateCell(p, false).replace(/<[^>]+>/g, '')].filter((x) => x && x !== '—').map(esc).join(' · '),
+      cols: [p.equipment ? `<span class="g-clamp" title="${esc(p.equipment)}">${esc(p.equipment)}</span>` : '—', gPeopleCell(p, true), gRateCell(p, true)],
+      mob: [p.equipment, none(p.people) ? '' : p.people + ' чел', gRateCell(p, true).replace(/<[^>]+>/g, '')].filter((x) => x && x !== '—').map(esc).join(' · '),
       bars: ops.flatMap((r) => r.bars.map((b) => ({ start: b.start, draw_end: b.draw_end, lane: 0, color,
         cls: [b.flag !== 'ok' ? 'hatch' : ''].join(' '), tip: `${r.operation}: ${gBarTip(b)}` }))) });
     if (!open) return;
