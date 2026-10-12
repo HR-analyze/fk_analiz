@@ -10,8 +10,10 @@ import pg_plan_store as store
 class PlanDatabaseTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        if not os.getenv("PLAN_DATABASE_URL"):
-            raise unittest.SkipTest("PLAN_DATABASE_URL required")
+        if not store.database_url():
+            raise unittest.SkipTest("Dedicated dashboard PostgreSQL is required")
+        if os.getenv("RELAXDEV_DEPLOY") == "1" and not os.getenv("PLAN_DATABASE_URL"):
+            assert store.database_url() == os.getenv("DATABASE_URL"), "RelaxDev auto DATABASE_URL fallback not working"
         store.init_storage()
 
     def setUp(self):
