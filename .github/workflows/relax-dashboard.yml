@@ -1,0 +1,51 @@
+name: RelaxDev dashboard tests
+on:
+  push:
+    branches: [relax-migration]
+  workflow_dispatch:
+jobs:
+  dashboard:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fkdashboard
+          POSTGRES_PASSWORD: dashboard
+          POSTGRES_DB: dashboard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fkdashboard -d dashboard_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      PLAN_DATABASE_URL: postgresql://fkdashboard:dashboard@localhost:5432/dashboard_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r dashboard/requirements.txt
+      - run: python -m compileall -q dashboard/
+      - run: python dashboard/tests/test_bhm_source.py
+      - run: python dashboard/tests/test_pg_plans.py
+      - run: docker build -t fk-dashboard-relax .
+      - name: Check container startup and PostgreSQL
+        run: |
+          docker run -d --name fk-dashboard-test --network host \
+            -e PLAN_DATABASE_URL="$PLAN_DATABASE_URL" \
+            -e PORT=8080 -e SOURCE_MODE=api \
+            -e BOT_API_URL=http://127.0.0.1:9999 \
+            -e BOT_API_KEY=local-test \
+            -e PLAN_UPLOAD_TOKEN=local-test \
+            -e DASHBOARD_USER=admin \
+            -e DASHBOARD_PASSWORD=local-test \
+            fk-dashboard-relax
+          sleep 4
+          docker inspect -f '{{.State.Running}}' fk-dashboard-test | grep true
+          curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ | grep 401
+          docker logs fk-dashboard-test
+      - if: always()
+        run: docker rm -f fk-dashboard-test || true
