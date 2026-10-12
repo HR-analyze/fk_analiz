@@ -12,10 +12,12 @@ const isNarrow = () => window.innerWidth < 640;
 const FILTERS = {
   dateFrom: '', dateTo: '', equipment: 'all', product: 'all',
   employee: 'all', shift: 'all', hour: '',
+  // только у расстойки: тип печи и статус партии
+  oven: 'all', status: 'all',
 };
 const FILTER_LABELS = {
   equipment: 'Оборудование', product: 'Продукт', employee: 'Сотрудник',
-  shift: 'Смена', hour: 'Час', date: 'Дата',
+  shift: 'Смена', hour: 'Час', date: 'Дата', oven: 'Печь', status: 'Статус',
 };
 const SHIFT_NAMES = { all: 'все смены', day: 'дневная смена', night: 'ночная смена' };
 
@@ -23,9 +25,12 @@ let meta = null;
 let timer = null;
 let lastData = null;
 
-// Источник данных: ФК (по умолчанию) или БХМ. У каждого свои справочники и единица
-// выпуска: ФК считает штуки, БХМ — килограммы теста. Выбор помнится в localStorage.
-const SOURCES = { fk: { title: 'ФК', qty: 'шт' }, bhm: { title: 'БХМ', qty: 'кг' } };
+// Источник данных: ФК (по умолчанию), БХМ или Расстойка. У каждого свои справочники и
+// единица выпуска: ФК считает штуки, БХМ — килограммы теста, расстойка — штуки после печи.
+// У расстойки своя страница (партии из двух этапов), ФК и БХМ делят общую. Выбор помнится в localStorage.
+const SOURCES = { fk: { title: 'ФК', qty: 'шт' }, bhm: { title: 'БХМ', qty: 'кг' },
+                  proofing: { title: 'Расстойка', qty: 'шт', kind: 'proofing' } };
+const isProofing = () => SOURCE === 'proofing';
 let SOURCE = 'fk';
 let UNIT = 'шт';
 let RATE = 'шт/ч';
@@ -460,11 +465,11 @@ function markSourceButtons(available) {
 }
 
 function applySourceUi() {
-  const planOk = planEnabled();
-  document.querySelectorAll('.tab[data-tab="plan"], .tab[data-tab="history"]').forEach((t) => { t.hidden = !planOk; });
   document.title = `${SOURCES[SOURCE].title} — аналитика производства`;
   markSourceButtons(meta && meta.sources);
-  if (!planOk && activeTab !== 'dashboard') showTab('dashboard');
+  applyTabsVisibility();
+  // Страница одного источника не должна мелькать на другом: прячем всё, что не его.
+  document.querySelectorAll('.tab-page').forEach((p) => { p.hidden = p.dataset.page !== activeTab; });
 }
 
 async function fetchMeta(src) {
@@ -483,6 +488,14 @@ function applyMeta(m) {
   $('dateFrom').min = $('dateTo').min = meta.date_min || '';
   $('dateFrom').max = $('dateTo').max = meta.date_max || '';
   setUnits(meta.units);
+  // Расстойка: печь (код → название) и статус партии; у ФК и БХМ этих полей нет.
+  const ovens = meta.ovens || [];
+  $('oven').innerHTML = '<option value="all">Все</option>' +
+    ovens.map((o) => `<option value="${esc(o.code)}">${esc(o.name)}</option>`).join('');
+  $('status').innerHTML = '<option value="all">Все</option>' +
+    (meta.statuses || []).map((x) => `<option value="${esc(x.code)}">${esc(x.name)}</option>`).join('');
+  document.querySelectorAll('.only-proofing').forEach((el) => { el.hidden = !isProofing(); });
+  $('productLabel').textContent = isProofing() ? 'Изделие' : 'Продукт';
 }
 
 function restoreFilters() {
@@ -493,6 +506,7 @@ function restoreFilters() {
   [['equipment', 'equipment'], ['product', 'products'], ['employee', 'employees']].forEach(([key, list]) => {
     if (FILTERS[key] !== 'all' && !(meta[list] || []).includes(FILTERS[key])) FILTERS[key] = 'all';
   });
+  if (FILTERS.oven !== 'all' && !(meta.ovens || []).some((o) => o.code === FILTERS.oven)) FILTERS.oven = 'all';
 }
 
 let switching = '';
@@ -502,14 +516,21 @@ async function switchSource(next) {
   switching = next;
   document.body.classList.add('loading');
   let m;
+  let proofFail = '';
   try {
     m = await fetchMeta(next);
   } catch (e) {
-    // Источник недоступен — остаёмся на прежнем, ничего не ломая.
-    switching = '';
-    document.body.classList.remove('loading');
-    showAlert(`Источник ${SOURCES[next].title} недоступен: ${e.message}`);
-    return;
+    if (next !== 'proofing') {
+      // Источник недоступен — остаёмся на прежнем, ничего не ломая.
+      switching = '';
+      document.body.classList.remove('loading');
+      showAlert(`Источник ${SOURCES[next].title} недоступен: ${e.message}`);
+      return;
+    }
+    // Расстойка открывается и без API: ошибка видна только на её странице.
+    proofFail = e.message;
+    m = { stub: true, equipment: [], products: [], employees: [], ovens: [], statuses: [], refresh_seconds: 60,
+          sources: meta && meta.sources, plan_enabled: false, units: { qty: 'шт', rate: 'шт/ч' } };
   }
   // Переключаемся только с готовыми справочниками: до этого момента и автообновление,
   // и фильтры работают со старым источником.
@@ -521,16 +542,29 @@ async function switchSource(next) {
   restoreFilters();
   syncControls();
   applySourceUi();
+  if (proofFail) {
+    showAlert('');
+    document.body.classList.remove('loading');
+    showProofError(proofFail);
+    return;
+  }
   await loadSummary(false);
 }
 
 /* ─── вкладки ─────────────────────────────────────────────────────────────── */
 
-const TABS = ['dashboard', 'plan', 'history'];
+const TABS = ['dashboard', 'plan', 'history', 'proofing', 'batches'];
 let activeTab = 'dashboard';
 
+// У ФК и БХМ — дашборд (+ план у ФК), у расстойки — «Сводка» и «Партии».
+function allowedTabs() {
+  if (isProofing()) return ['proofing', 'batches'];
+  return planEnabled() ? ['dashboard', 'plan', 'history'] : ['dashboard'];
+}
+
 function showTab(name, push = true) {
-  if (!TABS.includes(name) || (name !== 'dashboard' && !planEnabled())) name = 'dashboard';
+  const allowed = allowedTabs();
+  if (!TABS.includes(name) || !allowed.includes(name)) name = allowed[0];
   activeTab = name;
   document.querySelectorAll('.tab').forEach((t) => {
     const on = t.dataset.tab === name;
@@ -545,6 +579,12 @@ function showTab(name, push = true) {
   store.set('fk_tab', name);
   if (name === 'history') loadHistory();
   if (name !== 'history' && lastData) { mountExportButtons(); fitValues(document); }
+}
+
+function applyTabsVisibility() {
+  const allowed = allowedTabs();
+  document.querySelectorAll('.tab').forEach((t) => { t.hidden = !allowed.includes(t.dataset.tab); });
+  if (!allowed.includes(activeTab)) showTab(allowed[0]);
 }
 
 function initTabs() {
@@ -706,8 +746,7 @@ function mountExportButtons() {
   });
 }
 
-function renderAnalysis(blocks) {
-  const el = $('analysis');
+function renderAnalysis(blocks, el = $('analysis')) {
   if (!blocks || !blocks.length) { el.innerHTML = '<div class="empty">Нет данных за выбранный период</div>'; return; }
   el.innerHTML = blocks.map(([heading, lines]) =>
     `<section class="an-block"><h3>${esc(heading)}</h3><ul>` +
@@ -726,6 +765,16 @@ function activeFilters() {
   });
   if (FILTERS.shift !== 'all') out.push({ key: 'shift', value: FILTERS.shift, text: `Смена: ${SHIFT_NAMES[FILTERS.shift]}` });
   if (FILTERS.hour !== '') out.push({ key: 'hour', value: FILTERS.hour, text: `Час: ${String(FILTERS.hour).padStart(2, '0')}:00` });
+  if (isProofing()) {
+    if (FILTERS.oven !== 'all') {
+      const o = ((meta && meta.ovens) || []).find((x) => x.code === FILTERS.oven);
+      out.push({ key: 'oven', value: FILTERS.oven, text: `Печь: ${o ? o.name : FILTERS.oven}` });
+    }
+    if (FILTERS.status !== 'all') {
+      const st = ((meta && meta.statuses) || []).find((x) => x.code === FILTERS.status);
+      out.push({ key: 'status', value: FILTERS.status, text: `Статус: ${st ? st.name : FILTERS.status}` });
+    }
+  }
   return out;
 }
 
@@ -783,6 +832,8 @@ function resetFilters() {
   FILTERS.employee = 'all';
   FILTERS.shift = 'all';
   FILTERS.hour = '';
+  FILTERS.oven = 'all';
+  FILTERS.status = 'all';
 }
 
 function syncControls() {
@@ -793,6 +844,8 @@ function syncControls() {
   $('employee').value = FILTERS.employee;
   $('shift').value = FILTERS.shift;
   $('hour').value = FILTERS.hour;
+  $('oven').value = FILTERS.oven;
+  $('status').value = FILTERS.status;
   renderChips();
 }
 
@@ -804,12 +857,15 @@ function readControls() {
   FILTERS.employee = $('employee').value;
   FILTERS.shift = $('shift').value;
   FILTERS.hour = $('hour').value;
+  FILTERS.oven = $('oven').value || 'all';
+  FILTERS.status = $('status').value || 'all';
   renderChips();
 }
 
 /* ─── рендер ──────────────────────────────────────────────────────────────── */
 
 function render(data) {
+  if (data.kind === 'proofing') { renderProofing(data); return; }
   lastData = data;
   const lfl = data.lfl || {};
   const lflOk = lfl.available && !lfl.prev_empty;
@@ -939,6 +995,7 @@ function query(force) {
     employee: FILTERS.employee, shift: FILTERS.shift,
   });
   if (FILTERS.hour !== '') p.set('hour', FILTERS.hour);
+  if (isProofing()) { p.set('oven', FILTERS.oven); p.set('status', FILTERS.status); }
   if (force) p.set('refresh', '1');
   return p.toString();
 }
@@ -952,12 +1009,402 @@ async function loadSummary(force) {
     if (seq !== loadSeq) return;
     if (!r.ok || !data.ok) throw new Error(data.error || 'сервис недоступен');
     showAlert(data.source && data.source.error ? 'Данные показаны из кеша: ' + data.source.error : '');
+    if (data.kind === 'proofing') showProofError('');
     render(data);
   } catch (e) {
-    if (seq === loadSeq) showAlert('Не удалось загрузить данные: ' + e.message);
+    if (seq !== loadSeq) return;
+    // Ошибка расстойки показывается только на её странице.
+    if (isProofing()) { showAlert(''); showProofError(e.message); }
+    else showAlert('Не удалось загрузить данные: ' + e.message);
   } finally {
     if (seq === loadSeq) document.body.classList.remove('loading');
   }
+}
+
+/* ─── Расстойка и отпекание ───────────────────────────────────────────────── */
+
+// Своя страница: у партии два этапа, выпуск — один раз по концу отпекания.
+// Графики, таблицы и KPI — те же компоненты, что у ФК и БХМ, чтобы раздел выглядел частью продукта.
+let proofData = null;
+const NO_DATA = 'Нет данных';
+const UNIT_SHORT = { racks: 'шп.', pods: 'под.' };
+const UNIT_FORMS = { racks: ['шпилька', 'шпильки', 'шпилек'], pods: ['под', 'пода', 'подов'] };
+
+function plural(n, forms) {
+  const a = Math.abs(Math.round(n)) % 100;
+  const b = a % 10;
+  if (b === 1 && a !== 11) return forms[0];
+  if (b >= 2 && b <= 4 && (a < 12 || a > 14)) return forms[1];
+  return forms[2];
+}
+
+function dur(minutes) {
+  return minutes === null || minutes === undefined ? '—' : hm(minutes);
+}
+
+function showProofError(message) {
+  const box = $('proofError');
+  if (!message) { box.hidden = true; $('proofBody').hidden = false; return; }
+  box.hidden = false;
+  $('proofErrorText').textContent = message;
+  // Строки шапки и подвала не должны остаться от ФК/БХМ.
+  $('periodLine').textContent = proofData
+    ? 'Расстойка: данные не обновились — показаны последние полученные'
+    : 'Расстойка: данные недоступны';
+  $('sourceLine').textContent = 'Источник: API бота расстойки · ошибка подключения';
+  // Старые цифры при ошибке не прячем, если они уже были: подписываем, что данные не обновились.
+  $('proofBody').hidden = !proofData;
+  if (proofData) $('proofErrorText').textContent = message + ' Ниже — последние полученные данные.';
+}
+
+async function refreshProofMeta() {
+  try {
+    const m = await fetchMeta('proofing');
+    if (!isProofing()) return;
+    applyMeta(m);
+    restoreFilters();
+    syncControls();
+    markSourceButtons(meta.sources);
+  } catch (e) { /* остаёмся с тем, что есть */ }
+}
+
+function stageText(st, unitFallback) {
+  if (!st) return '<span class="muted">—</span>';
+  const unit = UNIT_SHORT[st.rack_unit || unitFallback] || 'шп.';
+  const load = st.racks_start === null || st.racks_start === undefined ? ''
+    : ` · ${num(st.racks_start)}${st.racks_end !== null && st.racks_end !== undefined && st.racks_end !== st.racks_start ? '→' + num(st.racks_end) : ''} ${unit}`;
+  const end = st.end_time ? st.end_time : (st.status === 'cancelled' ? 'отменён' : '…');
+  const minutes = st.duration_min === null || st.duration_min === undefined ? ''
+    : ` · ${st.valid ? hm(st.duration_min) : '<span class="delta bad" title="Некорректное время — не входит в средние">' + esc(hm(st.duration_min)) + '</span>'}`;
+  const who = st.closed_by && st.closed_by !== st.started_by ? `${st.started_by} → ${st.closed_by}` : st.started_by;
+  return `<span class="cellbox"><span class="stage">${esc(st.start_time)}–${esc(end)}${minutes}${esc(load)}</span>` +
+    `<small class="stage-who">${esc(who || '')}</small></span>`;
+}
+
+function proofKpis(k, lfl) {
+  const ok = lfl && lfl.available && !lfl.prev_empty;
+  const none = (v) => v === null || v === undefined;
+  // [подпись, значение, единица, пояснение, ключ LFL, «лучше» (1 — рост хорошо, -1 — плохо, 0 — без оценки), формат прошлого]
+  const cards = [
+    ['Начато партий', num(k.started), '', k.cancelled ? `из них отменено: ${num(k.cancelled)}` : 'по началу расстойки', 'started', 1, num],
+    ['Завершено партий', num(k.completed), '', 'по концу отпекания', 'completed', 1, num],
+    ['В работе', num(k.in_work), '', 'на конец периода', null, 0, num],
+    ['Выпуск', k.completed ? num(k.output) : NO_DATA, k.completed ? 'шт' : '',
+     k.completed_without_output ? `без выхода: ${num(k.completed_without_output)} парт.` : 'только закрытое отпекание', 'output', 1, (v) => num(v) + ' шт'],
+    ['Ср. расстойка', none(k.avg_proofing) ? NO_DATA : num(Math.round(k.avg_proofing)), none(k.avg_proofing) ? '' : 'мин',
+     `этапов: ${num(k.proofing_count)}`, 'avg_proofing', 0, (v) => none(v) ? NO_DATA : dec(v) + ' мин'],
+    ['Ср. отпекание', none(k.avg_baking) ? NO_DATA : num(Math.round(k.avg_baking)), none(k.avg_baking) ? '' : 'мин',
+     `этапов: ${num(k.baking_count)}`, 'avg_baking', 0, (v) => none(v) ? NO_DATA : dec(v) + ' мин'],
+    ['Производительность', none(k.rate) ? NO_DATA : num(Math.round(k.rate)), none(k.rate) ? '' : 'шт/ч',
+     'выход / часы отпекания', 'rate', 1, (v) => none(v) ? NO_DATA : num(Math.round(v)) + ' шт/ч'],
+    ['Крит. остановки', num(k.pauses), '', k.pauses ? `суммарно ${hm(k.stop_minutes)}` : 'не было', 'pauses', -1, num],
+  ];
+  $('pKpis').innerHTML = cards.map(([label, value, unit, note, key, better, fmt]) => {
+    let delta = '';
+    if (ok && key && lfl.kpi[key]) {
+      const c = lfl.kpi[key];
+      let tip = `${lfl.prev_label}: ${fmt(c.prev)}`;
+      if (key === 'pauses' && lfl.kpi.stop_minutes) {
+        tip += ` · минут остановок: ${num(k.stop_minutes)} против ${num(lfl.kpi.stop_minutes.prev)} (${pctText(lfl.kpi.stop_minutes.change)})`;
+      }
+      if (c.change === null) tip += ' · сравнить не с чем';
+      delta = `<div class="k-delta" data-tip="${esc(tip)}">${trend(c.change, better)}<span class="k-vs">${esc(lflVs(lfl))}</span></div>`;
+    }
+    return `<div class="kpi"><div class="k-label">${esc(label)}</div>` +
+      `<div class="k-value${value === NO_DATA ? ' k-none' : ''}"><span class="k-num">${esc(value)}</span>` +
+      (unit ? `<span class="k-unit">${esc(unit)}</span>` : '') + '</div>' +
+      `<div class="k-note">${esc(note)}</div>${delta}</div>`;
+  }).join('');
+  fitValues($('pKpis'));
+}
+
+function proofLflCaption(lfl) {
+  const el = $('pLflCaption');
+  el.hidden = false;
+  if (!lfl || !lfl.available) { el.textContent = 'Сравнение с прошлым периодом: ' + ((lfl && lfl.reason) || 'недоступно'); return; }
+  const cut = lfl.partial ? `, последний день до ${lfl.cutoff} — как сегодня` : '';
+  el.textContent = lfl.prev_empty
+    ? `За прошлый период ${lfl.prev_label} с этими фильтрами данных нет — сравнивать не с чем.`
+    : `▲▼ — изменение к прошлому периоду ${lfl.prev_label} (${lfl.days} дн.${cut}) с теми же фильтрами`;
+}
+
+function ovenCards(ovens) {
+  const top = Math.max(1, ...ovens.map((o) => o.rate || 0));
+  return ovens.map((o) => {
+    const active = FILTERS.oven === o.code;
+    const rate = o.rate === null || o.rate === undefined ? NO_DATA : num(Math.round(o.rate));
+    return `<button class="ovencard${active ? ' active' : ''}" type="button" data-filter="oven" data-value="${esc(o.code)}">
+      <div class="oc-top"><span class="oc-name">${esc(o.name)}</span><span class="oc-unit">${esc(o.unit_name)}</span></div>
+      <div class="oc-rate">${esc(rate)}${o.rate === null || o.rate === undefined ? '' : '<small>шт/ч</small>'}</div>
+      <div class="dc-meter"><i style="width:${((o.rate || 0) / top * 100).toFixed(1)}%"></i></div>
+      <dl class="oc-facts">
+        <div><dt>Выпуск</dt><dd>${o.batches ? num(o.output) + ' шт' : NO_DATA}</dd></div>
+        <div><dt>Партий</dt><dd>${num(o.batches)}</dd></div>
+        <div><dt>Загружено</dt><dd>${esc(o.loaded_text)}</dd></div>
+        <div><dt>Ср. отпекание</dt><dd>${esc(dur(o.avg_baking))}</dd></div>
+        <div><dt>Занято</dt><dd>${o.utilization === null || o.utilization === undefined ? '—' : dec(o.utilization) + '%'} · до ${num(o.max_parallel)} парт.</dd></div>
+        <div><dt>Остановки</dt><dd class="${o.pauses ? 'dc-stop' : ''}">${o.pauses ? num(o.pauses) + ' · ' + hm(o.stop) : 'нет'}</dd></div>
+      </dl>
+    </button>`;
+  }).join('') || '<div class="empty">Нет данных</div>';
+}
+
+function loadTone(pct) {
+  if (!(pct > 0)) return 'background:#f5f6f8';
+  const a = Math.min(1, 0.12 + pct / 100 * 0.88);
+  return `background:rgba(59,110,245,${a.toFixed(2)});color:${a > 0.55 ? '#fff' : '#1d2b52'}`;
+}
+
+function loadHeat(load) {
+  const rows = load.rows || [];
+  if (!rows.some((r) => r.stages)) return '<div class="empty">Нет данных за выбранный период</div>';
+  const hour = FILTERS.hour === '' ? null : Number(FILTERS.hour);
+  const inShift = (h) => FILTERS.shift === 'all' || (FILTERS.shift === 'day' ? h >= 8 && h < 20 : h < 8 || h >= 20);
+  const head = '<div class="lh-name"></div>' + Array.from({ length: 24 }, (_, h) =>
+    `<div class="lh-hour${hour === h ? ' on' : ''}">${String(h).padStart(2, '0')}</div>`).join('');
+  const body = rows.map((r) => `<div class="lh-name" title="${esc(r.name)}">${esc(r.name)}</div>` + r.hours.map((x) => {
+    const dim = (hour !== null && hour !== x.hour) || !inShift(x.hour);
+    const tip = `${r.name}, ${String(x.hour).padStart(2, '0')}:00 — занято в среднем ${dec(x.busy_min)} мин из 60 (${dec(x.pct)}%) · партий одновременно в среднем ${dec(x.parallel)}`;
+    return `<div class="lh-cell${dim ? ' dim' : ''}" style="${loadTone(x.pct)}" data-tip="${esc(tip)}">${x.pct >= 1 ? Math.round(x.pct) : ''}</div>`;
+  }).join('')).join('');
+  return `<div class="loadheat">${head}${body}</div>` +
+    '<div class="heat-key"><span><i class="lk" style="background:#f5f6f8"></i>свободно</span>' +
+    `<span><i class="lk" style="${loadTone(25)}"></i>25%</span><span><i class="lk" style="${loadTone(60)}"></i>60%</span>` +
+    `<span><i class="lk" style="${loadTone(100)}"></i>занято весь час</span>` +
+    '<span class="hk-note">пересечения партий не суммируются</span></div>';
+}
+
+function batchRows(list) {
+  const q = ($('pBatchSearch').value || '').trim().toLowerCase();
+  if (!q) return list;
+  return list.filter((b) => (b.product + ' ' + b.employees.join(' ') + ' ' + (b.oven_name || '')).toLowerCase().includes(q));
+}
+
+function renderBatchTable() {
+  const data = proofData;
+  if (!data) return;
+  const rows = batchRows(data.batches || []);
+  const shown = data.batches.length;
+  $('pBatchNote').textContent = data.batches_total > shown
+    ? `показаны последние ${num(shown)} из ${num(data.batches_total)} — сузь период`
+    : `партий: ${num(rows.length)}${rows.length !== shown ? ' из ' + num(shown) : ''}`;
+  renderTable($('pBatchTable'),
+    [{ title: 'Старт' }, { title: 'Изделие' }, { title: 'Статус' }, { title: 'Печь' },
+     { title: 'Расстойка' }, { title: 'Отпекание' }, { title: 'Вход → выход, шт', num: true },
+     { title: 'шт/ч', num: true }, { title: 'Цикл', num: true }, { title: 'Фото' }],
+    rows,
+    (b) => [
+      `<span class="cellbox">${esc(b.date.slice(5))} <b>${esc(b.start_time)}</b></span>`,
+      `<span class="tag" title="${esc(b.product)}">${esc(b.product)}</span>`,
+      `<span class="cellbox"><span class="badge ${esc(b.status)}">${esc(b.status_name)}</span>` +
+        (b.next_mark ? `<small class="stage-who">дальше: ${esc(b.next_mark)}${b.open_for_min !== null && b.open_for_min !== undefined ? ' · ' + esc(hm(b.open_for_min)) : ''}</small>` : '') + '</span>',
+      esc(b.oven_name || '—'),
+      stageText(b.proofing, 'racks'),
+      stageText(b.baking, b.oven_unit || 'racks'),
+      `${b.pieces_in === null || b.pieces_in === undefined ? '—' : num(b.pieces_in)} → ${b.pieces_out === null || b.pieces_out === undefined ? '—' : '<b>' + num(b.pieces_out) + '</b>'}`,
+      b.rate === null || b.rate === undefined ? '—' : num(Math.round(b.rate)),
+      b.cycle_min === null || b.cycle_min === undefined ? '—' : hm(b.cycle_min),
+      b.photo_count ? `<button class="photo-btn" type="button" data-gallery="${esc(b.id)}">📷 ${num(b.photo_count)}</button>` : '<span class="muted">нет</span>',
+    ]);
+}
+
+function renderProofing(data) {
+  proofData = data;
+  lastData = data;
+  if (meta && meta.stub) refreshProofMeta();
+  const k = data.kpi;
+  const lfl = data.lfl || {};
+  proofKpis(k, lfl);
+  proofLflCaption(lfl);
+
+  $('pChartDaily').innerHTML = barChart(
+    data.daily.map((d) => ({ label: d.date.slice(5), key: d.date, value: d.output })),
+    { color: '#3b6ef5', filterKey: 'date', unit: 'шт',
+      activeValue: FILTERS.dateFrom === FILTERS.dateTo ? FILTERS.dateFrom : undefined,
+      compare: lfl.available ? data.daily.map((d) => d.lfl_output) : [],
+      compareTip: (i) => {
+        const d = data.daily[i];
+        return ` · партий ${num(d.completed)}` + (d.lfl_date ? ` · ${d.lfl_date.slice(5)} (неделей раньше): ${num(d.lfl_output)} шт, ${pctText(d.lfl_change)}` : '');
+      } })
+    + (data.daily.length ? chartLegend([['box', '#3b6ef5', 'выпуск за день']]
+      .concat(lfl.available ? [['box', GHOST_COLOR, 'тот же день неделей раньше']] : [])) : '');
+
+  $('pChartHourly').innerHTML = barChart(
+    data.hourly.map((h) => ({ label: h.label, key: String(h.hour), value: h.value })),
+    { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: 'шт', activeValue: FILTERS.hour,
+      compareTip: (i) => ` · партий ${num(data.hourly[i].batches)} · в среднем ${dec(data.hourly[i].per_day)} шт за день` });
+
+  $('pOvens').innerHTML = ovenCards(data.ovens || []);
+
+  const load = data.load || {};
+  $('pLoadNote').textContent = `% времени часа · в среднем за ${num(load.days || 0)} дн.`;
+  $('pLoad').innerHTML = loadHeat(load);
+  renderTable($('pLoadTable'),
+    [{ title: 'Оборудование' }, { title: 'Занято (без пересечений)', num: true }, { title: 'Сумма по партиям', num: true },
+     { title: 'Занято, % периода', num: true }, { title: 'Одновременно до', num: true }, { title: 'Этапов', num: true }],
+    (load.rows || []).filter((r) => r.stages),
+    (r) => [`<span class="tag">${esc(r.name)}</span>`, dec(r.busy_hours) + ' ч', dec(r.sum_hours) + ' ч',
+            r.utilization === null || r.utilization === undefined ? '—' : dec(r.utilization) + '%',
+            num(r.max_parallel) + ' парт.', num(r.stages)]);
+
+  const cap = isNarrow() ? 8 : 12;
+  $('pChartProducts').innerHTML = barChart((data.top_products || []).slice(0, cap),
+    { color: '#f0a63c', rotate: true, filterKey: 'product', unit: 'шт', activeValue: FILTERS.product });
+  $('pChartEmployees').innerHTML = barChart((data.top_employees || []).slice(0, cap),
+    { color: '#2a78d6', rotate: true, filterKey: 'employee', unit: 'партий', activeValue: FILTERS.employee });
+
+  renderTable($('pProductTable'),
+    [{ title: 'Изделие' }, { title: 'Начато', num: true }, { title: 'Завершено', num: true }, { title: 'Выпуск, шт', num: true },
+     { title: 'Ср. расстойка', num: true }, { title: 'Ср. отпекание', num: true }, { title: 'Ср. цикл', num: true },
+     { title: 'шт/ч', num: true }],
+    data.products || [],
+    (r) => [`<span class="tag">${esc(r.product)}</span>`, num(r.started), num(r.completed), r.completed ? num(r.output) : '—',
+            esc(dur(r.avg_proofing)), esc(dur(r.avg_baking)), esc(dur(r.avg_cycle)),
+            r.rate === null || r.rate === undefined ? '—' : num(Math.round(r.rate))],
+    (r) => ({ key: 'product', value: r.product }));
+
+  $('pChartReasons').innerHTML = pieChart(data.pause_reasons || []);
+  renderTable($('pPauseEquipment'),
+    [{ title: 'Оборудование' }, { title: 'Остановок', num: true }, { title: 'Длительность', num: true }, { title: 'Причины' }],
+    data.pause_equipment || [],
+    (r) => [`<span class="tag">${esc(r.equipment)}</span>`, num(r.count), esc(hm(r.minutes)), esc(r.reasons)],
+    (r) => ({ key: 'equipment', value: r.equipment }));
+
+  renderAnalysis(data.analysis, $('pAnalysis'));
+
+  renderTable($('pDailyTable'),
+    [{ title: 'Дата' }, { title: 'Начато', num: true }, { title: 'Завершено', num: true }, { title: 'Выпуск, шт', num: true },
+     { title: 'Ср. расстойка', num: true }, { title: 'Ср. отпекание', num: true }, { title: 'шт/ч', num: true },
+     { title: 'Остановки', num: true }, { title: 'Неделей раньше', num: true }],
+    data.daily || [],
+    (d) => [`<span class="cellbox">${esc(d.date)} <span class="muted">${esc(d.weekday)}</span></span>`, num(d.started), num(d.completed),
+            d.completed ? num(d.output) : '—', esc(dur(d.avg_proofing)), esc(dur(d.avg_baking)),
+            d.rate === null || d.rate === undefined ? '—' : num(Math.round(d.rate)),
+            d.pauses ? `${num(d.pauses)} · ${hm(d.stop)}` : '—',
+            d.lfl_date ? `<span class="cellbox">${num(d.lfl_output)} ${trend(d.lfl_change, 1)}</span>` : '—'],
+    (d) => ({ key: 'date', value: d.date }));
+
+  renderTable($('pEmployeeTable'),
+    [{ title: 'Сотрудник' }, { title: 'Партий', num: true }, { title: 'Отметок', num: true },
+     { title: 'Начал расстойку', num: true }, { title: 'Закрыл расстойку', num: true },
+     { title: 'Начал отпекание', num: true }, { title: 'Закрыл отпекание', num: true },
+     { title: 'Выход закрытых им отпеканий, шт', num: true }, { title: 'Остановки', num: true }],
+    data.employees || [],
+    (e) => [`<span class="tag">${esc(e.employee)}</span>`, num(e.batches), num(e.marks), num(e.start_proofing),
+            num(e.end_proofing), num(e.start_baking), num(e.end_baking), num(e.output_closed),
+            e.pauses ? `${num(e.pauses)} · ${hm(e.stop)}` : '—'],
+    (e) => ({ key: 'employee', value: e.employee }));
+
+  const opened = data.open_stages || [];
+  $('pOpenNote').textContent = opened.length ? `сейчас открыто: ${num(opened.length)}` : 'все этапы закрыты';
+  renderTable($('pOpenTable'),
+    [{ title: 'Изделие' }, { title: 'Этап' }, { title: 'Оборудование' }, { title: 'Начало' },
+     { title: 'Открыт', num: true }, { title: 'Начал' }, { title: 'Следующая отметка' }],
+    opened,
+    (r) => [`<span class="tag">${esc(r.product)}</span>`, esc(r.stage), esc(r.equipment),
+            `${esc(r.start_date.slice(5))} ${esc(r.start_time)}`,
+            `<span class="${r.stale ? 'delta bad' : ''}" ${r.stale ? 'title="Дольше лимита этапа — вероятно, забыли закрыть"' : ''}>${esc(hm(r.open_min))}${r.stale ? ' ⚠' : ''}</span>`,
+            esc(r.started_by), esc(r.next_mark)]);
+
+  renderTable($('pPauseTable'),
+    [{ title: 'Дата' }, { title: 'Оборудование' }, { title: 'Причина' }, { title: 'Время' },
+     { title: 'Длительность', num: true }, { title: 'Сотрудник' }],
+    data.pause_rows || [],
+    (r) => [esc(r.date), esc(r.equipment), esc(r.reason), `${esc(r.start_time)}–${esc(r.end_time)}`, esc(hm(r.minutes)), esc(r.user_name)]);
+
+  renderBatchTable();
+  mountExportButtons();
+
+  const src = data.source || {};
+  const fetched = formatMoment(src.fetched_at);
+  const modes = { 'proofing-api': 'API бота расстойки', 'proofing-demo': 'тестовые данные расстойки (demo)' };
+  const skipped = (data.excluded_dates || []).length ? ` · скрыто дат: ${data.excluded_dates.join(', ')}` : '';
+  $('sourceLine').textContent = `Источник: ${modes[src.mode] || src.mode || '—'} · снимок от ${fetched} · автообновление ${meta ? meta.refresh_seconds : 60} с${skipped}`;
+  $('periodLine').textContent = `Период ${FILTERS.dateFrom || 'начало'} – ${FILTERS.dateTo || 'сегодня'} · ${SHIFT_NAMES[FILTERS.shift]} · ` +
+    `партий завершено: ${num(k.completed)} · выпуск: ${k.completed ? num(k.output) + ' шт' : 'нет данных'} · обновлено ${fetched}`;
+}
+
+/* ─── галерея фото партии: грузится только по нажатию ─────────────────────── */
+
+let gallery = { photos: [], index: -1, opener: null };
+
+function photoUrl(id) {
+  // Только адрес дашборда: ключ API бота остаётся на сервере.
+  return '/api/proofing/photo/' + encodeURIComponent(id);
+}
+
+function openGallery(batchId, opener) {
+  const b = ((proofData && proofData.batches) || []).find((x) => x.id === batchId);
+  if (!b || !b.photos.length) return;
+  gallery = { photos: b.photos, index: -1, opener };
+  $('galleryTitle').textContent = `${b.product} · ${b.date.slice(5)} ${b.start_time} · фото: ${b.photos.length}`;
+  $('galleryGrid').innerHTML = b.photos.map((p, i) =>
+    `<button class="g-thumb" type="button" data-photo="${i}">
+      <img loading="lazy" src="${esc(photoUrl(p.id))}" alt="${esc(p.mark)}">
+      <span>${esc(p.mark)}<small>${esc(p.user_name)} · ${esc(formatMoment(p.created_at))}</small></span>
+    </button>`).join('');
+  $('galleryGrid').querySelectorAll('img').forEach((img) =>
+    img.addEventListener('error', () => { img.replaceWith(Object.assign(document.createElement('div'), { className: 'g-fail', textContent: 'не удалось загрузить' })); }));
+  $('galleryView').hidden = true;
+  $('galleryGrid').hidden = false;
+  $('gallery').hidden = false;
+  document.body.classList.add('modal-open');
+  $('galleryClose').focus();
+}
+
+function showPhoto(i) {
+  const n = gallery.photos.length;
+  if (!n) return;
+  gallery.index = (i + n) % n;
+  const p = gallery.photos[gallery.index];
+  $('galleryImg').src = photoUrl(p.id);
+  $('galleryImg').alt = p.mark;
+  $('galleryCaption').textContent = `${gallery.index + 1} / ${n} · ${p.mark} · ${p.user_name} · ${formatMoment(p.created_at)}`;
+  $('galleryView').hidden = false;
+  $('galleryGrid').hidden = true;
+  $('galleryPrev').hidden = $('galleryNext').hidden = n < 2;
+}
+
+function closeGallery() {
+  if ($('gallery').hidden) return;
+  $('gallery').hidden = true;
+  $('galleryImg').removeAttribute('src');
+  document.body.classList.remove('modal-open');
+  if (gallery.opener && gallery.opener.focus) gallery.opener.focus();
+}
+
+function galleryBack() {
+  // Из просмотра одного фото — назад к сетке; из сетки — закрыть.
+  if (!$('galleryView').hidden && gallery.photos.length > 1) {
+    $('galleryView').hidden = true;
+    $('galleryGrid').hidden = false;
+  } else {
+    closeGallery();
+  }
+}
+
+function bindProofing() {
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest ? e.target.closest('[data-gallery]') : null;
+    if (btn) { openGallery(btn.dataset.gallery, btn); return; }
+    const thumb = e.target.closest ? e.target.closest('[data-photo]') : null;
+    if (thumb) showPhoto(Number(thumb.dataset.photo));
+  });
+  $('galleryClose').addEventListener('click', closeGallery);
+  $('galleryPrev').addEventListener('click', () => showPhoto(gallery.index - 1));
+  $('galleryNext').addEventListener('click', () => showPhoto(gallery.index + 1));
+  $('gallery').addEventListener('click', (e) => { if (e.target === $('gallery')) closeGallery(); });
+  document.addEventListener('keydown', (e) => {
+    if ($('gallery').hidden) return;
+    if (e.key === 'Escape') galleryBack();
+    else if (e.key === 'ArrowLeft' && !$('galleryView').hidden) showPhoto(gallery.index - 1);
+    else if (e.key === 'ArrowRight' && !$('galleryView').hidden) showPhoto(gallery.index + 1);
+  });
+  $('pBatchSearch').addEventListener('input', renderBatchTable);
+  $('proofRetry').addEventListener('click', async () => {
+    await refreshProofMeta();
+    loadSummary(true);
+  });
 }
 
 /* ─── тултип ──────────────────────────────────────────────────────────────── */
@@ -1047,13 +1494,14 @@ function bindEvents() {
   $('apply').addEventListener('click', () => { readControls(); loadSummary(false); });
   $('reset').addEventListener('click', () => { resetFilters(); syncControls(); loadSummary(false); });
   $('refresh').addEventListener('click', () => loadSummary(true));
-  ['dateFrom', 'dateTo', 'equipment', 'product', 'employee', 'shift', 'hour'].forEach((id) =>
+  ['dateFrom', 'dateTo', 'equipment', 'product', 'employee', 'shift', 'hour', 'oven', 'status'].forEach((id) =>
     $(id).addEventListener('change', () => { readControls(); loadSummary(false); }));
 
   $('exportPdf').addEventListener('click', () => download('/api/export/pdf?' + query(false)));
   document.querySelectorAll('.src-btn').forEach((b) =>
     b.addEventListener('click', () => switchSource(b.dataset.source)));
   $('exportAll').addEventListener('click', () => exportWidget('all'));
+  bindProofing();
   initDropzone();
 
   let width = window.innerWidth;
@@ -1072,10 +1520,16 @@ async function init() {
   SOURCE = SOURCES[saved] ? saved : 'fk';
   let notice = '';
   let m = null;
+  let proofFail = '';
   try {
     m = await fetchMeta(SOURCE);
   } catch (e) {
-    if (SOURCE !== 'fk') {
+    if (SOURCE === 'proofing') {
+      // Расстойка недоступна — показываем ошибку на её странице, ФК и БХМ доступны кнопками.
+      proofFail = e.message;
+      try { const fk = await fetchMeta('fk'); m = { ...fk, stub: true, equipment: [], products: [], employees: [],
+        ovens: [], statuses: [], date_min: '', date_max: '', plan_enabled: false, units: { qty: 'шт', rate: 'шт/ч' } }; } catch (e2) { /* ничего */ }
+    } else if (SOURCE !== 'fk') {
       // Сохранённый БХМ сейчас недоступен — открываем ФК, а не пустую страницу.
       notice = `Источник ${SOURCES[SOURCE].title} недоступен (${e.message}) — показан ФК.`;
       SOURCE = 'fk';
@@ -1097,7 +1551,8 @@ async function init() {
   initTabs();
   applySourceUi();
   await refreshPlanState();
-  await loadSummary(false);
+  if (proofFail) showProofError(proofFail);
+  else await loadSummary(false);
   if (notice) showAlert(notice);
 
   const every = Math.max(15, Number(meta.refresh_seconds) || 60) * 1000;

@@ -11,6 +11,7 @@
 Запуск (дашборд должен быть уже поднят):
     python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090
     python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090 --source bhm
+    python3 dashboard/tests/layout_check.py --url http://127.0.0.1:8090 --source proofing
 Код возврата 1, если хоть одна проверка провалилась.
 """
 import argparse
@@ -20,6 +21,8 @@ import sys
 WIDTHS = [(360, "малый телефон"), (390, "iPhone"), (414, "большой телефон"),
           (768, "планшет"), (1024, "ноутбук"), (1440, "десктоп"), (1920, "широкий")]
 TABS = ["dashboard", "plan", "history"]
+# У расстойки свои вкладки: сводка и таблица партий.
+SOURCE_TABS = {"bhm": ["dashboard"], "proofing": ["proofing", "batches"]}
 
 # Поломка вёрстки часто живёт МЕЖДУ типовыми разрешениями: на 390px шрифт уже
 # ужат медиазапросом, на 1440px места вдоволь, а на 820px значение не влезает.
@@ -30,7 +33,7 @@ SWEEP_FROM, SWEEP_TO, SWEEP_STEP = 320, 1920, 40
 # что обязано жить в одну строку.
 # Подписи и заголовки переноситься могут — это нормальная вёрстка.
 # В одну строку обязаны укладываться только числовые значения и ярлыки вкладок.
-SINGLE_LINE = ".k-value, .tab, .dc-date, .dc-qty"
+SINGLE_LINE = ".k-value, .tab, .dc-date, .dc-qty, .oc-rate"
 
 PROBE = """
 () => {
@@ -46,7 +49,7 @@ PROBE = """
       const st = getComputedStyle(n);
       if (st.visibility === 'hidden' || st.display === 'none' || st.opacity === '0') return true;
       const clip = st.clip || '';
-      if (clip && clip !== 'auto' && /rect\(\s*0/.test(clip.replace(/px/g, ''))) return true;
+      if (clip && clip !== 'auto' && /rect\\(\\s*0/.test(clip.replace(/px/g, ''))) return true;
       if (st.clipPath && st.clipPath.includes('inset(50%)')) return true;
       const r = n.getBoundingClientRect();
       if (r.width <= 1 || r.height <= 1) return true;
@@ -81,7 +84,7 @@ PROBE = """
       const ox = getComputedStyle(n).overflowX;
       if (ox === 'auto' || ox === 'scroll') { scroller = n; break; }
     }
-    const panel = el.closest('.panel, .kpi, .plan-tile, .daycard');
+    const panel = el.closest('.panel, .kpi, .plan-tile, .daycard, .ovencard');
     if (panel && panel !== el && !el.closest('svg') && !scroller) {
       const a = el.getBoundingClientRect(), b = panel.getBoundingClientRect();
       if (a.right > b.right + 2 || a.left < b.left - 2) {
@@ -121,7 +124,7 @@ PROBE = """
 
   // 44px — норматив для пальца; на десктопе целятся мышью, там хватает 32px.
   const minTap = window.innerWidth < 768 ? 44 : 32;
-  document.querySelectorAll('button, .daycard, .chip, .fchip, .tab, .export-btn, input, select')
+  document.querySelectorAll('button, .daycard, .ovencard, .chip, .fchip, .tab, .export-btn, input, select')
     .forEach((el) => {
       if (!seen(el)) return;
       const r = el.getBoundingClientRect();
@@ -151,7 +154,7 @@ async def run(url, chrome, source="fk"):
             await page.goto(url, wait_until="networkidle")
             await page.wait_for_timeout(1400)
 
-            for tab in TABS:
+            for tab in SOURCE_TABS.get(source, TABS):
                 await page.evaluate("(t) => document.querySelector(`.tab[data-tab='${t}']`).click()", tab)
                 await page.wait_for_timeout(700)
                 probe = PROBE.replace("SINGLE_LINE_SELECTOR", repr(SINGLE_LINE))
@@ -202,7 +205,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://127.0.0.1:8090")
     ap.add_argument("--chrome", default="", help="путь к бинарю Chromium, если Playwright его не находит")
-    ap.add_argument("--source", default="fk", choices=("fk", "bhm"), help="какой источник проверять")
+    ap.add_argument("--source", default="fk", choices=("fk", "bhm", "proofing"), help="какой источник проверять")
     args = ap.parse_args()
     print(f"Проверка вёрстки: {args.url} (источник {args.source})\n")
     problems = asyncio.run(run(args.url, args.chrome, args.source))

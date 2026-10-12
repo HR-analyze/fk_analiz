@@ -8,6 +8,8 @@
   --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px rgba(16,24,40,.05);
 }
 *{box-sizing:border-box}
+/* hidden должен прятать и элементы с display из CSS (.field, .gallery и т. п.) */
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--text);
   font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
@@ -361,4 +363,100 @@ body.loading .chart,body.loading .table,body.loading .kpis{opacity:.55;transitio
   .page-foot{flex-direction:column;align-items:stretch;gap:10px;font-size:12.5px}
   .page-foot .btn{width:100%}
   .tip{display:none}
+}
+
+/* ── Расстойка и отпекание ─────────────────────────────────────────────── */
+.kpis.k8{grid-template-columns:repeat(4,1fr)}
+/* таблица внутри колонки грида должна скроллиться в своей рамке, а не раздвигать страницу */
+.tab-page[data-page="proofing"] .grid-2 > *{min-width:0}
+.k-value.k-none .k-num{font-size:.62em;color:var(--muted);font-weight:700}
+.muted{color:var(--muted)}
+.proof-error{background:#fdecec;border:1px solid #f6c6c5;color:#9b1c1c;border-radius:14px;
+  padding:14px 18px;margin-bottom:16px;font-size:14px;line-height:1.45}
+.proof-error p{margin:6px 0 10px;color:#7a2020}
+
+/* печи: карточки как сводка по дням */
+.ovencards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.ovencard{font:inherit;text-align:left;cursor:pointer;background:#fff;border:1px solid var(--line);
+  border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;color:var(--text);
+  touch-action:manipulation;-webkit-tap-highlight-color:rgba(59,110,245,.15)}
+.ovencard:hover{border-color:#c9d6f5;background:#fbfcff}
+.ovencard.active{border-color:var(--blue);background:#f2f6ff;box-shadow:0 0 0 1px var(--blue) inset}
+.oc-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.oc-name{font-size:16px;font-weight:700}
+.oc-unit{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.oc-rate{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1;white-space:nowrap}
+.oc-rate small{font-size:13px;font-weight:600;color:var(--muted);margin-left:5px}
+.oc-facts{margin:2px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+.oc-facts div{min-width:0}
+.oc-facts dt{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.oc-facts dd{margin:1px 0 0;font-size:13.5px;font-variant-numeric:tabular-nums}
+
+/* загрузка по часам: строка — оборудование, клетка — час */
+.loadwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:14px}
+.loadheat{display:grid;grid-template-columns:150px repeat(24,minmax(24px,1fr));gap:3px;min-width:760px}
+.lh-name{font-size:12.5px;font-weight:600;color:#3f4a5e;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lh-hour{font-size:10.5px;color:var(--muted);text-align:center;padding-bottom:2px}
+.lh-hour.on{color:var(--blue);font-weight:800}
+.lh-cell{height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;cursor:default}
+.lh-cell.dim{opacity:.28}
+.heat-key i.lk{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:3px}
+
+.badge{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.badge.done{background:#e6f5ed;color:#0f7a4d}
+.badge.active{background:#eaf0ff;color:#2b3f7d}
+.badge.cancelled{background:#f0f2f6;color:#5d6679}
+.stage{display:block;font-variant-numeric:tabular-nums}
+.stage-who{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.photo-btn{font:inherit;font-size:13px;cursor:pointer;background:#fff;color:#3f5074;border:1px solid var(--line);
+  border-radius:8px;padding:6px 10px;min-height:38px;white-space:nowrap;touch-action:manipulation}
+.photo-btn:hover{background:#f2f6ff;border-color:#c9d6f5}
+.batch-tools{display:flex;gap:12px;margin-bottom:12px}
+.batch-tools .field{flex:0 1 360px}
+.batch-table td{vertical-align:top}
+.cellbox{display:block}
+
+/* галерея */
+body.modal-open{overflow:hidden}
+.gallery{position:fixed;inset:0;z-index:60;background:rgba(16,24,40,.6);display:flex;
+  align-items:center;justify-content:center;padding:20px}
+.gallery[hidden]{display:none}
+.gallery-box{background:#fff;border-radius:16px;width:min(1100px,100%);max-height:100%;overflow:auto;
+  padding:16px 18px;box-shadow:0 20px 60px rgba(16,24,40,.35)}
+.gallery-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.gallery-head h2{margin:0;font-size:17px}
+.gallery-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.g-thumb{font:inherit;text-align:left;cursor:pointer;border:1px solid var(--line);border-radius:12px;background:#fbfcfe;
+  padding:0;overflow:hidden;display:flex;flex-direction:column;min-height:44px}
+.g-thumb:hover{border-color:#c9d6f5}
+.g-thumb img,.g-fail{width:100%;aspect-ratio:4/3;object-fit:cover;background:#eef1f6;display:block}
+.g-fail{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px}
+.g-thumb span{padding:8px 10px;font-size:13px;font-weight:600}
+.g-thumb small{display:block;font-weight:400;color:var(--muted);font-size:12px;margin-top:2px}
+.gallery-view{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px}
+.gallery-view[hidden]{display:none}
+.gallery-view figure{margin:0;text-align:center}
+.gallery-view img{max-width:100%;max-height:72vh;border-radius:10px;background:#eef1f6}
+.gallery-view figcaption{margin-top:8px;color:var(--muted);font-size:13px}
+.gv-nav{font-size:22px;line-height:1;padding:8px 14px}
+
+@media (max-width:1180px){.kpis.k8{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:900px){.kpis.k8{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:720px){
+  .ovencards{grid-template-columns:1fr}
+  .oc-rate{font-size:23px}
+  .loadheat{grid-template-columns:118px repeat(24,26px);min-width:0}
+  .lh-name{font-size:11px;white-space:normal;line-height:1.15;overflow:visible}
+  .photo-btn{min-height:44px;padding:8px 14px}
+  .batch-tools .field{flex:1 1 100%}
+  .gallery{padding:0;align-items:stretch}
+  .gallery-box{border-radius:0;padding:12px}
+  .gallery-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .gallery-view{grid-template-columns:1fr 1fr;grid-template-areas:"img img" "prev next"}
+  .gallery-view figure{grid-area:img}
+  .gallery-view #galleryPrev{grid-area:prev}
+  .gallery-view #galleryNext{grid-area:next}
+  .stage-who{text-align:right}
+  .cellbox{text-align:right}
 }
