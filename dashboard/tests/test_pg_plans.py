@@ -2,7 +2,9 @@
 import os
 import threading
 import unittest
-from datetime import datetime
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pg_plan_store as store
 
 class PlanDatabaseTests(unittest.TestCase):
