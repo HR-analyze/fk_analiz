@@ -45,5 +45,16 @@ class PlanDatabaseTests(unittest.TestCase):
         self.assertFalse(exceptions,exceptions)
         self.assertEqual(len(store.load()),10)
 
+    def test_product_map_has_own_table(self):
+        import plans
+        import product_map
+        plans.PG_PLANS = True
+        product_map.init_storage()
+        store.save({"2026-10-20":{"line|bread":5}}, "plan.xlsx")
+        product_map.save({"bhm":{"Батон / ромашка":"Батон классический"}}, "map.xlsx")
+        self.assertEqual(product_map.load()["map"], {"bhm":{"Батон / ромашка":"Батон классический"}})
+        self.assertEqual(store.load()["2026-10-20"]["line|bread"], 5)  # планы не задеты
+        product_map.save({}, "")
+
 if __name__=="__main__":
     unittest.main()

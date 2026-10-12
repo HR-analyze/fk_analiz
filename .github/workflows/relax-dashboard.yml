@@ -33,6 +33,7 @@ jobs:
       - run: python dashboard/tests/test_bhm_source.py
       - run: python dashboard/tests/test_proofing.py
       - run: python dashboard/tests/test_kc.py
+      - run: python dashboard/tests/test_gantt.py
       - run: python dashboard/tests/test_pg_plans.py
       - run: docker build -t fk-dashboard-relax .
       - name: Check container startup and PostgreSQL
@@ -51,7 +52,8 @@ jobs:
           docker inspect -f '{{.State.Running}}' fk-dashboard-test | grep true
           curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/ | grep 401
           curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/proofing/photo/x | grep 401
-          docker exec fk-dashboard-test sh -c 'test ! -e bot.py && ls proofing_source.py proofing_aggregate.py proofing_exports.py kc_source.py kc_aggregate.py kc_exports.py kc_demo_data.json'
+          docker exec fk-dashboard-test sh -c 'test ! -e bot.py && ls proofing_source.py proofing_aggregate.py proofing_exports.py kc_source.py kc_aggregate.py kc_exports.py kc_demo_data.json gantt.py gantt_exports.py product_map.py kc_chat_history.json'
+          curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/api/summary?source=gantt" | grep 401
           curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080/api/summary?source=kc" | grep 401
           docker logs fk-dashboard-test
       - if: always()

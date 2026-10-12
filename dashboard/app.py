@@ -1,4 +1,4 @@
-"""Read-only веб-дашборд: ФК, БХМ, расстойка и КЦ. В базы ботов только чтение, никаких записей."""
+"""Read-only веб-дашборд: ФК, БХМ, расстойка, КЦ и общий Гант. В базы ботов только чтение, никаких записей."""
 import asyncio
 import base64
 import binascii
@@ -15,6 +15,9 @@ from aiohttp import web
 
 import aggregate
 import exports
+import gantt
+import gantt_exports
+import product_map
 import kc_aggregate
 import kc_exports
 import plans as plan_store
@@ -61,7 +64,12 @@ SOURCES = {
     # (kc_exports). Штуки операций не складываются в готовый выпуск. Плана нет.
     "kc": {"title": "КЦ", "data": kc_source, "exclude": KC_EXCLUDE_DATES, "plans": False,
            "units": {"qty": "шт", "rate": "шт/чел·ч"}, "file": "kc", "kind": "kc"},
+    # Гант — не отдельный бот, а сводка всех цехов на одной шкале времени + общий тайминг.
+    "gantt": {"title": "Гант", "data": None, "exclude": (), "plans": False,
+              "units": {"qty": "шт", "rate": "шт/ч"}, "file": "gantt", "kind": "gantt"},
 }
+# Разобранный вручную чат КЦ (до запуска бота) — только для Ганта, читается один раз.
+KC_CHAT_HISTORY = gantt.load_history()
 
 
 def pick_source(request):
@@ -83,7 +91,35 @@ def pick_source(request):
 
 
 def sources_state():
-    return {"fk": True, "bhm": bhm_source.enabled, "proofing": proofing_source.enabled, "kc": kc_source.enabled}
+    return {"fk": True, "bhm": bhm_source.enabled, "proofing": proofing_source.enabled, "kc": kc_source.enabled,
+            "gantt": True}
+
+
+async def gantt_snapshots(force=False):
+    """Снимки всех цехов для Ганта. Недоступный цех не роняет Гант — он в section_errors."""
+    jobs = {"fk": source, "bhm": bhm_source, "proofing": proofing_source, "kc": kc_source}
+    snaps, errors = {}, {}
+    names = [k for k, src in jobs.items() if getattr(src, "enabled", True)]
+    for k in jobs:
+        if k not in names:
+            errors[k] = "источник не настроен"
+    results = await asyncio.gather(*(jobs[k].get(force=force) for k in names), return_exceptions=True)
+    for k, res in zip(names, results):
+        if isinstance(res, Exception):
+            errors[k] = f"{type(res).__name__}: {res}"
+        else:
+            snaps[k] = res
+            err = jobs[k].describe().get("error")
+            if err:
+                errors[k] = "данные из кеша: " + err
+    return snaps, errors
+
+
+async def gantt_data(force=False):
+    snaps, errors = await gantt_snapshots(force)
+    bars = gantt.collect_bars(snaps, KC_CHAT_HISTORY)
+    stored = await asyncio.to_thread(product_map.load)
+    return bars, stored, errors
 
 
 async def kc_snapshot(force=False):
@@ -138,6 +174,15 @@ async def meta(request):
             "source": proofing_source.describe(), "source_key": key, "sources": sources_state(),
             "units": src["units"], "plan_enabled": False, "plan_upload_enabled": False,
             **proofing_aggregate.build_meta(snapshot, src["exclude"]),
+        }))
+    if src.get("kind") == "gantt":
+        bars, stored, errors = await gantt_data()
+        return no_store(web.json_response({
+            "ok": True, "kind": "gantt", "timezone": str(TZ), "refresh_seconds": REFRESH_SECONDS,
+            "source": {"mode": "gantt"}, "source_key": key, "sources": sources_state(), "units": src["units"],
+            "plan_enabled": False, "plan_upload_enabled": bool(plan_store.PLAN_UPLOAD_TOKEN),
+            "equipment": [], "employees": [],
+            **gantt.meta(bars, KC_CHAT_HISTORY, stored["map"], errors),
         }))
     if src.get("kind") == "kc":
         snapshot = await kc_snapshot()
@@ -327,10 +372,48 @@ async def collect_kc(request, key, src):
     return payload, filters, stamp
 
 
+GANTT_SECTION_TITLES = dict(product_map.SECTIONS)
+
+
+async def collect_gantt(request, key, src):
+    """Гант: одна выборка и один расчёт для страницы, Excel и PDF."""
+    q = request.query
+    bars, stored, errors = await gantt_data(force=q.get("refresh") == "1")
+    days = gantt.available_days(bars)
+    day = (q.get("date") or "").strip()
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        day = days[-1] if days else datetime.now(TZ).date().isoformat()
+    mode = (q.get("window") or "full").strip()
+    mode = mode if mode in gantt.WINDOWS else "full"
+    sections = [x for x in (q.get("sections") or "").split(",") if x in product_map.SECTIONS] or list(product_map.SECTIONS)
+    product = (q.get("product") or "all").strip() or "all"
+    equipment = (q.get("equipment") or "all").strip() or "all"
+    payload = gantt.build(bars, KC_CHAT_HISTORY, stored["map"], day, mode, sections, product, equipment,
+                          now=datetime.now(TZ), section_errors=errors)
+    payload.update(source={"mode": "gantt"}, source_key=key, source_title=src["title"], units=src["units"],
+                   plan_enabled=False, excluded_dates=[], map_updated=stored.get("updated_at", ""),
+                   map_size=sum(len(v) for v in stored["map"].values()))
+    filters = [
+        ("Раздел", "Гант — все цеха"),
+        ("Дата (рабочие сутки)", day),
+        ("Окно", gantt.WINDOWS[mode][0]),
+        ("Цеха", ", ".join(GANTT_SECTION_TITLES[s] for s in sections)),
+        ("Продукт (единый)", "все" if product == "all" else product),
+        ("Оборудование", "все" if equipment == "all" else equipment),
+    ]
+    stamp = {"date_from": day, "date_to": mode, "equipment": equipment, "product": product, "employee": "all",
+             "shift": "all", "hour": "", "source": key}
+    return payload, filters, stamp
+
+
 async def collect(request):
     """Одна выборка и один расчёт для страницы, Excel и PDF — цифры всегда совпадают."""
     q = request.query
     key, src = pick_source(request)
+    if src.get("kind") == "gantt":
+        return await collect_gantt(request, key, src)
     if src.get("kind") == "proofing":
         return await collect_proofing(request, key, src)
     if src.get("kind") == "kc":
@@ -415,6 +498,8 @@ async def summary(request):
         payload["analysis"] = proofing_aggregate.build_analysis(payload, filters)
     elif payload.get("kind") == "kc":
         payload["analysis"] = kc_aggregate.build_analysis(payload, filters)
+    elif payload.get("kind") == "gantt":
+        payload["analysis"] = gantt_exports.build_analysis(payload, filters)
     else:
         payload["analysis"] = aggregate.build_analysis(payload, filters)
     return no_store(web.json_response(payload))
@@ -454,6 +539,62 @@ async def export_kc(request, kind):
     return _attachment(blob, f"kc_svodka_{_stamp(args)}.pdf", "application/pdf")
 
 
+async def export_gantt(request, kind):
+    payload, filters, args = await collect(request)
+    name = f"gantt_{args['date_from']}_{args['date_to']}"
+    if kind == "xlsx":
+        stored = await asyncio.to_thread(product_map.load)
+        blob = await asyncio.to_thread(gantt_exports.build_xlsx, payload, filters, stored["map"])
+        return _attachment(blob, f"{name}.xlsx", XLSX_TYPE)
+    blob = await asyncio.to_thread(gantt_exports.build_pdf, payload, gantt_exports.build_analysis(payload, filters), filters)
+    return _attachment(blob, f"{name}.pdf", "application/pdf")
+
+
+async def gantt_map_state(request):
+    bars, stored, _ = await gantt_data()
+    return no_store(web.json_response({
+        "ok": True, "upload_enabled": bool(plan_store.PLAN_UPLOAD_TOKEN), "map": stored["map"],
+        "updated_at": stored.get("updated_at", ""), "file": stored.get("file", ""),
+        "products": gantt.known_products(bars), "sections": product_map.SECTIONS}))
+
+
+async def gantt_map_template(request):
+    bars, stored, _ = await gantt_data()
+    blob = await asyncio.to_thread(product_map.template_xlsx, gantt.known_products(bars), stored["map"])
+    return _attachment(blob, "spravochnik_produktov.xlsx", XLSX_TYPE)
+
+
+async def gantt_map_upload(request):
+    """Справочник соответствий — тем же ключом, что загрузка плана (PLAN_UPLOAD_TOKEN)."""
+    if not plan_store.PLAN_UPLOAD_TOKEN:
+        return web.json_response({"ok": False, "error": "загрузка выключена: не задан PLAN_UPLOAD_TOKEN"}, status=403)
+    if not plan_auth(request):
+        return web.json_response({"ok": False, "error": "неверный ключ загрузки"}, status=401)
+    reader = await request.multipart()
+    field = await reader.next()
+    while field is not None and field.name != "file":
+        field = await reader.next()
+    if field is None:
+        return web.json_response({"ok": False, "error": "файл не передан"}, status=400)
+    buffer, size = io.BytesIO(), 0
+    while True:
+        chunk = await field.read_chunk()
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > plan_store.MAX_UPLOAD_BYTES:
+            return web.json_response({"ok": False, "error": "файл слишком большой"}, status=413)
+        buffer.write(chunk)
+    buffer.seek(0)
+    try:
+        mapping, count = await asyncio.to_thread(product_map.parse_xlsx, buffer)
+    except product_map.MapError as exc:
+        return web.json_response({"ok": False, "error": str(exc)}, status=400)
+    stored = await asyncio.to_thread(product_map.save, mapping, field.filename or "")
+    log.info("product map uploaded: file=%s pairs=%s", field.filename, count)
+    return no_store(web.json_response({"ok": True, "pairs": count, "updated_at": stored["updated_at"]}))
+
+
 async def proofing_photo(request):
     """Фото партии по запросу: браузер видит только этот адрес дашборда, ключ бота — нет."""
     if not proofing_source.enabled:
@@ -476,6 +617,8 @@ async def export_xlsx(request):
         return await export_proofing(request, "xlsx")
     if request.query.get("source", "").strip().lower() == "kc":
         return await export_kc(request, "xlsx")
+    if request.query.get("source", "").strip().lower() == "gantt":
+        return await export_gantt(request, "xlsx")
     widget = request.query.get("widget", "all").strip() or "all"
     if widget != "all" and widget not in exports.ALL_WIDGETS:
         return web.json_response({"ok": False, "error": f"неизвестный виджет: {widget}"}, status=400)
@@ -499,6 +642,8 @@ async def export_pdf(request):
         return await export_proofing(request, "pdf")
     if request.query.get("source", "").strip().lower() == "kc":
         return await export_kc(request, "pdf")
+    if request.query.get("source", "").strip().lower() == "gantt":
+        return await export_gantt(request, "pdf")
     payload, filters, args = await collect(request)
     analysis = aggregate.build_analysis(payload, filters)
     title = "Сводка по производству" if args["source"] == "fk" else f"Сводка по производству {payload['source_title']}"
@@ -541,6 +686,7 @@ def validate_relax():
 async def start_storage(app):
     validate_relax()
     await asyncio.to_thread(plan_store.init_storage)
+    await asyncio.to_thread(product_map.init_storage)
 
 
 @web.middleware
@@ -582,6 +728,9 @@ def build_app():
     app.router.add_get("/api/export/xlsx", export_xlsx)
     app.router.add_get("/api/export/pdf", export_pdf)
     app.router.add_get("/api/proofing/photo/{id}", proofing_photo)
+    app.router.add_get("/api/gantt/map", gantt_map_state)
+    app.router.add_get("/api/gantt/map/template", gantt_map_template)
+    app.router.add_post("/api/gantt/map/upload", gantt_map_upload)
     app.router.add_get("/api/plan", plan_state)
     app.router.add_get("/api/plan/history", plan_history)
     app.router.add_post("/api/plan/upload", plan_upload)

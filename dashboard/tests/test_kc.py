@@ -400,7 +400,8 @@ def test_kc_down_does_not_break_other_sections():
                 body = await h.json()
                 assert h.status == 200 and "kc" in body and KEY not in json.dumps(body)
                 meta = await (await client.get("/api/meta?source=fk")).json()
-                assert meta["sources"] == {"fk": True, "bhm": True, "proofing": True, "kc": True}
+                assert {k: meta["sources"][k] for k in ("fk", "bhm", "proofing", "kc")} == {
+                    "fk": True, "bhm": True, "proofing": True, "kc": True}
             with patched(ks, KC_SOURCE_MODE="off"):
                 r = await client.get("/api/summary?source=kc")
                 assert r.status == 503 and "не настроен" in (await r.json())["error"]

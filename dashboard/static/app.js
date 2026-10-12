@@ -30,15 +30,18 @@ let lastData = null;
 // У расстойки своя страница (партии из двух этапов), ФК и БХМ делят общую. Выбор помнится в localStorage.
 const SOURCES = { fk: { title: 'ФК', qty: 'шт' }, bhm: { title: 'БХМ', qty: 'кг' },
                   proofing: { title: 'Расстойка', qty: 'шт', kind: 'proofing' },
-                  kc: { title: 'КЦ', qty: 'шт', kind: 'kc' } };
+                  kc: { title: 'КЦ', qty: 'шт', kind: 'kc' },
+                  gantt: { title: 'Гант', qty: 'шт', kind: 'gantt' } };
 const isProofing = () => SOURCE === 'proofing';
 const isKc = () => SOURCE === 'kc';
+const isGantt = () => SOURCE === 'gantt';
 // Разделы со своей страницей: открываются и без API, ошибка видна только у них.
-const OWN_PAGE = ['proofing', 'kc'];
+const OWN_PAGE = ['proofing', 'kc', 'gantt'];
 const hasOwnPage = (src = SOURCE) => OWN_PAGE.includes(src);
 
 function showSectionError(message) {
-  if (isKc()) showKcError(message);
+  if (isGantt()) showGanttError(message);
+  else if (isKc()) showKcError(message);
   else showProofError(message);
 }
 let SOURCE = 'fk';
@@ -508,6 +511,7 @@ function applyMeta(m) {
   // Поле фильтра видно только у источников из data-only.
   document.querySelectorAll('[data-only]').forEach((el) => { el.hidden = !el.dataset.only.split(' ').includes(SOURCE); });
   $('productLabel').textContent = isProofing() ? 'Изделие' : (isKc() ? 'Продукция' : 'Продукт');
+  if (isGantt()) fillGanttTools(meta);
 }
 
 function restoreFilters() {
@@ -568,13 +572,14 @@ async function switchSource(next) {
 
 /* ─── вкладки ─────────────────────────────────────────────────────────────── */
 
-const TABS = ['dashboard', 'plan', 'history', 'proofing', 'batches', 'kc', 'kcops', 'kcnorms'];
+const TABS = ['dashboard', 'plan', 'history', 'proofing', 'batches', 'kc', 'kcops', 'kcnorms', 'gantt', 'timing', 'gmap'];
 let activeTab = 'dashboard';
 
 // У ФК и БХМ — дашборд (+ план у ФК), у расстойки — «Сводка» и «Партии».
 function allowedTabs() {
   if (isProofing()) return ['proofing', 'batches'];
   if (isKc()) return ['kc', 'kcops', 'kcnorms'];
+  if (isGantt()) return ['gantt', 'timing', 'gmap'];
   return planEnabled() ? ['dashboard', 'plan', 'history'] : ['dashboard'];
 }
 
@@ -588,9 +593,11 @@ function showTab(name, push = true) {
     t.setAttribute('aria-selected', on ? 'true' : 'false');
   });
   document.querySelectorAll('.tab-page').forEach((p) => { p.hidden = p.dataset.page !== name; });
-  // Фильтры не относятся к журналу загрузок — там они только путают.
-  $('filterPanel').hidden = name === 'history';
-  $('chips').hidden = name === 'history' || !activeFilters().length;
+  // Фильтры не относятся к журналу загрузок — там они только путают. У Ганта — своя панель.
+  $('filterPanel').hidden = name === 'history' || isGantt();
+  $('chips').hidden = name === 'history' || isGantt() || !activeFilters().length;
+  $('gTools').hidden = !(isGantt() && (name === 'gantt' || name === 'timing'));
+  if (name === 'gmap') loadGanttMap();
   if (push && location.hash.slice(1) !== name) history.replaceState(null, '', '#' + name);
   store.set('fk_tab', name);
   if (name === 'history') loadHistory();
@@ -808,6 +815,13 @@ function renderChips() {
 }
 
 function setFilter(key, value) {
+  if (key === 'gproduct') {
+    // Гант: строка тайминга сужает диаграмму до продукта (повторно — снимает).
+    GANTT.product = GANTT.product === value ? 'all' : value;
+    $('gProduct').value = GANTT.product;
+    loadSummary(false);
+    return;
+  }
   if (key === 'date') {
     const same = FILTERS.dateFrom === value && FILTERS.dateTo === value;
     if (same) { resetDates(); } else { FILTERS.dateFrom = value; FILTERS.dateTo = value; }
@@ -889,6 +903,7 @@ function readControls() {
 function render(data) {
   if (data.kind === 'proofing') { renderProofing(data); return; }
   if (data.kind === 'kc') { renderKc(data); return; }
+  if (data.kind === 'gantt') { renderGantt(data); return; }
   lastData = data;
   const lfl = data.lfl || {};
   const lflOk = lfl.available && !lfl.prev_empty;
@@ -1011,6 +1026,7 @@ function showAlert(message) {
 }
 
 function query(force) {
+  if (isGantt()) return ganttQuery(force);
   const p = new URLSearchParams({
     source: SOURCE,
     date_from: FILTERS.dateFrom, date_to: FILTERS.dateTo,
@@ -1035,6 +1051,7 @@ async function loadSummary(force) {
     showAlert(data.source && data.source.error ? 'Данные показаны из кеша: ' + data.source.error : '');
     if (data.kind === 'proofing') showProofError('');
     if (data.kind === 'kc') showKcError('');
+    if (data.kind === 'gantt') showGanttError('');
     render(data);
   } catch (e) {
     if (seq !== loadSeq) return;
@@ -1729,6 +1746,307 @@ function bindKc() {
   });
 }
 
+/* ─── Гант: все цеха на одной шкале + общий тайминг ───────────────────────── */
+
+const GANTT = { date: '', window: 'full', sections: ['bhm', 'fk', 'proofing', 'kc'], product: 'all', equipment: 'all', search: '' };
+const G_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', kc: '#7c5cf5' };
+const G_STAGE_COLORS = { bhm: '#eb6834', fk: '#2a78d6', proofing: '#1baf7a', baking: '#0f766e', kc: '#7c5cf5', pack: '#9ca3af' };
+let ganttData = null;
+
+function showGanttError(message) {
+  $('gError').hidden = !message;
+  $('gErrorText').textContent = message || '';
+}
+
+function ganttQuery(force) {
+  const p = new URLSearchParams({ source: 'gantt', window: GANTT.window, sections: GANTT.sections.join(','),
+    product: GANTT.product, equipment: GANTT.equipment });
+  if (GANTT.date) p.set('date', GANTT.date);
+  if (force) p.set('refresh', '1');
+  return p.toString();
+}
+
+function fillGanttTools(m) {
+  const days = (m.days || []).slice().reverse();
+  if (!GANTT.date || !days.includes(GANTT.date)) GANTT.date = days[0] || '';
+  $('gDate').innerHTML = days.map((d) => `<option value="${esc(d)}">${esc(d.split('-').reverse().join('.'))}</option>`).join('')
+    || '<option value="">нет данных</option>';
+  $('gDate').value = GANTT.date;
+  $('gWindow').innerHTML = Object.entries(m.windows || {}).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join('');
+  $('gWindow').value = GANTT.window;
+  fillSelect($('gProduct'), m.products || [], 'Все');
+  if (GANTT.product !== 'all' && !(m.products || []).includes(GANTT.product)) GANTT.product = 'all';
+  $('gProduct').value = GANTT.product;
+  fillSelect($('gEquipment'), m.equipment || [], 'Все');
+  if (GANTT.equipment !== 'all' && !(m.equipment || []).includes(GANTT.equipment)) GANTT.equipment = 'all';
+  $('gEquipment').value = GANTT.equipment;
+  $('gSections').innerHTML = (m.sections_list || []).map((x) => {
+    const on = GANTT.sections.includes(x.key);
+    const err = (m.section_errors || {})[x.key];
+    return `<button class="g-sec${on ? ' on' : ''}" type="button" data-gsec="${esc(x.key)}" aria-pressed="${on}" ` +
+      `${err ? `title="${esc(err)}"` : ''}><i style="background:${G_COLORS[x.key]}"></i>${esc(x.title)}${err ? ' ⚠' : ''}</button>`;
+  }).join('');
+}
+
+function gMinutes(iso, start) { return (new Date(iso) - start) / 60000; }
+
+function gHours(start, total) {
+  const out = [];
+  for (let m = 0; m <= total; m += 60) {
+    const d = new Date(start.getTime() + m * 60000);
+    const h = Number(new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', hourCycle: 'h23', timeZone: (meta && meta.timezone) || undefined }).format(d));
+    out.push({ m, h });
+  }
+  return out;
+}
+
+function gBarText(b) {
+  return [b.people ? `${b.people} чел` : '', b.qty ? `${num(b.qty)} ${b.unit}` : '', b.equipment].filter(Boolean).join(' · ');
+}
+
+function gBarTip(b) {
+  const end = b.end_time || (b.running ? 'идёт' : 'конец не отмечен');
+  return [`${b.section_title} · ${b.product} — ${b.operation}`,
+    `${b.start_time}–${end}${none(b.duration_min) ? '' : ' (' + hm(b.duration_min) + ')'}`,
+    b.people ? `людей: ${b.people}${none(b.person_hours) ? '' : ', чел·ч ' + dec(b.person_hours)}` : 'людей: нет данных',
+    b.qty ? `выработка: ${num(b.qty)} ${b.unit}${none(b.rate) ? '' : ` · ${dec(b.rate)} ${b.unit}/ч`}${none(b.rate_per_person) ? '' : ` · ${dec(b.rate_per_person)} ${b.unit}/чел·ч`}` : 'выработка: нет данных',
+    b.equipment ? `оборудование: ${b.equipment}` : '',
+    b.source === 'chat' ? 'источник: чат КЦ' : '',
+    b.flag === 'check' ? '⚠ время по времени сообщения' : (b.flag === 'invalid' ? '⚠ некорректное время — не в нормах' : ''),
+    b.note || ''].filter(Boolean).join(' · ');
+}
+
+// rows: [{label, sub, color?, lanes, bars:[{start, draw_end, lane, color, cls, text, tip, idx}]}], groups — заголовки цехов.
+function ganttGrid(rows, wStart, wEnd, nowIso) {
+  const start = new Date(wStart);
+  const total = (new Date(wEnd) - start) / 60000;
+  const pct = (m) => Math.max(0, Math.min(100, m / total * 100));
+  const hours = gHours(start, total);
+  const ticks = hours.map((x) => `<span class="g-tick${x.h === 8 || x.h === 20 ? ' shift' : ''}" style="left:${pct(x.m)}%">${String(x.h).padStart(2, '0')}</span>`).join('');
+  const nowM = nowIso ? gMinutes(nowIso, start) : -1;
+  const nowLine = nowM > 0 && nowM < total ? `<i class="g-now" style="left:${pct(nowM)}%" title="сейчас"></i>` : '';
+  const shiftLines = hours.filter((x) => (x.h === 8 || x.h === 20) && x.m > 0 && x.m < total)
+    .map((x) => `<i class="g-shift" style="left:${pct(x.m)}%"></i>`).join('');
+  let html = `<div class="gantt" style="--hours:${Math.round(total / 60)}"><div class="g-row g-head"><div class="g-label">Продукт · операция</div>` +
+    `<div class="g-track g-ticks">${ticks}</div></div>`;
+  rows.forEach((r) => {
+    if (r.group) {
+      html += `<div class="g-group" style="--c:${r.color}"><span>${esc(r.group)}</span></div>`;
+      return;
+    }
+    const bars = r.bars.map((b) => {
+      const s = pct(gMinutes(b.start, start));
+      const top = b.lane * 26 + 3;
+      if (!b.draw_end) {
+        return `<span class="g-mark" style="left:${s}%;top:${top}px;--c:${b.color}" data-tip="${esc(b.tip)}" data-gbar="${b.idx}" role="button" tabindex="0"></span>`;
+      }
+      const e = pct(gMinutes(b.draw_end, start));
+      return `<span class="g-bar ${b.cls || ''}" style="left:${s}%;width:${Math.max(e - s, 0.35)}%;top:${top}px;--c:${b.color}" ` +
+        `data-tip="${esc(b.tip)}" data-gbar="${b.idx}" role="button" tabindex="0"><b>${esc(b.text || '')}</b></span>`;
+    }).join('');
+    html += `<div class="g-row"><div class="g-label" title="${esc(r.label + ' · ' + r.sub)}"><span>${esc(r.label)}</span><small>${esc(r.sub)}</small></div>` +
+      `<div class="g-track" style="height:${r.lanes * 26 + 4}px">${shiftLines}${nowLine}${bars}</div></div>`;
+  });
+  return html + '</div>';
+}
+
+let gBarsFlat = [];
+
+function renderGantt(data) {
+  ganttData = data;
+  lastData = data;
+  if (data.day && data.day !== GANTT.date) { GANTT.date = data.day; if ($('gDate').value !== data.day) $('gDate').value = data.day; }
+  const t = data.totals;
+  const errors = data.section_errors || {};
+  const names = { bhm: 'БХМ', fk: 'ФК', proofing: 'Расстойка', kc: 'КЦ' };
+  $('gWarn').hidden = !Object.keys(errors).length;
+  $('gWarn').textContent = Object.keys(errors).length
+    ? '⚠ Не все цеха доступны: ' + Object.entries(errors).map(([k, v]) => `${names[k] || k} — ${v}`).join('; ') + '. Остальные показаны.' : '';
+  const cards = [
+    ['Операций в окне', num(t.ops), '', `закрыто ${num(t.closed)} · без конца/идут ${num(t.open)}`],
+    ['Человеко-часы', t.people_known ? dec(t.person_hours) : NO_DATA, t.people_known ? 'чел·ч' : '', `людей известно у ${num(t.people_known)} операций`],
+    ['Продуктов', num(new Set(data.rows.map((r) => r.product)).size), '', `строк на шкале: ${num(data.rows.length)}`],
+    ['Из чата КЦ', num(t.from_chat), '', t.check ? `время по сообщению: ${num(t.check)}` : 'до запуска бота КЦ'],
+  ];
+  $('gKpis').innerHTML = cards.map(([label, value, unit, note]) => `<div class="kpi"><div class="k-label">${esc(label)}</div>` +
+    `<div class="k-value${value === NO_DATA ? ' k-none' : ''}"><span class="k-num">${esc(value)}</span>${unit ? `<span class="k-unit">${esc(unit)}</span>` : ''}</div>` +
+    `<div class="k-note">${esc(note)}</div></div>`).join('');
+  fitValues($('gKpis'));
+  $('gLegend').innerHTML = Object.entries(names).map(([k, v]) => `<span><i style="background:${G_COLORS[k]}"></i>${v}</span>`).join('') +
+    '<span><i class="lg-hatch"></i>время по сообщению / некорректно</span><span><i class="lg-run"></i>идёт сейчас</span>' +
+    '<span><i class="lg-mark"></i>начало без отметки конца</span>';
+  drawGantt();
+  renderGanttTable();
+  renderTiming(data);
+  const fetched = formatMoment(data.now);
+  $('sourceLine').textContent = `Гант: ФК, БХМ, расстойка, КЦ (бот${data.history_source ? ' + разобранный чат' : ''}) · расчёт ${fetched}`;
+  $('periodLine').textContent = `${data.day.split('-').reverse().join('.')} · ${data.window_title} · операций: ${num(t.ops)} · продуктов: ${num(new Set(data.rows.map((r) => r.product)).size)}`;
+}
+
+function ganttRowsFiltered() {
+  const q = GANTT.search.trim().toLowerCase();
+  return (ganttData.rows || []).filter((r) => !q || `${r.product} ${r.operation} ${r.equipment}`.toLowerCase().includes(q));
+}
+
+function drawGantt() {
+  if (!ganttData) return;
+  const rows = [];
+  gBarsFlat = [];
+  let section = '';
+  ganttRowsFiltered().forEach((r) => {
+    if (r.section !== section) { section = r.section; rows.push({ group: r.section_title, color: G_COLORS[r.section] }); }
+    rows.push({ label: r.product, sub: r.operation + (r.equipment ? ' · ' + r.equipment : ''), lanes: r.lanes,
+      bars: r.bars.map((b) => {
+        gBarsFlat.push(b);
+        return { start: b.start, draw_end: b.draw_end, lane: b.lane, color: G_COLORS[b.section], idx: gBarsFlat.length - 1,
+          cls: [b.flag !== 'ok' ? 'hatch' : '', b.running ? 'run' : ''].join(' '), text: gBarText(b), tip: gBarTip(b) };
+      }) });
+  });
+  $('gChart').innerHTML = rows.length ? ganttGrid(rows, ganttData.start, ganttData.end, ganttData.now)
+    : '<div class="empty">Нет операций в этом окне — выбери другие сутки или окно</div>';
+  $('gDetail').hidden = true;
+  $('gNote').textContent = `${ganttData.window_title} · ${num(rows.filter((r) => !r.group).length)} строк · нажми на полосу`;
+}
+
+function renderGanttTable() {
+  const bars = [];
+  ganttRowsFiltered().forEach((r) => r.bars.forEach((b) => bars.push(b)));
+  bars.sort((a, b) => a.start.localeCompare(b.start));
+  $('gTableNote').textContent = `операций: ${num(bars.length)}`;
+  renderTable($('gTable'),
+    [{ title: 'Цех' }, { title: 'Продукт' }, { title: 'Операция' }, { title: 'Время' }, { title: 'Длит.', num: true },
+     { title: 'Людей', num: true }, { title: 'Выработка', num: true }, { title: 'В час', num: true }, { title: 'На чел·ч', num: true },
+     { title: 'Оборудование' }, { title: 'Источник' }],
+    bars,
+    (b) => [`<span class="g-dot" style="--c:${G_COLORS[b.section]}"></span>${esc(b.section_title)}`,
+      `<span class="tag">${esc(b.unified || b.product)}</span>`, esc(b.operation),
+      `<span class="cellbox">${esc(b.start_time)}–${esc(b.end_time || (b.running ? 'идёт' : '…'))}${b.flag !== 'ok' ? ` <span class="delta warn" title="${esc(gBarTip(b))}">⚠</span>` : ''}</span>`,
+      none(b.duration_min) ? '—' : esc(hm(b.duration_min)), none(b.people) ? '—' : num(b.people),
+      b.qty ? `${num(b.qty)} ${esc(b.unit)}` : '—', decOr(b.rate), decOr(b.rate_per_person),
+      esc(b.equipment || '—'), b.source === 'chat' ? 'чат КЦ' : 'бот']);
+}
+
+function renderTiming(data) {
+  const rows = data.timing || [];
+  const chains = rows.filter((r) => r.stages_count > 1).length;
+  $('tNote').textContent = `ⓘ Этапы связаны по единому продукту (справочник продуктов), а не по номеру партии — общего номера у ботов нет. ` +
+    `Фасовка — отдельный бот, пока не подключён: показываем только «передано на фасовку» из чата КЦ. ` +
+    `Продуктов, прошедших больше одного цеха в этом окне: ${chains}.`;
+  $('tLegend').innerHTML = (data.stages || []).map((s) => `<span><i style="background:${G_STAGE_COLORS[s.key]}"></i>${esc(s.title)}</span>`).join('');
+  // Строка — продукт, дорожка — этап, полосы — реальные операции этапа (не сплошной интервал).
+  const chartRows = rows.map((r) => {
+    const present = r.stages.filter((s) => s.present);
+    return { label: r.product, sub: `этапов ${r.stages_count}${none(r.lead_min) ? '' : ' · ' + hm(r.lead_min)}`,
+      lanes: Math.max(1, present.length),
+      bars: present.flatMap((s, lane) => (s.bars || []).map((op) => ({ start: op.start, draw_end: op.end || null, lane,
+        color: G_STAGE_COLORS[s.key], text: s.title,
+        tip: `${r.product} · ${s.title}: этап ${s.start_time}–${s.end_time || '…'} · операций ${s.ops} · ${s.qty}` +
+          (s.people_max ? ` · до ${s.people_max} чел.` : '') + (none(s.gap_min) ? '' : ` · ожидание после прошлого этапа ${hm(s.gap_min)}`) }))) };
+  });
+  $('tChart').innerHTML = chartRows.length ? ganttGrid(chartRows, data.start, data.end, data.now) : '<div class="empty">Нет данных</div>';
+  $('tTableNote').textContent = `продуктов: ${num(rows.length)}`;
+  const stageCols = (data.stages || []).map((s) => ({ title: s.title }));
+  renderTable($('tTable'), [{ title: 'Продукт' }, { title: 'Этапов', num: true }, { title: 'Начало → конец', num: true }].concat(stageCols),
+    rows,
+    (r) => [`<span class="tag">${esc(r.product)}</span>`, num(r.stages_count), none(r.lead_min) ? '—' : esc(hm(r.lead_min))].concat(
+      r.stages.map((s) => {
+        if (s.key === 'pack') {
+          const hs = s.handoffs || [];
+          return hs.length ? hs.map((h) => `передано ${num(h.qty)} ${esc(h.unit)} в ${esc(h.time)}`).join('<br>') : '<span class="muted">нет источника</span>';
+        }
+        if (!s.present) return '<span class="muted">—</span>';
+        return `<span class="cellbox"><b>${esc(s.start_time.slice(6))}–${esc(s.end_time ? s.end_time.slice(6) : '…')}</b>` +
+          `<small class="stage-who">${none(s.span_min) ? '' : esc(hm(s.span_min)) + ' · '}${esc(s.qty)}${s.people_max ? ` · до ${s.people_max} чел.` : ''}` +
+          `${none(s.gap_min) ? '' : ` · ожидание ${esc(hm(s.gap_min))}`}</small></span>`;
+      })),
+    (r) => ({ key: 'gproduct', value: r.product }));
+}
+
+async function loadGanttMap() {
+  try {
+    const r = await fetch('/api/gantt/map', { cache: 'no-store' });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.error || 'сервис недоступен');
+    const rows = [];
+    Object.entries(d.products || {}).forEach(([sec, names]) => names.forEach((n) => rows.push({ sec, name: n, unified: ((d.map || {})[sec] || {})[n] || '' })));
+    const mapped = rows.filter((x) => x.unified).length;
+    $('mNote').textContent = d.upload_enabled ? (d.updated_at ? `загружен ${formatMoment(d.updated_at)}${d.file ? ' · ' + d.file : ''}` : 'ещё не загружали')
+      : 'загрузка выключена: на сервере не задан PLAN_UPLOAD_TOKEN';
+    $('mUpload').disabled = !d.upload_enabled;
+    $('mCount').textContent = `сведено ${num(mapped)} из ${num(rows.length)} названий`;
+    rows.sort((a, b) => (b.unified ? 1 : 0) - (a.unified ? 1 : 0) || a.sec.localeCompare(b.sec) || a.name.localeCompare(b.name, 'ru'));
+    renderTable($('mTable'), [{ title: 'Цех' }, { title: 'Продукт в цехе' }, { title: 'Единый продукт' }], rows,
+      (x) => [esc((d.sections || {})[x.sec] || x.sec), esc(x.name), x.unified ? `<span class="tag">${esc(x.unified)}</span>` : '<span class="muted">как есть</span>']);
+  } catch (e) {
+    $('mNote').textContent = 'не удалось получить справочник: ' + e.message;
+  }
+}
+
+async function uploadGanttMap(file) {
+  let token = store.get('fk_plan_token');
+  if (!token) {
+    token = (window.prompt('Ключ загрузки (PLAN_UPLOAD_TOKEN)') || '').trim();
+    if (!token) return;
+  }
+  const el = $('mResult');
+  el.hidden = false; el.className = 'upload-result pending'; el.textContent = `Загружаю ${file.name}…`;
+  const form = new FormData();
+  form.append('file', file, file.name);
+  try {
+    const r = await fetch('/api/gantt/map/upload', { method: 'POST', body: form, headers: { 'X-Plan-Token': token } });
+    const d = await r.json();
+    if (!r.ok || !d.ok) { if (r.status === 401) store.del('fk_plan_token'); throw new Error(d.error || 'ошибка загрузки'); }
+    store.set('fk_plan_token', token);
+    el.className = 'upload-result ok'; el.textContent = `Загружено соответствий: ${d.pairs}.`;
+    await loadGanttMap();
+    try { applyMeta(await fetchMeta('gantt')); } catch (e) { /* справочники обновятся при следующей загрузке */ }
+    loadSummary(false);
+  } catch (e) {
+    el.className = 'upload-result bad'; el.textContent = 'Не удалось загрузить: ' + e.message;
+  }
+}
+
+function showGanttDetail(idx) {
+  const b = gBarsFlat[idx];
+  if (!b) return;
+  const el = $('gDetail');
+  el.hidden = false;
+  el.innerHTML = `<b>${esc(b.section_title)} · ${esc(b.product)} — ${esc(b.operation)}</b><br>` + esc(gBarTip(b)).split(' · ').slice(1).join('<br>');
+}
+
+function bindGantt() {
+  const reload = () => { loadSummary(false); };
+  $('gDate').addEventListener('change', () => { GANTT.date = $('gDate').value; reload(); });
+  $('gWindow').addEventListener('change', () => { GANTT.window = $('gWindow').value; reload(); });
+  $('gProduct').addEventListener('change', () => { GANTT.product = $('gProduct').value; reload(); });
+  $('gEquipment').addEventListener('change', () => { GANTT.equipment = $('gEquipment').value; reload(); });
+  $('gSearch').addEventListener('input', () => { GANTT.search = $('gSearch').value; drawGantt(); renderGanttTable(); });
+  const step = (dir) => {
+    const opts = Array.from($('gDate').options).map((o) => o.value);
+    const i = opts.indexOf(GANTT.date);
+    const j = i - dir;  // список по убыванию дат
+    if (j >= 0 && j < opts.length) { GANTT.date = opts[j]; $('gDate').value = GANTT.date; reload(); }
+  };
+  $('gPrev').addEventListener('click', () => step(-1));
+  $('gNext').addEventListener('click', () => step(1));
+  document.addEventListener('click', (e) => {
+    const sec = e.target.closest ? e.target.closest('[data-gsec]') : null;
+    if (sec) {
+      const k = sec.dataset.gsec;
+      GANTT.sections = GANTT.sections.includes(k) ? GANTT.sections.filter((x) => x !== k) : GANTT.sections.concat(k);
+      if (!GANTT.sections.length) GANTT.sections = [k];
+      fillGanttTools(meta);
+      reload();
+      return;
+    }
+    const bar = e.target.closest ? e.target.closest('[data-gbar]') : null;
+    if (bar && bar.closest('#gChart')) showGanttDetail(Number(bar.dataset.gbar));
+  });
+  $('mTemplate').addEventListener('click', () => download('/api/gantt/map/template'));
+  $('mUpload').addEventListener('click', () => $('mFile').click());
+  $('mFile').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; if (f) uploadGanttMap(f); e.target.value = ''; });
+}
+
 /* ─── тултип ──────────────────────────────────────────────────────────────── */
 
 function moveTip(e, text) {
@@ -1825,6 +2143,7 @@ function bindEvents() {
   $('exportAll').addEventListener('click', () => exportWidget('all'));
   bindProofing();
   bindKc();
+  bindGantt();
   initDropzone();
 
   let width = window.innerWidth;

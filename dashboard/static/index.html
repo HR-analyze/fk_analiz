@@ -15,6 +15,7 @@
       <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="bhm">БХМ</button>
       <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="proofing">Расстойка</button>
       <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="kc" title="Кондитерский цех">КЦ</button>
+      <button class="src-btn" type="button" role="radio" aria-checked="false" data-source="gantt" title="Диаграмма Ганта и общий тайминг всех цехов">Гант</button>
     </div>
     <div class="head-row">
       <h1>Аналитический отчёт по производству</h1>
@@ -35,6 +36,9 @@
     <button class="tab" role="tab" data-tab="kc" hidden>Сводка</button>
     <button class="tab" role="tab" data-tab="kcops" hidden>Операции</button>
     <button class="tab" role="tab" data-tab="kcnorms" hidden>Нормативы</button>
+    <button class="tab" role="tab" data-tab="gantt" hidden>Диаграмма Ганта</button>
+    <button class="tab" role="tab" data-tab="timing" hidden>Общий тайминг</button>
+    <button class="tab" role="tab" data-tab="gmap" hidden>Справочник продуктов</button>
   </nav>
 
   <details class="panel filters" id="filterPanel">
@@ -425,6 +429,69 @@
     <section class="panel" data-widget="operations">
       <header class="panel-head"><h2>Трудозатраты по операциям</h2><span class="unit">нажми на строку</span></header>
       <div class="table-wrap"><table class="table" id="kOperationTable"></table></div>
+    </section>
+  </div>
+
+  <!-- ── Гант: все цеха на одной шкале ─────────────────────────────────── -->
+  <section class="panel gantt-tools" id="gTools" hidden>
+    <div class="filters-body">
+      <label class="field"><span>Рабочие сутки</span>
+        <span class="g-day"><button class="btn" type="button" id="gPrev" aria-label="Предыдущие сутки">‹</button>
+        <select id="gDate"></select>
+        <button class="btn" type="button" id="gNext" aria-label="Следующие сутки">›</button></span></label>
+      <label class="field"><span>Окно</span><select id="gWindow"></select></label>
+      <label class="field"><span>Продукт (единый)</span><select id="gProduct"><option value="all">Все</option></select></label>
+      <label class="field"><span>Оборудование</span><select id="gEquipment"><option value="all">Все</option></select></label>
+      <label class="field"><span>Поиск</span><input type="search" id="gSearch" placeholder="продукт или операция" autocomplete="off"></label>
+    </div>
+    <div class="g-sections" id="gSections" role="group" aria-label="Цеха"></div>
+  </section>
+
+  <div class="tab-page" data-page="gantt" hidden>
+    <div class="proof-error" id="gError" hidden><b>Гант недоступен.</b> <span id="gErrorText"></span></div>
+    <div class="plan-skew" id="gWarn" hidden></div>
+    <section class="kpis k4" id="gKpis"></section>
+    <section class="panel">
+      <header class="panel-head"><h2>Диаграмма Ганта</h2><span class="unit" id="gNote">продукт · операция · люди · выработка · оборудование</span></header>
+      <div class="g-legend" id="gLegend"></div>
+      <div class="gantt-scroll" id="gChart"></div>
+      <div class="g-detail" id="gDetail" hidden></div>
+    </section>
+    <section class="panel">
+      <header class="panel-head"><h2>Операции окна</h2><span class="unit" id="gTableNote">—</span></header>
+      <div class="table-wrap"><table class="table" id="gTable"></table></div>
+    </section>
+  </div>
+
+  <div class="tab-page" data-page="timing" hidden>
+    <div class="plan-skew" id="tNote"></div>
+    <section class="panel">
+      <header class="panel-head"><h2>Путь продукта по цехам</h2><span class="unit">БХМ → ФК → расстойка → отпекание → КЦ → фасовка</span></header>
+      <div class="g-legend" id="tLegend"></div>
+      <div class="gantt-scroll" id="tChart"></div>
+    </section>
+    <section class="panel">
+      <header class="panel-head"><h2>Общий тайминг по продуктам</h2><span class="unit" id="tTableNote">—</span></header>
+      <div class="table-wrap"><table class="table" id="tTable"></table></div>
+    </section>
+  </div>
+
+  <div class="tab-page" data-page="gmap" hidden>
+    <section class="panel">
+      <header class="panel-head"><h2>Справочник продуктов</h2><span class="unit" id="mNote">—</span></header>
+      <p class="plan-hint">У цехов разные названия одного продукта («Батон / ромашка» в БХМ и «Батон классический» в ФК).
+        Скачай шаблон, впиши в колонку «Единый продукт» одно название для всех цехов и загрузи файл —
+        общий тайминг свяжет этапы. Пустая ячейка — связь только по точному совпадению названия.</p>
+      <div class="plan-actions">
+        <button class="btn" type="button" id="mTemplate">Скачать шаблон Excel</button>
+        <button class="btn primary" type="button" id="mUpload">Загрузить справочник</button>
+        <input type="file" id="mFile" accept=".xlsx,.xlsm" hidden>
+      </div>
+      <div id="mResult" class="upload-result" hidden></div>
+    </section>
+    <section class="panel">
+      <header class="panel-head"><h2>Текущие соответствия</h2><span class="unit" id="mCount">—</span></header>
+      <div class="table-wrap"><table class="table" id="mTable"></table></div>
     </section>
   </div>
 

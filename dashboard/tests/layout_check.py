@@ -23,7 +23,7 @@ WIDTHS = [(360, "малый телефон"), (390, "iPhone"), (414, "больш
           (768, "планшет"), (1024, "ноутбук"), (1440, "десктоп"), (1920, "широкий")]
 TABS = ["dashboard", "plan", "history"]
 # У расстойки свои вкладки: сводка и таблица партий.
-SOURCE_TABS = {"bhm": ["dashboard"], "proofing": ["proofing", "batches"], "kc": ["kc", "kcops", "kcnorms"]}
+SOURCE_TABS = {"bhm": ["dashboard"], "proofing": ["proofing", "batches"], "kc": ["kc", "kcops", "kcnorms"], "gantt": ["gantt", "timing", "gmap"]}
 
 # Поломка вёрстки часто живёт МЕЖДУ типовыми разрешениями: на 390px шрифт уже
 # ужат медиазапросом, на 1440px места вдоволь, а на 820px значение не влезает.
@@ -206,7 +206,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://127.0.0.1:8090")
     ap.add_argument("--chrome", default="", help="путь к бинарю Chromium, если Playwright его не находит")
-    ap.add_argument("--source", default="fk", choices=("fk", "bhm", "proofing", "kc"), help="какой источник проверять")
+    ap.add_argument("--source", default="fk", choices=("fk", "bhm", "proofing", "kc", "gantt"), help="какой источник проверять")
     args = ap.parse_args()
     print(f"Проверка вёрстки: {args.url} (источник {args.source})\n")
     problems = asyncio.run(run(args.url, args.chrome, args.source))
