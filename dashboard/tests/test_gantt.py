@@ -488,19 +488,35 @@ def test_exports_xlsx_and_pdf():
             r = await client.get("/api/export/xlsx?source=gantt&date=2026-10-07&window=full")
             assert r.status == 200 and "gantt_2026-10-07_full" in r.headers["Content-Disposition"]
             wb = openpyxl.load_workbook(io.BytesIO(await r.read()))
-            assert wb.sheetnames == ["Строки диаграммы", "Операции", "Общий тайминг", "Среднее по продукту",
-                                     "Передано на фасовку", "Справочник продуктов", "Справочник операций", "Фильтры"]
+            assert wb.sheetnames == ["Процессы по цехам", "Цеха · операции", "Продукты (среднее)", "Этапы по продуктам",
+                                     "Строки диаграммы", "Операции", "Общий тайминг", "Передано на фасовку",
+                                     "Справочник продуктов", "Справочник операций", "Фильтры"]
             page = await (await client.get("/api/summary?source=gantt&date=2026-10-07&window=full")).json()
             assert wb["Операции"].max_row - 1 == page["totals"]["ops"]
             assert wb["Общий тайминг"].max_row - 1 == len(page["timing"])
             assert wb["Строки диаграммы"].max_row - 1 == len(page["rows"]) + len(page["products"])
             av = page["averages"]["products"]
-            assert wb["Среднее по продукту"].max_row - 1 == sum(1 + len(x["stages"]) + len(x["ops"]) for x in av)
+            # плоские листы процессов: строка — продукт × операция; время — числом (ч:мм)
+            proc = wb["Процессы по цехам"]
+            assert proc.max_row - 1 == sum(len(x["ops"]) for x in av)
+            assert [c.value for c in proc[1]][:4] == ["Цех", "Этап цеха", "Продукт", "Операция"]
+            assert proc.cell(row=2, column=9).number_format == "[h]:mm"
+            shops = {r[0] for r in proc.iter_rows(min_row=2, values_only=True)}
+            assert shops <= {"Тестозаготовочный цех", "Формовочный цех", "Печной цех", "Кондитерский цех"} and len(shops) >= 3
+            assert wb["Продукты (среднее)"].max_row - 1 == len(av)
+            assert wb["Этапы по продуктам"].max_row - 1 == sum(len(x["stages"]) for x in av)
+            assert wb["Цеха · операции"].max_row > 1
             notes = [c.value for c in wb["Фильтры"]["B"] if c.value]
             assert any("переписки" in str(v) for v in notes)
-            assert any(r[-1] == "переписка кондитерского цеха — неточно" for r in wb["Среднее по продукту"].iter_rows(min_row=2, values_only=True))
+            assert any(r[-1] == "переписка кондитерского цеха — неточно" for r in wb["Процессы по цехам"].iter_rows(min_row=2, values_only=True))
             r = await client.get("/api/export/pdf?source=gantt&date=2026-10-07")
-            assert r.status == 200 and (await r.read())[:4] == b"%PDF"
+            blob = await r.read()
+            assert r.status == 200 and blob[:4] == b"%PDF"
+            import pypdf
+            text = "\n".join(pg.extract_text() for pg in pypdf.PdfReader(io.BytesIO(blob)).pages)
+            assert "Процессы по продуктам" in text and "Этап · операция" in text
+            for x in page["averages"]["products"][:5]:   # блок на каждый продукт
+                assert x["product"] in text, x["product"]
         finally:
             await client.close()
     asyncio.run(run())

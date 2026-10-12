@@ -533,7 +533,12 @@ def averages(bars_by_section, namer, day_from, day_to, sections=None, product="a
         for (stage, sec, op), rs in op_runs.items():
             items = [b for r in rs for b in r["items"]]
             qty = _qty_groups(items)
+            rates = _rate_stats(items)
+            # основная единица операции — для выгрузки числом (Excel), а не текстом «1 460 шт»
+            unit = rates["rate_unit"] or (max(qty, key=qty.get) if qty else "")
             ops_out.append({
+                "qty_unit": unit if unit in qty else "",
+                "qty_day_value": round(qty[unit] / len(rs), 1) if unit in qty else None,
                 "stage": stage, "stage_title": STAGES[STAGE_INDEX[stage]]["title"], "section": sec,
                 "section_title": SECTIONS[sec], "operation": op, "days": len(rs),
                 "offset_min": avg(r["offset"] for r in rs), "span_min": avg(r["span"] for r in rs),
@@ -542,7 +547,7 @@ def averages(bars_by_section, namer, day_from, day_to, sections=None, product="a
                 "no_end": sum(1 for b in items if not _timed(b)),
                 "from_chat": sum(1 for b in items if b["source"] == "chat"),
                 "equipment": ", ".join(sorted({b["equipment"] for b in items if b["equipment"]})),
-                **_rate_stats(items)})
+                **rates})
         ops_out.sort(key=lambda o: (STAGE_INDEX[o["stage"]], o["offset_min"] if o["offset_min"] is not None else 0, o["operation"].lower()))
         stages_out = [{"key": st["key"], "title": st["title"], "days": len(stage_runs[st["key"]]),
                        "offset_min": avg(r["offset"] for r in stage_runs[st["key"]]),
