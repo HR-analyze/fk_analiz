@@ -204,6 +204,15 @@ def test_rows_grouped_by_product_with_columns():
     dough = s["products"][0]
     assert (dough["ops"], dough["qty"], dough["rate"], dough["rate_per_person"]) == (3, "200 кг", 200.0, None)
 
+    # незакрытая с утра «Сборка теста» идёт до «сейчас» — в выработку в час её время не входит
+    forgot = {"production": bhm["production"] + [
+        {"id": "b9", "user_name": "О", "equipment": "Daxner", "product": "Багет", "operation": "Сборка теста",
+         "start_time": "08:00", "end_time": "", "qty": None, "status": "open", "created_at": at(7, 8).isoformat(), "date": "2026-10-07"}]}
+    s = gantt.build(gantt.collect_bars({"bhm": forgot}, {}), {}, {}, "2026-10-07", "day", now=at(7, 18))
+    dough = s["products"][0]
+    assert dough["busy_min"] == 600 and dough["running"] == 1          # на шкале — 08:00–18:00
+    assert (dough["rate"], dough["work_min"]) == (200.0, 60)           # 200 кг за 1 ч закрытых операций
+
 
 def test_peak_people_relay_is_not_parallel():
     kc = {"operations": [kc_op("Эклер", "Начинка", at(7, 9), 60, people=2), kc_op("Эклер", "Декор", at(7, 10), 60, people=3)]}

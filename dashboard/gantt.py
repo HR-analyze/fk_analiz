@@ -454,17 +454,22 @@ def _day_output(items):
     return {"qty": qty, "unit": unit, "stage": stage, "operation": op}
 
 
-def _product_rate(items, busy_min):
+def _product_rate(items, clip):
     """Выработка продукта в строке диаграммы (несколько операций): как в «Среднем по продукту» —
     количество последнего этапа, самая массовая операция (операции не складываются).
-    На человека — / чел·ч всех операций продукта; людей нет — / время работы с продуктом в окне."""
+    На человека — / чел·ч всех операций продукта; людей нет — / время работы с продуктом в окне.
+    Время — только по ЗАКРЫТЫМ операциям: незакрытая операция «идёт» до «сейчас» и раздула бы
+    время в разы (забытая с утра «Сборка теста» — 10 часов вместо минут)."""
     out = _day_output(items)
     if not out:
         return {"rate": None, "rate_per_person": None, "rate_unit": "", "qty": "", "output_from": ""}
+    closed = [(max(b["start"], clip[0]), min(b["end"], clip[1])) for b in items if _timed(b)]
+    work_min = _union_minutes([(s, e) for s, e in closed if e > s])
     ph = _person_hours(items)
-    return {"rate": round(out["qty"] / (busy_min / 60), 1) if busy_min else None,
+    return {"rate": round(out["qty"] / (work_min / 60), 1) if work_min else None,
             "rate_per_person": round(out["qty"] / ph, 1) if ph else None,
-            "rate_unit": out["unit"], "qty": _qty_text({out["unit"]: out["qty"]}),
+            "rate_unit": out["unit"], "qty": _qty_text({out["unit"]: out["qty"]}), "output_qty": out["qty"],
+            "work_min": round(work_min), "person_hours_all": ph,
             "output_from": f"{STAGES[STAGE_INDEX[out['stage']]]['title']} · {out['operation']}"}
 
 
@@ -614,10 +619,11 @@ def build(bars_by_section, history, mapping, day, mode="full", sections=None, pr
         stats = _row_stats(items, now, (start, end))
         stats["output_from"] = ops[0] if len(ops) == 1 else ""
         if len(ops) > 1:
-            stats.update(_product_rate(items, stats["busy_min"]))
+            stats.update(_product_rate(items, (start, end)))
         known = [bar_end(b, now) for b in items if bar_end(b, now)]
         products.append({"section": sec, "section_title": SECTIONS[sec], "product": prod, "ops": len(ops),
                          "runs": len(items), **stats, "people": _peak_people(items, now),
+                         "running": sum(1 for b in items if b["running"]),
                          "people_ops": sum(r["people"] or 0 for r in out_rows if r["section"] == sec and r["product"] == prod) or None,
                          "start": _iso(min(b["start"] for b in items)), "end": _iso(max(known)) if known else ""})
     closed = [b for b in bars if b["end"]]
