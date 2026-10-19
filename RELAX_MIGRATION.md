@@ -37,8 +37,12 @@ KC_API_URL=https://<konditerka-bot-host>
 KC_API_KEY=<same-secret-as-DASHBOARD_API_KEY-on-konditerka-bot>
 
 PLAN_UPLOAD_TOKEN=<long-random-secret>
-DASHBOARD_USER=admin
-DASHBOARD_PASSWORD=<long-unique-password>
+
+# Optional. The dashboard opens WITHOUT a password by default. To protect it with a
+# browser login (HTTP Basic), set all three:
+#DASHBOARD_AUTH=1
+#DASHBOARD_USER=admin
+#DASHBOARD_PASSWORD=<long-unique-password>
 
 TIMEZONE=Europe/Moscow
 CACHE_TTL=60
@@ -55,12 +59,12 @@ The KC section works the same way: API only (no access to the KC bot database, n
 
 Section buttons are now named «Формовочный цех» (FK), «Тестозаготовочный цех» (BHM), «Печной цех» (proofing), «Кондитерский цех» (KC) and «Тайминги» (Gantt); URLs and `?source=` keys are unchanged. The «Тайминги» section needs no new variables: it combines the four sources above plus the one-time parsed KC Telegram chat (`kc_chat_history.json`, baked into the image). Its mapping (shop product names → unified product, hand-typed KC operations → unified operation) is uploaded on the site with `PLAN_UPLOAD_TOKEN` and stored in the same dashboard PostgreSQL in a **separate** table `fk_dashboard_product_map`, created automatically on startup; the plans table is not touched. Packing (фасовка) has no source yet — it will be a separate bot. KC data taken from the chat is marked as inaccurate on the page and in the exports.
 
-Missing mandatory settings make startup fail instead of silently exposing data or writing transient plans. A username/password challenge protects the dashboard endpoints; `/health` remains publicly accessible to platform probes.
+Missing mandatory settings make startup fail instead of silently exposing data or writing transient plans. By default the dashboard is open: anyone with the URL can read it (including exports and proofing photos). Writes (plan upload/delete, product map upload) stay closed by `PLAN_UPLOAD_TOKEN`. Set `DASHBOARD_AUTH=1` (with `DASHBOARD_USER` and `DASHBOARD_PASSWORD`) to put a username/password challenge on the dashboard endpoints; `/health` always stays public for platform probes.
 
 ## Verify
 
 1. Open `/health`; confirm `ok: true` and `mode: api`.
-2. Open `/`; enter dashboard login/password; confirm FK facts, BHM tab and exports.
+2. Open `/` (it asks for login/password only when `DASHBOARD_AUTH=1`); confirm FK facts, BHM tab and exports.
 3. Click «Печной цех» (proofing); confirm KPI, charts, «Партии» tab, a photo gallery, Excel and PDF. `/health` shows `proofing.error` empty.
 4. Click «Кондитерский цех» (KC); confirm «Сводка», «Операции», «Нормативы», Excel and PDF. `/health` shows `kc.error` empty.
 5. Click «Тайминги» (Gantt); pick a day, check the chart (product rows collapse; columns equipment / people / output per person-hour), «Общий тайминг», «Среднее по продукту» (product output per day and per person-hour; expand a product), download the template, upload it back.

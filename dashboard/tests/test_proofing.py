@@ -517,7 +517,7 @@ def test_app_photo_proxy_hides_key():
                 assert r.status == 404   # не из снимка — к боту даже не обращаемся
                 assert len([c for c in state["calls"] if "photo" in c["path"]]) == 1
                 # авторизация дашборда защищает и раздел расстойки, и фото
-                with patched(dashboard, RELAXDEV_DEPLOY=True, DASHBOARD_USER="u", DASHBOARD_PASSWORD="p"):
+                with patched(dashboard, RELAXDEV_DEPLOY=True, DASHBOARD_AUTH=True, DASHBOARD_USER="u", DASHBOARD_PASSWORD="p"):
                     for path in (f"/api/proofing/photo/{PHOTO_ID}", "/api/summary?source=proofing"):
                         assert (await client.get(path)).status == 401
                     assert (await client.get("/health")).status == 200

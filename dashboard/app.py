@@ -34,6 +34,10 @@ log = logging.getLogger("fk.dashboard")
 
 PORT = int(os.getenv("PORT", "8090"))
 RELAXDEV_DEPLOY = os.getenv("RELAXDEV_DEPLOY", "") == "1"
+# Вход по паролю выключен по умолчанию. DASHBOARD_AUTH=1 включает его обратно
+# (тогда нужны DASHBOARD_USER и DASHBOARD_PASSWORD). Загрузки планов и маппинга
+# от этого флага не зависят: их по-прежнему закрывает PLAN_UPLOAD_TOKEN.
+DASHBOARD_AUTH = os.getenv("DASHBOARD_AUTH", "") == "1"
 DASHBOARD_USER = os.getenv("DASHBOARD_USER", "").strip()
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "")
 STATIC = Path(__file__).parent / "static"
@@ -688,9 +692,10 @@ def validate_relax():
         "BOT_API_KEY": bool(os.getenv("BOT_API_KEY", "").strip()),
         "PLAN_DATABASE_URL": plan_store.PG_PLANS,
         "PLAN_UPLOAD_TOKEN": bool(plan_store.PLAN_UPLOAD_TOKEN),
-        "DASHBOARD_USER": bool(DASHBOARD_USER),
-        "DASHBOARD_PASSWORD": bool(DASHBOARD_PASSWORD),
     }
+    if DASHBOARD_AUTH:
+        required["DASHBOARD_USER"] = bool(DASHBOARD_USER)
+        required["DASHBOARD_PASSWORD"] = bool(DASHBOARD_PASSWORD)
     missing = [key for key, ready in required.items() if not ready]
     if missing:
         raise RuntimeError("RelaxDev dashboard: missing " + ", ".join(missing))
@@ -714,7 +719,7 @@ async def start_storage(app):
 
 @web.middleware
 async def basic_auth(request, handler):
-    if not RELAXDEV_DEPLOY or request.path == "/health":
+    if not (RELAXDEV_DEPLOY and DASHBOARD_AUTH) or request.path == "/health":
         return await handler(request)
     header = request.headers.get("Authorization", "")
     valid = False

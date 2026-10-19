@@ -46,6 +46,7 @@ jobs:
             -e BOT_API_URL=http://127.0.0.1:9999 \
             -e BOT_API_KEY=local-test \
             -e PLAN_UPLOAD_TOKEN=local-test \
+            -e DASHBOARD_AUTH=1 \
             -e DASHBOARD_USER=admin \
             -e DASHBOARD_PASSWORD=local-test \
             fk-dashboard-relax

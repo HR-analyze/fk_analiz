@@ -414,9 +414,27 @@ def test_basic_auth_protects_kc():
     async def run():
         client = await _client()
         try:
-            with patched(dashboard, RELAXDEV_DEPLOY=True, DASHBOARD_USER="u", DASHBOARD_PASSWORD="p"):
+            with patched(dashboard, RELAXDEV_DEPLOY=True, DASHBOARD_AUTH=True, DASHBOARD_USER="u", DASHBOARD_PASSWORD="p"):
                 for path in ("/api/summary?source=kc", "/api/export/xlsx?source=kc", "/api/meta?source=kc"):
                     assert (await client.get(path)).status == 401, path
+        finally:
+            await client.close()
+    asyncio.run(run())
+
+
+def test_no_password_by_default_but_writes_still_need_the_token():
+    """Без DASHBOARD_AUTH просмотр открыт, а запись по-прежнему закрыта ключом."""
+    async def run():
+        client = await _client()
+        try:
+            with patched(dashboard, RELAXDEV_DEPLOY=True, DASHBOARD_AUTH=False,
+                         DASHBOARD_USER="u", DASHBOARD_PASSWORD="p"):
+                for path in ("/", "/api/meta?source=kc", "/api/summary?source=kc", "/health"):
+                    assert (await client.get(path)).status != 401, path
+                # Запись пароль и не охранял: её закрывает PLAN_UPLOAD_TOKEN.
+                assert (await client.delete("/api/plan")).status in (401, 403)
+                assert (await client.post("/api/plan/upload")).status in (401, 403)
+                assert (await client.post("/api/gantt/map/upload")).status in (401, 403)
         finally:
             await client.close()
     asyncio.run(run())
