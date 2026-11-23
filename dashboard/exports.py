@@ -51,7 +51,7 @@ def widget_rows(summary, widget):
             ["Из них открытых", k["open_operations"], "", ""],
             row(f"Выпуск, {u}", "quantity"),
             row("Средняя длительность, мин", "avg_duration"),
-            row(f"Средняя производительность, {rate}", "avg_rate"),
+            row(f"Производительность за период, {rate}", "avg_rate"),
             row("Простоев, шт", "pauses"),
             row("Простои, мин", "stop_minutes"),
             ["Работа, мин", k["work_minutes"], "", ""],
@@ -72,11 +72,10 @@ def widget_rows(summary, widget):
              _blank(w["qty_change"]), w["pauses"], w["base_pauses"], _blank(w["pauses_change"])]
             for w in lfl.get("weeks", [])]
     if widget == "hourly":
-        target = summary.get("hourly_target", 0)
-        return "Производительность по часам", ["Час", f"Средняя, {rate}", f"Средняя за период, {rate}", "Ниже средней",
-                                               f"Прошлый период, {rate}", "Изменение, %"], [
-            [h["label"], h["value"], target, "да" if 0 < h["value"] < target else "",
-             _blank(h.get("lfl_value")), _blank(h.get("lfl_change"))] for h in summary["hourly"]]
+        return "Средний выпуск по часам суток", ["Час", f"Средний выпуск, {u}",
+                                                 f"Прошлый период, {u}", "Изменение, %"], [
+            [h["label"], h["value"], _blank(h.get("lfl_value")), _blank(h.get("lfl_change"))]
+            for h in summary["hourly"]]
     if widget in ("equipment", "products", "employees", "reasons"):
         source = {"equipment": ("Выпуск по оборудованию", "Оборудование", f"Выпуск, {u}", summary["by_equipment"]),
                   "products": ("Топ продуктов", "Продукт", f"Выпуск, {u}", summary["top_products"]),
@@ -214,7 +213,7 @@ def _nice_max(value):
     return step * exp
 
 
-def _bar_drawing(items, width, height, font, color_hex, target=None, below_hex="#E34948"):
+def _bar_drawing(items, width, height, font, color_hex):
     """Столбцы на примитивах: встроенные графики reportlab плохо держат длинные подписи."""
     from reportlab.graphics.shapes import Drawing, Group, Line, Rect, String
     from reportlab.lib.colors import HexColor
@@ -228,7 +227,7 @@ def _bar_drawing(items, width, height, font, color_hex, target=None, below_hex="
 
     pad_l, pad_r, pad_t, pad_b = 48, 6, 10, 46
     plot_w, plot_h = width - pad_l - pad_r, height - pad_t - pad_b
-    top = _nice_max(max([i["value"] for i in items] + ([target] if target else [])))
+    top = _nice_max(max(i["value"] for i in items))
     slot = plot_w / len(items)
     bar_w = min(slot * 0.62, 26)
 
@@ -241,9 +240,8 @@ def _bar_drawing(items, width, height, font, color_hex, target=None, below_hex="
     for i, item in enumerate(items):
         h = item["value"] / top * plot_h
         x = pad_l + slot * i + (slot - bar_w) / 2
-        below = bool(target) and 0 < item["value"] < target
         d.add(Rect(x, pad_b, bar_w, max(h, 0.6),
-                   fillColor=HexColor(below_hex if below else color_hex), strokeColor=None))
+                   fillColor=HexColor(color_hex), strokeColor=None))
         # Подпись под наклоном — иначе длинные названия налезают друг на друга.
         label = Group(String(0, 0, str(item["label"])[:26], fontName=font, fontSize=5.6,
                              textAnchor="end", fillColor=HexColor("#6B7687")))
@@ -252,10 +250,6 @@ def _bar_drawing(items, width, height, font, color_hex, target=None, below_hex="
         d.add(label)
 
     d.add(Line(pad_l, pad_b, width - pad_r, pad_b, strokeColor=HexColor("#D9DFE8"), strokeWidth=0.6))
-    if target:
-        y = pad_b + target / top * plot_h
-        d.add(Line(pad_l, y, width - pad_r, y, strokeColor=HexColor("#101828"),
-                   strokeWidth=0.8, strokeDashArray=[3, 2]))
     return d
 
 
@@ -336,7 +330,7 @@ def build_pdf(summary, analysis, filters, title="Сводка по произв�
     tiles = [("Операций", k["operations"], "operations"),
              (f"Выпуск, {u}", f"{k['quantity']:,}".replace(",", " "), "quantity"),
              ("Средняя длит., мин", k["avg_duration"], "avg_duration"),
-             (f"Производительность, {rate}", k["avg_rate"], "avg_rate"),
+             (f"Производительность за период, {rate}", k["avg_rate"], "avg_rate"),
              ("Простоев", k["pauses"], "pauses"), ("Коэф. использования, %", k["utilization"], "utilization")]
 
     def tile_delta(key):
@@ -366,18 +360,17 @@ def build_pdf(summary, analysis, filters, title="Сводка по произв�
     # Графики
     charts = [
         ("Выпуск по дням", [{"label": d["date"][5:], "value": d["qty"]} for d in summary["daily"]],
-         "#3B6EF5", None),
-        ("Производительность по часам", [{"label": h["label"], "value": h["value"]} for h in summary["hourly"]],
-         "#7C5CF5", summary.get("hourly_target") or None),
-        ("Выпуск по оборудованию", summary["by_equipment"][:10], "#3FBF94", None),
-        ("Топ продуктов", summary["top_products"][:10], "#F0A63C", None),
-        ("Выпуск по сотрудникам", summary.get("top_employees", [])[:10], "#2A78D6", None),
+         "#3B6EF5"),
+        (f"Средний выпуск по часам суток, {u}", summary["hourly"], "#7C5CF5"),
+        ("Выпуск по оборудованию", summary["by_equipment"][:10], "#3FBF94"),
+        ("Топ продуктов", summary["top_products"][:10], "#F0A63C"),
+        ("Выпуск по сотрудникам", summary.get("top_employees", [])[:10], "#2A78D6"),
     ]
     story.append(Paragraph("Графики", h2))
-    for name, items, color_hex, target in charts:
+    for name, items, color_hex in charts:
         story.append(KeepTogether([
-            Paragraph(name + (f" · средняя {target} {rate}" if target else ""), body),
-            _bar_drawing(items, width, 132, font, color_hex, target),
+            Paragraph(name, body),
+            _bar_drawing(items, width, 132, font, color_hex),
             Spacer(1, 3 * mm)]))
 
     pie_palette = ["#2A78D6", "#EB6834", "#1BAF7A", "#EDA100", "#E87BA4", "#008300", "#4A3AA7", "#E34948"]

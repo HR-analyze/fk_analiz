@@ -1,7 +1,6 @@
 // Валидированная категориальная палитра (dataviz: все гейты пройдены на светлой поверхности).
 const PIE_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300',
                     '#4a3aa7', '#e34948', '#0f766e', '#9a3412', '#6d28d9', '#be123c'];
-const BELOW_COLOR = '#e34948';   // статусный: час ниже средней
 const GHOST_COLOR = '#dde3ec';   // прошлый период: светлый столбец за текущим
 const $ = (id) => document.getElementById(id);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -155,26 +154,18 @@ function heatTone(change) {
 
 function renderHourlyLfl(lfl, data) {
   const el = $('hourlyLfl');
-  if (!data.hourly_target) { el.innerHTML = ''; return; }
-  const ok = lfl && lfl.available && !lfl.prev_empty;
-  const h = ok ? lfl.hourly : null;
-  const stat = (label, value, extra) =>
-    `<div class="hstat"><div class="hs-label">${esc(label)}</div><div class="hs-value">${value}</div>` +
-    `<div class="hs-extra">${extra}</div></div>`;
-  const stats = '<div class="hstats">' +
-    stat(`Средняя, ${RATE}`, esc(dec(data.hourly_target)),
-         ok ? `${trend(h.target_change, 1)}<span>было ${esc(dec(h.prev_target))}</span>` : '<span>за период</span>') +
-    stat('Часов ниже средней', esc(num(data.hourly_below)),
-         ok ? `${trend(data.hourly_below - h.prev_below, -1, 'h')}<span>было ${esc(num(h.prev_below))}</span>` : '<span>красные столбцы</span>') +
-    '</div>';
-  if (!ok) { el.innerHTML = stats; return; }
+  if (!lfl?.available || lfl.prev_empty || !data.hourly.some((h) => h.value > 0)) {
+    el.innerHTML = '';
+    return;
+  }
+  const h = lfl.hourly;
   const cells = data.hourly.map((x, i) => {
     const c = x.lfl_change;
     const text = c === null || c === undefined ? '—' : (c > 0 ? '+' : c < 0 ? '−' : '') + Math.round(Math.abs(c));
-    const tip = `${x.label}: ${dec(x.value)} ${RATE} · прошлый период: ${dec(x.lfl_value)} ${RATE}, ${pctText(c)}`;
+    const tip = `${x.label}: ${dec(x.value)} ${UNIT} · прошлый период: ${dec(x.lfl_value)} ${UNIT}, ${pctText(c)}`;
     return `<div class="hc ${heatTone(c)}" data-tip="${esc(tip)}"><span>${String(i).padStart(2, '0')}</span><b>${esc(text)}</b></div>`;
   }).join('');
-  el.innerHTML = `<div class="lfl-title">К прошлому периоду ${esc(lfl.prev_label)}</div>` + stats +
+  el.innerHTML = `<div class="lfl-title">К прошлому периоду ${esc(lfl.prev_label)}</div>` +
     `<div class="heat-head"><span>По часам, % к тому же часу</span><span>лучше в <b>${num(h.better)}</b> ч · хуже в <b>${num(h.worse)}</b> ч</span></div>` +
     `<div class="heat">${cells}</div>` +
     '<div class="heat-key"><span><i class="hc up2"></i><i class="hc up1"></i>лучше</span>' +
@@ -199,9 +190,8 @@ function barChart(items, opts = {}) {
   const padB = rotate ? Math.min(narrow ? 78 : 92, Math.round(26 + longest * (narrow ? 12 : 11.5) * 0.45)) : 38;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
-  const target = Number(opts.target) || 0;
   const compare = opts.compare || [];
-  const max = niceMax(Math.max(...items.map((i) => i.value), ...compare.map((v) => Number(v) || 0), target));
+  const max = niceMax(Math.max(...items.map((i) => i.value), ...compare.map((v) => Number(v) || 0)));
   const slot = plotW / items.length;
   // С прошлым периодом рисуем «столбец в столбце»: широкий светлый — было,
   // узкий цветной поверх — стало. Так видно без засечек, выросли или просели.
@@ -222,14 +212,11 @@ function barChart(items, opts = {}) {
     const h = max ? (item.value / max) * plotH : 0;
     const x = padL + slot * i + (slot - curW) / 2;
     const y = padT + plotH - h;
-    const below = target > 0 && item.value > 0 && item.value < target;
-    const fill = below ? BELOW_COLOR : color;
     const active = opts.activeValue !== undefined && String(item.key ?? item.label) === String(opts.activeValue);
     const attrs = opts.filterKey
       ? ` data-filter="${esc(opts.filterKey)}" data-value="${esc(item.key ?? item.label)}" role="button" tabindex="0"`
       : '';
     const tip = `${item.label}: ${dec(item.value)}${opts.unit ? ' ' + opts.unit : ''}`
-      + (below ? ` · ниже средней на ${dec(target - item.value)}` : '')
       + (opts.compareTip ? opts.compareTip(i) : '');
     // Прозрачная зона на всю колонку — палец на мобилке попадает даже мимо самого столбца.
     parts.push(`<rect class="hit${opts.filterKey ? ' clickable' : ''}${active ? ' active' : ''}" x="${(padL + slot * i).toFixed(1)}" y="${padT}" width="${slot.toFixed(1)}" height="${plotH}" fill="transparent"${attrs} data-tip="${esc(tip)}"/>`);
@@ -239,7 +226,7 @@ function barChart(items, opts = {}) {
       const gx = padL + slot * i + (slot - barW) / 2;
       parts.push(`<rect x="${gx.toFixed(1)}" y="${(padT + plotH - gh).toFixed(1)}" width="${barW.toFixed(1)}" height="${Math.max(gh, 2).toFixed(1)}" rx="4" fill="${GHOST_COLOR}" pointer-events="none"/>`);
     }
-    parts.push(`<rect class="bar${active ? ' active' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${curW.toFixed(1)}" height="${Math.max(h, item.value > 0 ? 2 : 0).toFixed(1)}" rx="${paired ? 3 : 4}" fill="${fill}"${paired ? ' stroke="#fff" stroke-width="1.5"' : ''} pointer-events="none"/>`);
+    parts.push(`<rect class="bar${active ? ' active' : ''}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${curW.toFixed(1)}" height="${Math.max(h, item.value > 0 ? 2 : 0).toFixed(1)}" rx="${paired ? 3 : 4}" fill="${color}"${paired ? ' stroke="#fff" stroke-width="1.5"' : ''} pointer-events="none"/>`);
     if (i % labelEvery === 0) {
       const lx = padL + slot * i + slot / 2;
       if (rotate) {
@@ -250,13 +237,6 @@ function barChart(items, opts = {}) {
       }
     }
   });
-
-  if (target > 0) {
-    const ty = padT + plotH - (target / max) * plotH;
-    parts.push(`<line x1="${padL}" y1="${ty.toFixed(1)}" x2="${W - padR}" y2="${ty.toFixed(1)}" stroke="#101828" stroke-width="1.5" stroke-dasharray="6 4" pointer-events="none"/>`);
-    const ly = ty - 7 < padT + 10 ? ty + 15 : ty - 7;
-    parts.push(`<text x="${W - padR - 2}" y="${ly.toFixed(1)}" text-anchor="end" font-size="${font}" font-weight="700" fill="#101828" stroke="#fff" stroke-width="4" stroke-linejoin="round" paint-order="stroke" pointer-events="none">средняя ${esc(dec(target))}</text>`);
-  }
 
   parts.push(`<line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#d9dfe8" stroke-width="1" pointer-events="none"/>`);
   return `<svg viewBox="0 0 ${W} ${H}" role="img">${parts.join('')}</svg>`;
@@ -337,7 +317,7 @@ function renderKpis(k, lfl) {
     ['Операций', num(k.operations), '', k.open_operations ? `из них открыто: ${num(k.open_operations)}` : 'за период', 'operations', 0, num],
     ['Выпуск', num(k.quantity), UNIT, 'всего', 'quantity', 1, (v) => num(v) + ' ' + UNIT],
     ['Средняя длит.', num(k.avg_duration), 'мин', 'на операцию', 'avg_duration', 0, (v) => num(v) + ' мин'],
-    ['Производительность', dec(k.avg_rate), RATE, 'средняя', 'avg_rate', 1, (v) => dec(v) + ' ' + RATE],
+    ['Производительность', dec(k.avg_rate), RATE, 'выпуск / время работы', 'avg_rate', 1, (v) => dec(v) + ' ' + RATE],
     ['Простои', num(k.pauses), '', `суммарно ${hm(k.stop_minutes)}`, 'pauses', -1, num],
     ['Коэф. использования', dec(k.utilization), '%', 'работа / (работа + простои)', 'utilization', 1, (v) => dec(v) + '%'],
   ];
@@ -833,16 +813,14 @@ function render(data) {
 
   $('chartHourly').innerHTML = barChart(
     data.hourly.map((h, i) => ({ label: h.label, key: String(i), value: h.value })),
-    { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: RATE,
-      target: data.hourly_target, activeValue: FILTERS.hour,
+    { color: '#7c5cf5', rotate: true, filterKey: 'hour', unit: UNIT,
+      activeValue: FILTERS.hour,
       compareTip: lflOk ? (i) => {
         const h = data.hourly[i];
-        return ` · прошлый период: ${dec(h.lfl_value)} ${RATE}, ${pctText(h.lfl_change)}`;
-      } : null })
-    + (data.hourly_target ? chartLegend([['box', '#7c5cf5', 'выше средней'], ['box', BELOW_COLOR, 'ниже средней'],
-                                         ['dash', '#101828', 'средняя']]) : '');
+        return ` · прошлый период: ${dec(h.lfl_value)} ${UNIT}, ${pctText(h.lfl_change)}`;
+      } : null });
   renderHourlyLfl(lfl, data);
-  $('hourlyNote').textContent = `${RATE} · нажми на столбец`;
+  $('hourlyNote').textContent = `${UNIT} · нажми на столбец`;
 
   const cap = isNarrow() ? 8 : 12;
   $('chartEquipment').innerHTML = barChart(data.by_equipment.slice(0, cap),
