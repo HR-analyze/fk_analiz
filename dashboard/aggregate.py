@@ -359,17 +359,16 @@ def kpi_block(production, pauses):
     durations = [duration_min(r["start_time"], r["end_time"]) for r in production]
     work_minutes = sum(durations)
     stop_minutes = sum(duration_min(r["start_time"], r["end_time"]) for r in pauses)
-    rates = [
-        r["qty"] / (duration_min(r["start_time"], r["end_time"]) / 60)
-        for r in production
-        if r["qty"] > 0 and duration_min(r["start_time"], r["end_time"]) > 0
-    ]
+    timed_output = [(r["qty"], minutes) for r, minutes in zip(production, durations)
+                    if r["qty"] > 0 and minutes > 0]
+    output_minutes = sum(minutes for _, minutes in timed_output)
+    output_qty = sum(qty for qty, _ in timed_output)
     total = work_minutes + stop_minutes
     return {
         "operations": len(production),
         "quantity": _q(sum(r["qty"] for r in production)),
         "avg_duration": round(_avg(durations)),
-        "avg_rate": round(_avg(rates), 1),
+        "avg_rate": round(output_qty * 60 / output_minutes, 1) if output_minutes else 0.0,
         "pauses": len(pauses),
         "stop_minutes": stop_minutes,
         "work_minutes": work_minutes,
@@ -632,7 +631,7 @@ def lfl_lines(lfl, k, qty_unit="шт"):
         rows.append(line if line.endswith(".") else line + ".")
     h = lfl.get("hourly") or {}
     if h.get("better") or h.get("worse"):
-        rows.append(f"По часам: выше прошлого периода в {h['better']} ч, ниже — в {h['worse']} ч.")
+        rows.append(f"Выпуск по часам суток: выше прошлого периода в {h['better']} ч, ниже — в {h['worse']} ч.")
     return rows
 
 
@@ -658,7 +657,7 @@ def build_analysis(summary, filters=None):
     period = [
         f"Операций за период: {k['operations']}, из них открытых: {k['open_operations']}.",
         f"Выпуск: {n(k['quantity'])} {u}.",
-        f"Средняя длительность операции: {k['avg_duration']} мин, средняя производительность: {k['avg_rate']} {rate}.",
+        f"Средняя длительность операции: {k['avg_duration']} мин, производительность за период: {k['avg_rate']} {rate}.",
         f"Простоев зафиксировано: {k['pauses']}, суммарно {n(k['stop_minutes'])} мин.",
         f"Коэффициент использования: {k['utilization']}% (работа {n(k['work_minutes'])} мин, простои {n(k['stop_minutes'])} мин).",
     ]
@@ -698,18 +697,6 @@ def build_analysis(summary, filters=None):
         if items:
             blocks.append((title, [f"{i + 1}. {x['label']} — {n(x['value'])} {unit}{share(x['value'])}"
                                    for i, x in enumerate(items)]))
-
-    target = summary.get("hourly_target", 0)
-    if target:
-        below = [h["label"] for h in summary["hourly"] if 0 < h["value"] < target]
-        rows = [f"Средняя производительность по часам: {target} {rate}.",
-                f"Часов с производительностью ниже средней: {len(below)}."]
-        if below:
-            rows.append("Это часы: " + ", ".join(below) + ".")
-        idle = [h["label"] for h in summary["hourly"] if h["value"] == 0]
-        if idle:
-            rows.append(f"Часов без выпуска: {len(idle)} ({', '.join(idle)}).")
-        blocks.append(("Производительность по часам", rows))
 
     reasons = summary["pause_reasons"]
     if reasons:
